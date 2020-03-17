@@ -3,6 +3,9 @@
 #   https://towardsdatascience.com/analyzing-coronavirus-covid-19-data-using-pandas-and-plotly-2e34fe2c4edc
 #
 # Some plots at the end by David Rowe 2020
+#
+# usage:
+#   $ ./covid19.py
 
 ## Import Libraries
 import numpy as np
@@ -96,7 +99,7 @@ last_days = 14
 def plot_cases(country, sub_plot, data):
     x = np.arange(1,last_days+1)
     y = np.array(data['Total Confirmed Cases'])[-last_days:]
-    plt.subplot(sub_plot); plt.plot(x,y); plt.ylabel(country + ' Cases');
+    plt.subplot(sub_plot); plt.plot(x,y); plt.title(country + ' Cases');
     plt.grid()
 
 # a linear slope on a log plot means exponential growth which is bad
@@ -113,7 +116,6 @@ def plot_doubling(country, data):
     t = 3
     cases = np.array(data['Total Confirmed Cases'], dtype=float)[-last_days-t:]
     ratio = np.log2(cases[t:]/cases[0:-t])
-    print(cases.size, ratio.size,ratio)
     # do something sensible just in case we get a 0 ratio
     ratio[ratio  == 0] = 1000
     Td = t/ratio
@@ -123,7 +125,8 @@ def plot_doubling(country, data):
     
 today = date.today()
 
-plt.figure(1)
+plt.figure(1,figsize=(8,6))
+plt.tight_layout()
 plot_cases("Australia", "221", AustraliaGrowth)
 plot_cases("US", "222", USGrowth)
 plot_cases("Italy", "223", ItalyGrowth)
@@ -131,7 +134,7 @@ plot_cases("Spain", "224", SpainGrowth)
 plt.suptitle('Total Cases ' + today.strftime("%B %d, %Y"))
 plt.savefig("cases.png")
 
-plt.figure(2)
+plt.figure(2,figsize=(8,6))
 plot_logcases("Australia", AustraliaGrowth)
 plot_logcases("US", USGrowth)
 plot_logcases("Italy", ItalyGrowth)
@@ -140,7 +143,7 @@ plt.title('Total Cases ' + today.strftime("%B %d, %Y"))
 plt.savefig("logcases.png")
 plt.grid()
 
-plt.figure(3)
+plt.figure(3,figsize=(8,6))
 plot_doubling("Australia", AustraliaGrowth)
 plot_doubling("US", USGrowth)
 plot_doubling("Italy", ItalyGrowth)

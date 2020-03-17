@@ -17,6 +17,7 @@ from plotly.subplots import make_subplots
 plt.rcParams['figure.figsize'] = [15, 5]
 from IPython import display
 from ipywidgets import interact, widgets
+from datetime import date
 
 ## Read Data for Cases, Deaths and Recoveries
 ConfirmedCases_raw=pd.read_csv('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv')
@@ -87,27 +88,66 @@ AustraliaGrowth=AustraliaFirstCase[AustraliaFirstCase.ne(0)].dropna().reset_inde
 USGrowth=USFirstCase[USFirstCase.ne(0)].dropna().reset_index()
 SpainGrowth=SpainFirstCase[SpainFirstCase.ne(0)].dropna().reset_index()
 
-# Plotting stuff
+# Plotting stuff ----------------------------------------------------
+
+# this is moving fast, and early data is noisey, we just want the last few days
+last_days = 14
 
 def plot_cases(country, sub_plot, data):
-    plt.subplot(sub_plot); plt.plot(data.index,data['Total Confirmed Cases']); plt.ylabel(country + 'Cases');
+    x = np.arange(1,last_days+1)
+    y = np.array(data['Total Confirmed Cases'])[-last_days:]
+    plt.subplot(sub_plot); plt.plot(x,y); plt.ylabel(country + ' Cases');
     plt.grid()
 
+# a linear slope on a log plot means exponential growth which is bad
 def plot_logcases(country, data):
-    plt.plot(data.index,np.log10(data['Total Confirmed Cases']),label=country);
+    x = np.arange(1,last_days+1)
+    y = np.array(data['Total Confirmed Cases'])[-last_days:]
+    plt.semilogy(x,y,label=country);
     plt.legend()
     
+# N(t)=N(0)*2**(t/Td)
+# Td = t/log2(N(t)/N(0)
+def plot_doubling(country, data):
+    # estimate over a window of 3 days so not too noisey
+    t = 3
+    cases = np.array(data['Total Confirmed Cases'], dtype=float)[-last_days-t:]
+    ratio = np.log2(cases[t:]/cases[0:-t])
+    print(cases.size, ratio.size,ratio)
+    # do something sensible just in case we get a 0 ratio
+    ratio[ratio  == 0] = 1000
+    Td = t/ratio
+    x = np.arange(1,ratio.size+1)
+    plt.plot(x,Td,label=country);
+    plt.legend()
+    
+today = date.today()
+
 plt.figure(1)
 plot_cases("Australia", "221", AustraliaGrowth)
 plot_cases("US", "222", USGrowth)
 plot_cases("Italy", "223", ItalyGrowth)
 plot_cases("Spain", "224", SpainGrowth)
-plt.show(block=False)
+plt.suptitle('Total Cases ' + today.strftime("%B %d, %Y"))
+plt.savefig("cases.png")
 
 plt.figure(2)
 plot_logcases("Australia", AustraliaGrowth)
 plot_logcases("US", USGrowth)
 plot_logcases("Italy", ItalyGrowth)
 plot_logcases("Spain", SpainGrowth)
+plt.title('Total Cases ' + today.strftime("%B %d, %Y"))
+plt.savefig("logcases.png")
+plt.grid()
+
+plt.figure(3)
+plot_doubling("Australia", AustraliaGrowth)
+plot_doubling("US", USGrowth)
+plot_doubling("Italy", ItalyGrowth)
+plot_doubling("Spain", SpainGrowth)
+plt.ylabel("Doubling Time (days)");
+plt.title('Doubling Time ' + today.strftime("%B %d, %Y"))
+plt.savefig("doublingtime.png")
 plt.grid()
 plt.show()
+

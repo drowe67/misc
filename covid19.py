@@ -1,4 +1,4 @@
-# covid19.py
+#!/usr/bin/python3
 # Most of this code came from Mohammad Ashhad - Thanks:
 #   https://towardsdatascience.com/analyzing-coronavirus-covid-19-data-using-pandas-and-plotly-2e34fe2c4edc
 #
@@ -87,7 +87,27 @@ AustraliaGrowth=AustraliaFirstCase[AustraliaFirstCase.ne(0)].dropna().reset_inde
 USGrowth=USFirstCase[USFirstCase.ne(0)].dropna().reset_index()
 SpainGrowth=SpainFirstCase[SpainFirstCase.ne(0)].dropna().reset_index()
 
-print(AustraliaGrowth)
+# Plotting stuff
+
+def plot_cases(country, sub_plot, data):
+    plt.subplot(sub_plot); plt.plot(data.index,data['Total Confirmed Cases']); plt.ylabel(country + 'Cases');
+    plt.grid()
+
+def plot_logcases(country, data):
+    plt.plot(data.index,np.log10(data['Total Confirmed Cases']),label=country);
+    plt.legend()
+    
 plt.figure(1)
-plt.plot(AustraliaGrowth.index,AustraliaGrowth['Total Confirmed Cases'])
+plot_cases("Australia", "221", AustraliaGrowth)
+plot_cases("US", "222", USGrowth)
+plot_cases("Italy", "223", ItalyGrowth)
+plot_cases("Spain", "224", SpainGrowth)
+plt.show(block=False)
+
+plt.figure(2)
+plot_logcases("Australia", AustraliaGrowth)
+plot_logcases("US", USGrowth)
+plot_logcases("Italy", ItalyGrowth)
+plot_logcases("Spain", SpainGrowth)
+plt.grid()
 plt.show()

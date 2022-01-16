@@ -1,0 +1,9 @@
+time,latitude,longitude,bearing,noise,comment
+1330, -34.887, 138.526,   0, -127, "Don Kleabe"
+1500, -35.167, 138.574, 344, -140, "Onkaparinga Chapel Hill Rd"
+1520, -35.166, 138.583, 360, -140, "Onkaparinga Hardies Scrub"
+1520, -35.080, 138.666,   0, -138, "Scott Creek harmonic noise"
+1520, -35.085, 138.681,   0, -133, "Scott Creek Mathews Rd harmonic noise"
+1520, -34.884, 138.931,   0, -133, "Onkaparinga Valley Rd Industrial site harmonic noise"
+1520, -34.774, 138.962,   0, -142, "Cromer"
+1520, -34.710, 138.960,   0, -143, "Jenkins scrub"

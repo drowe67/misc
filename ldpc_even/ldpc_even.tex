@@ -2,11 +2,31 @@
 \usepackage{amsmath}
 \begin{document}
 
-In LDPC decoders, the expression:
+In LDPC decoders, the Lemma:
 \begin{equation} \label{eq:prob_even}
 P_{even}^{m}=\frac{1}{2}+\frac{1}{2}\prod_{i=1}^{m}(1-2p_{i})
 \end{equation}
-is used to determine the probability that an even number of bits are $1$, given $m$ bits, and the probability of bit $i$ being $1$ is $p_i$.  A proof is provided in \cite{gallager1963low}, however the introductory paper \cite{ryan2004introduction} suggests using induction which is the approach taken here.
+is used to determine the probability that in a sequence of $m$ bits, an even number of bits are equal to $1$, given the probability of bit $i$ being $1$ is $p_i$.  A proof is provided in \cite{gallager1963low}, however the introductory paper \cite{ryan2004introduction} suggests using induction which is the approach taken here.
+
+For single bit $m=1$ case, $bit_{1}=0$ is the only outcome with an even number (zero) of bits set to $1$, therefore $P_{even}^{1}=prob(bit_{1}=0)=1-p_{1}$.  Expanding (\ref{eq:prob_even}) for $m=1$ gives the same result, proving the Lemma for $m=1$.
+
+Now consider the case of a sequence of $m$ bits followed by one additional bit $m+1$.  $P_{even}^{m+1}$ will occur if there is a string of $m$ bits with an even number of ones followed by $bit_{m+1}=0$, or a string of $m$ bits with an odd number of ones followed by $bit_{m+1}=1$:
+\begin{equation} \label{eq:prob_m1}
+\begin{split}
+P_{even}^{m+1}&=P_{even}^{m}(1-p_{m+1})+(1-P_{even}^{m})p_{m+1} \\
+&=P_{even}^{m}(1-2p_{m+1})+p_{m+1}
+\end{split}
+\end{equation}
+Expanding (\ref{eq:prob_even}) for $m+1$, and noting that $\frac{1}{2}\prod_{i=1}^{m}(1-2p_{i})=P_{even}^{m}-\frac{1}{2}$:
+\begin{equation}
+\begin{split}
+P_{even}^{m+1}&=\frac{1}{2}+\frac{1}{2}((1-2p_{1})...(1-2p_{m})(1-2p_{m+1})) \\
+&=\frac{1}{2}+\frac{1}{2}\prod_{i=1}^{m}(1-2p_{i})(1-2p_{m+1}) \\
+&=\frac{1}{2}+(P_{even}^{m}-\frac{1}{2})(1-2p_{m+1}) \\
+&=P_{even}^{m}(1-2p_{m+1})+p_{m+1}
+\end{split}
+\end{equation}
+which agrees with (\ref{eq:prob_m1}), proving that (\ref{eq:prob_even}) is correct for $m+1$ bits, given it is correct for $m$ bits.  Combined with the $m=1$ case this proves the Lemma for all $m$.
 
 \bibliographystyle{plain}
 \bibliography{ldpc_even_refs}

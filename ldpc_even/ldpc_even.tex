@@ -1,0 +1,13 @@
+\documentclass{article}
+\usepackage{amsmath}
+\begin{document}
+
+In LDPC decoders, the expression:
+\begin{equation} \label{eq:prob_even}
+P_{even}^{m}=\frac{1}{2}+\frac{1}{2}\prod_{i=1}^{m}(1-2p_{i})
+\end{equation}
+is used to determine the probability that an even number of bits are $1$, given $m$ bits, and the probability of bit $i$ being $1$ is $p_i$.  A proof is provided in \cite{gallager1963low}, however the introductory paper \cite{ryan2004introduction} suggests using induction which is the approach taken here.
+
+\bibliographystyle{plain}
+\bibliography{ldpc_even_refs}
+\end{document}

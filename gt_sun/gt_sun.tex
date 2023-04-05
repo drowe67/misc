@@ -1,0 +1,30 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{url}
+\begin{document}
+
+The power received by pointing an antenna at the sun $P_{sun}$, and a quiet area of sky $P_{quiet}$ is used commonly used to estimate receiver $G/T$ \cite{flagg2006_det_gt}.  The power delivered to the receiver for each measurement is:
+\begin{equation}
+\begin{split}
+P_{sun} &= (T_{sun}+T)G \\
+P_{quiet} &= TG 
+\end{split}
+\end{equation}
+where $G$ is the antenna gain and $T$ is the system noise temperature; the sum of all noise temperature sources such as feedline losses, LNA, ground spillover, and sky noise. The $Y$ factor is the ratio of the two  measurements:
+\begin{equation}
+\begin{split}
+Y &= \frac{P_{sun}}{P_{quiet}} \\
+  &= \frac{(T_{sun}+T)G}{TG} \\
+  &= \frac{T_{sun}+T}{T} 
+\end{split}
+\end{equation}
+Solving for $T$ we have:
+\begin{equation} \label{eq:T}
+T = \frac{T_{sun}}{Y-1}
+\end{equation}
+
+Expanding (\ref{eq:T})
+
+\bibliographystyle{plain}
+\bibliography{gt_sun_refs}
+\end{document}

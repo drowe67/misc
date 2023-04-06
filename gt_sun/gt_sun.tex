@@ -1,9 +1,32 @@
 \documentclass{article}
 \usepackage{amsmath}
 \usepackage{hyperref}
+\usepackage{tikz}
 \begin{document}
 
-The power received by pointing an antenna at the sun $P_{sun}$, and a quiet area of sky $P_{quiet}$ is used commonly used to estimate receiver $G/T$ \cite{flagg2006_det_gt}.  The power in Watts delivered to the receiver for each measurement is:
+\begin{center}
+
+\begin{tikzpicture}
+\draw (1,2) -- (2,2);
+\draw (2.5,0.75) -- (2.5,1.5);
+\draw (2.5,2) circle (0.5);
+\draw (2.25,2) -- (2.75,2);
+\draw (2.5,1.75) -- (2.5,2.25);
+\draw (3,2) -- (4,2);
+\draw (4,1.5) rectangle (5,2.5);
+\draw (5,2) -- (6,2) -- (6,1.5);
+\draw (5.75,1.5) rectangle (6.25,0.5);
+\draw (6,0.5) -- (6,0);
+\draw (5.75,0) -- (6.25,0);
+
+\node[] at (0.5,2) {$P_{sun}$};
+\node[] at (2.5,0.5) {$P_{quiet}$};
+\node[] at (4.5,2) {$G$};
+\node[align=right] at (6.75,1) {Rx};
+\end{tikzpicture}
+\end{center}
+
+The power received by pointing an antenna at the sun $P_{sun}$ and a quiet area of sky $P_{quiet}$ is used commonly used to estimate receiver $G/T$ \cite{flagg2006_det_gt}.  The power in Watts delivered to the receiver Rx for each measurement is:
 \begin{equation}
 \begin{split}
 P_{sun} &= (kT_{sun}B+kTB)G \\

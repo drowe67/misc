@@ -1,16 +1,16 @@
 \documentclass{article}
 \usepackage{amsmath}
-\usepackage{url}
+\usepackage{hyperref}
 \begin{document}
 
-The power received by pointing an antenna at the sun $P_{sun}$, and a quiet area of sky $P_{quiet}$ is used commonly used to estimate receiver $G/T$ \cite{flagg2006_det_gt}.  The power delivered to the receiver for each measurement is:
+The power received by pointing an antenna at the sun $P_{sun}$, and a quiet area of sky $P_{quiet}$ is used commonly used to estimate receiver $G/T$ \cite{flagg2006_det_gt}.  The power in Watts delivered to the receiver for each measurement is:
 \begin{equation}
 \begin{split}
 P_{sun} &= (kT_{sun}B+kTB)G \\
 P_{quiet} &= kTBG 
 \end{split}
 \end{equation}
-where $G$ is the antenna gain referenced to an isotropic antenna and $T$ is the system noise temperature; the sum of all noise temperature sources such as feedline losses, LNA, ground spillover, and sky noise, and $T_{sun}$ is the noise temperature of the sun at the time of the measurement. The $Y$ factor is the ratio of the two  measurements:
+where $G$ is the antenna power gain referenced to an isotropic antenna and $T$ is the system noise temperature; the sum of all noise temperature sources such as feedline losses, LNA, ground spillover, and sky noise, and $T_{sun}$ is the noise temperature of the sun at the time of the measurement. The $Y$ factor is the ratio of the two  measurements:
 \begin{equation}
 \begin{split}
 Y &= \frac{P_{sun}}{P_{quiet}} \\
@@ -33,7 +33,7 @@ A_e = A_e^{iso}G \\
 A_e = \frac{\lambda^2}{4\pi}G
 \end{split}
 \end{equation}
-where $A_e^{iso}$ is the effective area of an isotropic antenna and $G$ is the antenna gain referenced to an isotropic antenna in dBi. Substituting (\ref{eq:Ea}) into (\ref{eq:Psun}):
+where $A_e^{iso}$ is the effective area of an isotropic antenna and $G$ is the ratio of the antenna power gain to an isotropic antenna (note linear power gain, not dBi). Substituting (\ref{eq:Ea}) into (\ref{eq:Psun}):
 \begin{equation}
 P_{sun} = \frac{F\lambda^2G}{8\pi}
 \end{equation}
@@ -49,7 +49,7 @@ Re-arranging we obtain the commonly used expression for estimating $G/T$ from $P
 \begin{equation}
 G/T = \frac{8\pi k(P_{sun}/P_{quiet}-1)}{F\lambda^2}
 \end{equation}
-
+Note that $P_{sun}$ and $P_{quiet}$ are in Watts (not dBW or dBm), and $G/T$ is a linear power ratio in Watts/K, commonly converted to dB and expressed as dB/K.
 \bibliographystyle{plain}
 \bibliography{gt_sun_refs}
 \end{document}

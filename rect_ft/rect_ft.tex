@@ -1,0 +1,58 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{tikz}
+\begin{document}
+
+\title{Fourier Transforms of Rectangular Functions}
+\maketitle
+
+Consider a rectangular function in continuous time \cite{wikipedia_rect}:
+\begin{equation}
+rect(t)= 
+	\begin{cases}
+      1, & |t| <= T/2 \\
+      0, & |t| > T/2
+	\end{cases}
+\end{equation}
+The continuous time, continuous frequency Fourier Transform is given by:
+\begin{equation} \label{eq:ctcf}
+\begin{split}
+X(f) &= \int_{-\infty}^{\infty} rect(t)e^{-j2 \pi ft} \\
+     &= \int_{-T/2}^{T/2} e^{-j 2 \pi ft} \\
+     &= \left[ \frac{1}{-j 2 \pi f} e^{-j 2 \pi ft} \right]_{-T/2}^{T/2} \\
+     &= \frac{1}{-j 2 \pi f} \left[  e^{-j 2 \pi f \frac{T}{2}} - e^{j 2 \pi f \frac{T}{2}} \right] \\
+     &= \frac{sin(\pi f T)}{\pi f}
+\end{split}
+\end{equation}
+Consider a rectangular function in discrete time:
+\begin{equation}
+rect(n)= 
+	\begin{cases}
+      1, & n < N \\
+      0, & otherwise
+	\end{cases}
+\end{equation}
+The discrete time, continuous frequency Fourier Transform is given by:
+\begin{equation}
+\begin{split}
+                     X(w) &= \sum_{n=0}^{N-1} e^{-j \omega n} \\
+                          &= e^{-j \omega 0} + e^{-j \omega 1} + ... + e^{-j \omega (N-1)} \\
+       e^{-j \omega} X(w) &= e^{-j \omega} + e^{-j \omega 2} + e^{-j \omega 3} + ... + e^{-j \omega N} \\
+X(w) - e^{-j \omega} X(w) &= 1 - e^{-j \omega N} \\
+                     X(w) &= \frac{1 - e^{-j \omega N}}{1 - e^{-j \omega}} \\
+\frac{e^{j \frac{\omega N}{2}}}{e^{j \frac{\omega}{2}}} X(w) &= \frac{e^{j \frac{\omega N}{2}}(1 - e^{-j \omega N})}{e^{j \frac{\omega}{2}}(1 - e^{-j \omega})} \\
+e^{j \frac{\omega (N-1)}{2}} X(w) &= \frac{e^{j \frac{\omega N}{2}} - e^{-j \frac{\omega N}{2}}}{e^{j \frac{\omega}{2}} - e^{-j \frac{\omega}{2}}} \\
+X(w) &= e^{-j \frac{\omega (N-1)}{2}} \frac{sin(\frac{\omega N}{2})}{sin(\frac{\omega}{2})}
+\end{split}
+\end{equation}
+Which can be interpreted as a complex, unit magnitude phase shift (delay) term multiplied by a real valued magnitude term.  For small $\omega$, the denominator term $sin(a) \approx a$, which results in a magnitude spectrum similar to Equation \ref{eq:ctcf}.
+
+In deriving Equation \ref{eq:ctcf}, a simpler approach is to use the identity for the sum of a geometric series:
+\begin{equation} \label{eq_geosum}
+\sum_{k=0}^{K-1} ar^k = a \left( \frac{1-r^n}{1-r} \right)
+\end{equation}
+
+\bibliographystyle{plain}
+\bibliography{rect_ft_refs}
+\end{document}

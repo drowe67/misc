@@ -7,6 +7,8 @@
 \title{Fourier Transforms of Rectangular Functions}
 \maketitle
 
+\section{Continuous Time Continuous Frequency}
+
 Consider a rectangular function in continuous time \cite{wikipedia_rect}:
 \begin{equation}
 rect(t)= 
@@ -18,13 +20,16 @@ rect(t)=
 The continuous time, continuous frequency Fourier Transform is given by:
 \begin{equation} \label{eq:ctcf}
 \begin{split}
-X(f) &= \int_{-\infty}^{\infty} rect(t)e^{-j2 \pi ft} \\
-     &= \int_{-T/2}^{T/2} e^{-j 2 \pi ft} \\
+X(f) &= \int_{-\infty}^{\infty} rect(t)e^{-j2 \pi ft} dt\\
+     &= \int_{-T/2}^{T/2} e^{-j 2 \pi ft} dt \\
      &= \left[ \frac{1}{-j 2 \pi f} e^{-j 2 \pi ft} \right]_{-T/2}^{T/2} \\
      &= \frac{1}{-j 2 \pi f} \left[  e^{-j 2 \pi f \frac{T}{2}} - e^{j 2 \pi f \frac{T}{2}} \right] \\
      &= \frac{sin(\pi f T)}{\pi f}
 \end{split}
 \end{equation}
+
+\section{Discrete Time Continuous Frequency}
+
 Consider a rectangular function in discrete time:
 \begin{equation}
 rect(n)= 
@@ -33,10 +38,11 @@ rect(n)=
       0, & otherwise
 	\end{cases}
 \end{equation}
-The discrete time, continuous frequency Fourier Transform is given by:
-\begin{equation}
+
+\begin{equation} \label{eq:dtcf}
 \begin{split}
-                     X(w) &= \sum_{n=0}^{N-1} e^{-j \omega n} \\
+                     X(w) &= \sum_{n=-\infty}^{\infty} rect(n) e^{-j \omega n} \\
+                          &= \sum_{n=0}^{N-1} e^{-j \omega n} \\
                           &= e^{-j \omega 0} + e^{-j \omega 1} + ... + e^{-j \omega (N-1)} \\
        e^{-j \omega} X(w) &= e^{-j \omega} + e^{-j \omega 2} + e^{-j \omega 3} + ... + e^{-j \omega N} \\
 X(w) - e^{-j \omega} X(w) &= 1 - e^{-j \omega N} \\
@@ -46,12 +52,100 @@ e^{j \frac{\omega (N-1)}{2}} X(w) &= \frac{e^{j \frac{\omega N}{2}} - e^{-j \fra
 X(w) &= e^{-j \frac{\omega (N-1)}{2}} \frac{sin(\frac{\omega N}{2})}{sin(\frac{\omega}{2})}
 \end{split}
 \end{equation}
-Which can be interpreted as a complex, unit magnitude phase shift (delay) term multiplied by a real valued magnitude term.  For small $\omega$, the denominator term $sin(a) \approx a$, which results in a magnitude spectrum similar to Equation \ref{eq:ctcf}.
+This can be interpreted as a complex term representing a linear phase shift (delay), multiplied by a real valued magnitude term.  For small $\omega$, the denominator term $sin(a) \approx a$, which results in a magnitude spectrum similar to the continuous time Fourier Transform (Equation \ref{eq:ctcf}).
 
-In deriving Equation \ref{eq:ctcf}, a simpler approach is to use the identity for the sum of a geometric series:
+Equation \ref{eq:dtcf} can also be derived using the closed form expression for the sum of a geometric series:
 \begin{equation} \label{eq_geosum}
 \sum_{k=0}^{K-1} ar^k = a \left( \frac{1-r^n}{1-r} \right)
 \end{equation}
+
+\section {Low Pass Filter Design}
+
+Consider a continuous frequency rectangular function:
+\begin{equation} \label{eq:h_omega}
+H(\omega)= 
+	\begin{cases}
+      1, & |\omega| <= B/2 \\
+      0, & otherwise
+	\end{cases}
+\end{equation}
+$H(\omega)$ can be considered an ideal low pass filter for real input signals, with bandwidth $B/2$ radians. The discrete time, continuous frequency inverse Fourier Transform is given by:
+\begin{equation} \label{eq:dtcf_1}
+\begin{split}
+h(n) &= \frac{1}{2 \pi} \int_{-\pi}^{+\pi} H(\omega )e^{j \omega n} d\omega \\
+     &= \frac{1}{2 \pi} \int_{-B/2}^{+B/2} e^{j \omega n} d\omega \\
+     &= \frac{1}{2 \pi jn} \left[ e^{j \omega B/2} - e^{-j \omega B/2} \right] \\
+     &= \frac{sin \left( \frac{nB}{2} \right) }{\pi n} \\
+     &= \left( \frac{\frac{B}{2 \pi}}{\frac{B}{2 \pi}} \right ) \frac{sin \left( \frac{nB}{2} \right) }{\pi n} \\
+     &= \frac{B}{2 \pi} sinc \left( \frac{nB}{2} \right) \\
+\end{split}
+\end{equation}
+The infinite length even sequence $h(n)$ can be considered the time domain impulse response of an ideal low pass filter with cut off frequency $B/2$ radians. In practice filters are limited to $N_{tap}$ taps by applying a tapered window.  This results in non-ideal frequency response, rather than an ideal rectangular (brick wall) filter. A suitable length $N_{tap}$ set of Hanning windowed filter coefficients can be found by:
+\begin{equation}
+\begin{split}
+c(i) &= h \left( i-\frac{N_{tap}-1}{2} \right) w(i) \quad i=0 \ldots N_{tap}-1 \\
+w(i) &= 0.5 - 0.5cos \left( \frac{2 \pi}{N_{tap}-1} \right)
+\end{split}
+\end{equation}
+This expression can be used when $N_{tap}$ is odd or even.
+
+One use case is filtering an OFDM modem signal which has significant side lobe energy at frequencies outside of the carriers. In this use case, we wish to have the filter -1dB point at a frequency just outside the carriers, in order to minimise distortion to the PSK constellation.  For a given $N_{tap}$, the smallest $B/2$ can be found by experiment that produces acceptable distortion of the scatter diagram.
+
+\subsection{Complex Band Pass Filter}
+
+Equation \ref{eq:h_omega} can be considered a low pass filter of bandwidth $B/2$ radians for real valued signals, or a bandpass filter with centre frequency 0 radians and bandwidth $B$ radians for analytic (single sided complex valued) signals. This suggests the low pass prototype filter can be shifted in frequency to construct a bandpass filter for analytic signals. 
+
+Given the low pass prototype coefficients $h(n)$, we wish to design a band pass filter:
+\begin{equation}
+  rect(\omega)= 
+	\begin{cases}
+      1, & \alpha - B/2 <= \omega <= \alpha + B/2 \\
+      0, & otherwise
+	\end{cases}
+\end{equation}
+
+Where $\alpha$ is the centre frequency of the bandpass filter of bandwidth $B$.  Consider the time domain sequence of operations:
+\begin{equation} \label{eq:bandpass_time}
+y(n) = e^{j \alpha n} \sum_{k=0}^{N_{tap}-1} h(k) x(n-k) e^{-j \alpha (n-k)}
+\end{equation}
+Here we frequency shift the input energy in $x(n)$ centred on $\alpha$ down to 0, filter it, and shift the result back up to a centre frequency of $\alpha$, effectively implementing the band pass filter in Equation \ref{eq:h_omega}.  Re-arranging Equation \ref{eq:bandpass_time}:
+\begin{equation} \label{eq:bandpass_time2}
+\begin{split}
+y(n) &= e^{j \alpha n} \sum_{k=0}^{N_{tap}-1}  h(k) x(n-k) e^{-j \alpha n} e^{j \alpha k} \\
+     &= \sum_{k=0}^{N_{tap}-1} h(k) e^{j \alpha k} x(n-k) \\
+     &= \sum_{k=0}^{N_{tap}-1} h_{\alpha}(k) x(n-k) \\
+h_{\alpha}(k) &= h(k) e^{j \alpha k}     
+\end{split}
+\end{equation}
+Note $h_{\alpha}(k)$ is complex, and can be pre-computed from $h(n)$ at initialisation time. An alternative approach to deriving Equation \ref{eq:bandpass_time} would be to find $h_{\alpha}(k)$ directly from the inverse FT of \eqref{eq:h_omega}.
+
+Each operation in the summation is complex so requires $4N_{tap}$ Floating Point Operations (FOPs) to compute each $y(n)$, or for a block of $N$ samples, $4N_{tap}N$ FOPs.  In contrast, Equation \ref{eq:bandpass_time} has real coefficients, so for complex $x(n)$ requires $2N_{tap}$ FOPs to compute each $y(n)$, plus 4 FOPs each for the up and down frequency shifts. For a block of $N$ samples, this is a total of $(2N_{tap}+8)N$ FOPs. Table \ref{eq:bandpass_time} presents the FOPs required to process a 100ms ($N=800$ samples at $Fs=8000 Hz$) block of samples.  In this example the real coefficient algorithm in Equation \ref{eq:bandpass_time} is the most efficient.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{l l }
+ \hline
+ Algorithm & FOPs \\
+ \hline
+ Real $h(k)$ & 320,000 \\ 
+ Complex $h_{\alpha}(k)$ & 166,400 \\
+ \hline
+\end{tabular}
+\caption{Floating Point Operations (FOPs) to bandpass filter a $N=800$ block of samples using a $N_{tap}=100$ filter}
+\label{table:ratek1_mean_E}
+\end{table}
+
+\subsection {Further Work}
+
+CPU analysis.  Note on shifts at end of block rather than sample by sample updates.
+
+Figures showing rectangular function sin time and frequency, block diagram of complex up and down conversion.
+
+Octave script to compare and plot fir1() to \ref{eq:dtcf_1}. Show effect of windowing on frequency response.
+
+Rather than selecting $B/2$ by trial and error, we could find an expression for the windowed FT $X_w(\omega)$, and solve for $B/2$ given $|X_w(\omega)|=10^{-1/20}$, ie based on a (frequency,magnitude) coordinate of the desired -1dB point, where $\omega$ is just outside of the outermost OFDM carrier.  This could be evaluated for any $N_t$, trading off filter performance (and hence the OFDM signal spurious mask) for CPU load.  
+
+The procedure for finding $B/2$ (either experimental or closed form) could also be used to configure external filters, e.g. those available in hardware ADC/DAC chips.
 
 \bibliographystyle{plain}
 \bibliography{rect_ft_refs}

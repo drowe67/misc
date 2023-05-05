@@ -2,6 +2,7 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usepackage{tkz-euclide}
 \begin{document}
 
 \title{Fourier Transforms of Rectangular Functions}
@@ -14,9 +15,22 @@ Consider a rectangular function in continuous time \cite{wikipedia_rect}:
 rect(t)= 
 	\begin{cases}
       1, & |t| <= T/2 \\
-      0, & |t| > T/2
+      0, & otherwise
 	\end{cases}
 \end{equation}
+
+\begin{figure}[h]
+\caption{Rectangular Function in Continuous Time}
+\vspace{5mm}
+\label{fig:rect_time}
+\centering
+\begin{tikzpicture}
+\draw[thick,->] (1,0) -- (5,0) node [below]{t};
+\draw[thick,->] (3,0) -- (3,2) ;
+\draw (2,0) node [below]{$-T/2$} -- (2,1) -- (4,1) -- (4,0) node [below]{$T/2$};
+\end{tikzpicture}
+\end{figure}
+
 The continuous time, continuous frequency Fourier Transform is given by:
 \begin{equation} \label{eq:ctcf}
 \begin{split}
@@ -34,7 +48,7 @@ Consider a rectangular function in discrete time:
 \begin{equation}
 rect(n)= 
 	\begin{cases}
-      1, & n < N \\
+      1, & n=0,1, \ldots N-1 \\
       0, & otherwise
 	\end{cases}
 \end{equation}
@@ -69,6 +83,19 @@ H(\omega)=
       0, & otherwise
 	\end{cases}
 \end{equation}
+
+\begin{figure}[h]
+\caption{Rectangular Function in Continuous Frequency}
+\vspace{5mm}
+\label{fig:rect_freq}
+\centering
+\begin{tikzpicture}
+\draw[thick,->] (1,0) -- (5,0) node [below]{$\omega$};
+\draw[thick,->] (3,0) -- (3,2) ;
+\draw (2,0) node [below]{$-B/2$} -- (2,1) -- (4,1) -- (4,0) node [below]{$B/2$};
+\end{tikzpicture}
+\end{figure}
+
 $H(\omega)$ can be considered an ideal low pass filter for real input signals, with bandwidth $B/2$ radians. The discrete time, continuous frequency inverse Fourier Transform is given by:
 \begin{equation} \label{eq:dtcf_1}
 \begin{split}
@@ -96,19 +123,65 @@ One use case is filtering an OFDM modem signal which has significant side lobe e
 Equation \ref{eq:h_omega} can be considered a low pass filter of bandwidth $B/2$ radians for real valued signals, or a bandpass filter with centre frequency 0 radians and bandwidth $B$ radians for analytic (single sided complex valued) signals. This suggests the low pass prototype filter can be shifted in frequency to construct a bandpass filter for analytic signals. 
 
 Given the low pass prototype coefficients $h(n)$, we wish to design a band pass filter:
-\begin{equation}
-  rect(\omega)= 
+\begin{equation} \label{eq:h_omega_bp}
+  H(\omega)= 
 	\begin{cases}
       1, & \alpha - B/2 <= \omega <= \alpha + B/2 \\
       0, & otherwise
 	\end{cases}
 \end{equation}
+Where $\alpha$ is the centre frequency of the bandpass filter of bandwidth $B$.  
 
-Where $\alpha$ is the centre frequency of the bandpass filter of bandwidth $B$.  Consider the time domain sequence of operations:
+\begin{figure}[h]
+\caption{Bandpass Filter}
+\vspace{5mm}
+\label{fig:bandpass_freq}
+\centering
+\begin{tikzpicture}
+\draw[thick,->] (-5,0) -- (5,0) node [below]{$\omega$};
+\draw[thick,->] (0,0) -- (0,2) ;
+\draw (2,0) node [below]{$\alpha-B/2$} -- (2,1) -- (4,1) -- (4,0) node [below]{$\alpha+B/2$};
+\end{tikzpicture}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Bandpass Filter Signal Processing}
+\label{fig:bandpass_proc}
+\vspace{5mm}
+\begin{center}
+\begin{tikzpicture}
+\draw (1,2) -- (2.1,2);
+\draw (2.5,0.75) -- (2.5,1.6);
+
+\draw (2.5,2) circle (0.4);
+\draw (2.25,2.25) -- (2.75,1.75);
+\draw (2.25,1.75) -- (2.75,2.25);
+
+\draw (2.9,2) -- (4,2);
+\draw (4,1.5) rectangle (5,2.5);
+\draw (5,2) -- (6.1,2);
+
+\draw (6.5,2) circle (0.4);
+\draw (6.25,2.25) -- (6.75,1.75);
+\draw (6.25,1.75) -- (6.75,2.25);
+\draw (6.5,0.75) -- (6.5,1.6);
+
+\draw (6.9,2) -- (8,2);
+
+\node[] at (0.5,2) {$x(n)$};
+\node[] at (2.5,0.5) {$e^{-j \omega n}$};
+\node[] at (6.5,0.5) {$e^{j \omega n}$};
+\node[] at (4.5,2) {$h(k)$};
+\node[] at (8.5,2) {$y(n)$};
+\end{tikzpicture}
+\end{center}
+\end{figure}
+
+Consider the time domain sequence of operations in Figure \ref{fig:bandpass_proc}:
 \begin{equation} \label{eq:bandpass_time}
 y(n) = e^{j \alpha n} \sum_{k=0}^{N_{tap}-1} h(k) x(n-k) e^{-j \alpha (n-k)}
 \end{equation}
-Here we frequency shift the input energy in $x(n)$ centred on $\alpha$ down to 0, filter it, and shift the result back up to a centre frequency of $\alpha$, effectively implementing the band pass filter in Equation \ref{eq:h_omega}.  Re-arranging Equation \ref{eq:bandpass_time}:
+Here we frequency shift the input energy in $x(n)$ centred on $\alpha$ down to 0, filter it, and shift the result back up to a centre frequency of $\alpha$, effectively implementing the band pass filter in Equation \ref{eq:h_omega_bp}.  Re-arranging Equation \ref{eq:bandpass_time}:
 \begin{equation} \label{eq:bandpass_time2}
 \begin{split}
 y(n) &= e^{j \alpha n} \sum_{k=0}^{N_{tap}-1}  h(k) x(n-k) e^{-j \alpha n} e^{j \alpha k} \\
@@ -117,35 +190,35 @@ y(n) &= e^{j \alpha n} \sum_{k=0}^{N_{tap}-1}  h(k) x(n-k) e^{-j \alpha n} e^{j 
 h_{\alpha}(k) &= h(k) e^{j \alpha k}     
 \end{split}
 \end{equation}
-Note $h_{\alpha}(k)$ is complex, and can be pre-computed from $h(n)$ at initialisation time. An alternative approach to deriving Equation \ref{eq:bandpass_time} would be to find $h_{\alpha}(k)$ directly from the inverse FT of \eqref{eq:h_omega}.
+Note $h_{\alpha}(k)$ is complex, and can be pre-computed from $h(n)$ at initialisation time. An alternative approach to deriving Equation \ref{eq:bandpass_time2} would be to find $h_{\alpha}(k)$ directly from the inverse FT of \eqref{eq:h_omega_bp}.
 
-Each operation in the summation is complex so requires $4N_{tap}$ Floating Point Operations (FOPs) to compute each $y(n)$, or for a block of $N$ samples, $4N_{tap}N$ FOPs.  In contrast, Equation \ref{eq:bandpass_time} has real coefficients, so for complex $x(n)$ requires $2N_{tap}$ FOPs to compute each $y(n)$, plus 4 FOPs each for the up and down frequency shifts. For a block of $N$ samples, this is a total of $(2N_{tap}+8)N$ FOPs. Table \ref{eq:bandpass_time} presents the FOPs required to process a 100ms ($N=800$ samples at $Fs=8000 Hz$) block of samples.  In this example the real coefficient algorithm in Equation \ref{eq:bandpass_time} is the most efficient.
+Each operation in the summation of \ref{eq:bandpass_time2} is complex so requires $4N_{tap}$ Multiply Accumulates (MACs) to compute each $y(n)$, or for a block of $N$ samples, $4N_{tap}N$ MACs.
+
+In contrast, Equation \ref{eq:bandpass_time} has real coefficients, so for complex $x(n)$ requires $2N_{tap}$ MACs to compute each $y(n)$, plus 4 MACs each for the up and down frequency shifts. We assume $e^{-j \alpha n}$ is stored as a look up table and requires no FOPs. Alternatively it can be computed using a recursion with an additional 4 MACs/sample. The up and down conversions are conjugates so only one needs to be computed, the other can then be obtained by a sign change. For a block of $N$ samples, this is a total of $(2N_{tap}+8)N$ MACs.
+
+Table \ref{eq:bandpass_time} presents the MACs required to process a 100ms ($N=800$ samples at $Fs=8000 Hz$) block of samples.  In this example the real coefficient algorithm in Equation \ref{eq:bandpass_time} is the most efficient.
 
 \begin{table}[h]
 \centering
 \begin{tabular}{l l }
  \hline
- Algorithm & FOPs \\
+ Algorithm & MACs \\
  \hline
- Real $h(k)$ & 320,000 \\ 
- Complex $h_{\alpha}(k)$ & 166,400 \\
+ Real $h(k)$ & 166,400 \\
+ Complex $h_{\alpha}(k)$  & 320,000 \\ 
  \hline
 \end{tabular}
-\caption{Floating Point Operations (FOPs) to bandpass filter a $N=800$ block of samples using a $N_{tap}=100$ filter}
+\caption{Multiply Accumulates (MACs) to bandpass filter a $N=800$ block of samples using a $N_{tap}=100$ filter}
 \label{table:ratek1_mean_E}
 \end{table}
 
 \subsection {Further Work}
 
-CPU analysis.  Note on shifts at end of block rather than sample by sample updates.
-
-Figures showing rectangular function sin time and frequency, block diagram of complex up and down conversion.
+MACs analysis - Note on shifts at end of block rather than sample by sample updates of pointers.
 
 Octave script to compare and plot fir1() to \ref{eq:dtcf_1}. Show effect of windowing on frequency response.
 
-Rather than selecting $B/2$ by trial and error, we could find an expression for the windowed FT $X_w(\omega)$, and solve for $B/2$ given $|X_w(\omega)|=10^{-1/20}$, ie based on a (frequency,magnitude) coordinate of the desired -1dB point, where $\omega$ is just outside of the outermost OFDM carrier.  This could be evaluated for any $N_t$, trading off filter performance (and hence the OFDM signal spurious mask) for CPU load.  
-
-The procedure for finding $B/2$ (either experimental or closed form) could also be used to configure external filters, e.g. those available in hardware ADC/DAC chips.
+Rather than selecting $B/2$ by trial and error, we could find an expression for the windowed FT $X_w(\omega)$, and solve for $B/2$ given $|X_w(\omega)|=10^{-1/20}$, where $\omega$ is the frequency of the desired -1dB point (e.g. just outside of the outermost OFDM carrier).  This could be evaluated for any $N_t$, trading off filter performance (and hence the OFDM signal spurious mask) for CPU load.  
 
 \bibliographystyle{plain}
 \bibliography{rect_ft_refs}

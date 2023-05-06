@@ -118,13 +118,18 @@ This expression can be used when $N_{tap}$ is odd or even.
 
 One use case is filtering an OFDM modem signal which has significant side lobe energy at frequencies outside of the carriers. In this use case, we wish to have the filter -1dB point at a frequency just outside the carriers, in order to minimise distortion to the PSK constellation.  For a given $N_{tap}$, the smallest $B/2$ can be found by experiment that produces acceptable distortion of the scatter diagram.
 
-\subsection{Complex Band Pass Filter}
+To filter an input signal $X(n)$ we convolve it with the impulse response $h(n)$:
+\begin{equation} \label{eq:filter_conv}
+y(n) = \sum_{k=0}^{N_{tap}-1} h(k) x(n-k)
+\end{equation}
+
+\section{Complex Band Pass Filter}
 
 Equation \ref{eq:h_omega} can be considered a low pass filter of bandwidth $B/2$ radians for real valued signals, or a bandpass filter with centre frequency 0 radians and bandwidth $B$ radians for analytic (single sided complex valued) signals. This suggests the low pass prototype filter can be shifted in frequency to construct a bandpass filter for analytic signals. 
 
 Given the low pass prototype coefficients $h(n)$, we wish to design a band pass filter:
 \begin{equation} \label{eq:h_omega_bp}
-  H(\omega)= 
+  H_{\alpha}(\omega)= 
 	\begin{cases}
       1, & \alpha - B/2 <= \omega <= \alpha + B/2 \\
       0, & otherwise
@@ -171,7 +176,7 @@ Where $\alpha$ is the centre frequency of the bandpass filter of bandwidth $B$.
 \node[] at (0.5,2) {$x(n)$};
 \node[] at (2.5,0.5) {$e^{-j \omega n}$};
 \node[] at (6.5,0.5) {$e^{j \omega n}$};
-\node[] at (4.5,2) {$h(k)$};
+\node[] at (4.5,2) {$H(\omega)$};
 \node[] at (8.5,2) {$y(n)$};
 \end{tikzpicture}
 \end{center}
@@ -181,7 +186,7 @@ Consider the time domain sequence of operations in Figure \ref{fig:bandpass_proc
 \begin{equation} \label{eq:bandpass_time}
 y(n) = e^{j \alpha n} \sum_{k=0}^{N_{tap}-1} h(k) x(n-k) e^{-j \alpha (n-k)}
 \end{equation}
-Here we frequency shift the input energy in $x(n)$ centred on $\alpha$ down to 0, filter it, and shift the result back up to a centre frequency of $\alpha$, effectively implementing the band pass filter in Equation \ref{eq:h_omega_bp}.  Re-arranging Equation \ref{eq:bandpass_time}:
+Here we frequency shift the input energy in $x(n)$ centred on $\alpha$ down to 0, filter with the low pass filter $H(\omega)$, and shift the result back up to a centre frequency of $\alpha$, effectively implementing the band pass filter in Equation \ref{eq:h_omega_bp}.  Re-arranging Equation \ref{eq:bandpass_time}:
 \begin{equation} \label{eq:bandpass_time2}
 \begin{split}
 y(n) &= e^{j \alpha n} \sum_{k=0}^{N_{tap}-1}  h(k) x(n-k) e^{-j \alpha n} e^{j \alpha k} \\
@@ -191,6 +196,8 @@ h_{\alpha}(k) &= h(k) e^{j \alpha k}
 \end{split}
 \end{equation}
 Note $h_{\alpha}(k)$ is complex, and can be pre-computed from $h(n)$ at initialisation time. An alternative approach to deriving Equation \ref{eq:bandpass_time2} would be to find $h_{\alpha}(k)$ directly from the inverse FT of \eqref{eq:h_omega_bp}.
+
+\subsection{CPU Load}
 
 Each operation in the summation of \ref{eq:bandpass_time2} is complex so requires $4N_{tap}$ Multiply Accumulates (MACs) to compute each $y(n)$, or for a block of $N$ samples, $4N_{tap}N$ MACs.
 
@@ -212,11 +219,26 @@ Table \ref{eq:bandpass_time} presents the MACs required to process a 100ms ($N=8
 \label{table:ratek1_mean_E}
 \end{table}
 
-\subsection {Further Work}
+\section{Filter Implementation}
 
-MACs analysis - Note on shifts at end of block rather than sample by sample updates of pointers.
+Consider filtering a block of $N$ samples:
+\begin{equation} \label{eq:filter_block}
+y(n) = \sum_{k=0}^{N_{tap}-1} h(k) x(n-k) \quad n=0,1, \ldots N-1
+\end{equation}
+This requires a filter memory of previous $N_{tap}-1$ samples of $x(n)$ to be maintained.  For efficient implementation we wish to avoid managing this memory during the inner MAC, for example manipulating pointers or shifting samples in a delay line. An efficient algorithm is:
+\begin{enumerate}
+\item At initialisation time, set up an array of $N_{tap}-1+N$ samples, initialise the first $N_{tap}-1$ samples to zero.
+\item Copy the latest $N$ input samples into the last $N$ samples of the array
+\item Evaluate Equation \ref{eq:filter_block} over the last $N$ samples of the array.
+\item Update the filter memory by copying the last $N_{tap}-1$ samples of the array to the start of the array
+\end{enumerate}
+Steps 2-4 are repeated for each block of $N$ samples.
+
+\section {Further Work}
 
 Octave script to compare and plot fir1() to \ref{eq:dtcf_1}. Show effect of windowing on frequency response.
+
+Maths for sample rate conversion, zero insertion, decimation.
 
 Rather than selecting $B/2$ by trial and error, we could find an expression for the windowed FT $X_w(\omega)$, and solve for $B/2$ given $|X_w(\omega)|=10^{-1/20}$, where $\omega$ is the frequency of the desired -1dB point (e.g. just outside of the outermost OFDM carrier).  This could be evaluated for any $N_t$, trading off filter performance (and hence the OFDM signal spurious mask) for CPU load.  
 

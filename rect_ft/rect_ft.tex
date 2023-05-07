@@ -34,11 +34,12 @@ rect(t)=
 The continuous time, continuous frequency Fourier Transform is given by:
 \begin{equation} \label{eq:ctcf}
 \begin{split}
-X(f) &= \int_{-\infty}^{\infty} rect(t)e^{-j2 \pi ft} dt\\
-     &= \int_{-T/2}^{T/2} e^{-j 2 \pi ft} dt \\
-     &= \left[ \frac{1}{-j 2 \pi f} e^{-j 2 \pi ft} \right]_{-T/2}^{T/2} \\
-     &= \frac{1}{-j 2 \pi f} \left[  e^{-j 2 \pi f \frac{T}{2}} - e^{j 2 \pi f \frac{T}{2}} \right] \\
-     &= \frac{sin(\pi f T)}{\pi f}
+X(w) &= \int_{-\infty}^{\infty} rect(t)e^{-j \omega t} dt\\
+     &= \int_{-T/2}^{T/2} e^{-j \omega t} dt \\
+     &= \left[ \frac{1}{-j \omega} e^{-j \omega t} \right]_{-T/2}^{T/2} \\
+     &= \frac{1}{-j \omega} \left[  e^{-j \omega \frac{T}{2}} - e^{j \omega \frac{T}{2}} \right] \\
+     &= \frac{2 sin(\omega T/2)}{\omega} \\
+     &= T sinc \left( \frac{\omega T}{2} \right)
 \end{split}
 \end{equation}
 

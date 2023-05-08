@@ -13,7 +13,15 @@ Throughout the 20th century HF radio receiver technology evolved with the aim of
 
 Our target radio signals are from distant sources, weak, narrow band, and evolve slowly in time. Human generated radio noise tends to be very strong, wideband from narrow pulse sources, with a time domain envelope that evolves quickly in time.  It is often radiated from nearby sources, such as electricity transmission lines and house wiring a few 10s of meters from our antenna.  It has significant structure, so can be interpreted as an interfering signal, rather than random noise.
 
-Modern radios are very good at rejecting unwanted (but well behaved) signals, using frequency selectivity and good strong signal performance.  This report explores ways we can tune out human made noise in the lower HF bands.
+Modern radios are very good at rejecting strong unwanted narrowband signals, using frequency selectivity and good strong signal performance.  This report explores ways we can reject human made noise in the lower HF bands.
+
+\section{Summary of Human Generated Radio Noise Signals}
+
+Table, with various categories, possible attacks.
+
+Electricty line, part way between transmission lines and antennas.  RF does seem to propogate along them quite well.  ADSL on phone lines, likewise, part antenna and part transmision lines.  Buried electricity lines and fibre internet seem like a good combination.
+
+Can we argue all our noise is impulsive now?  Guess not, impulsive becomes AWGN.
 
 \section{Pulse Width Modulation}
 
@@ -32,7 +40,7 @@ Let $d$ have a constant and time varying component:
 \begin{equation}
 d=d_c+ad(t)
 \end{equation}
-where $d(t)$ is a normalised modulation function and $a$ is the peak amplitude of the modulation (ie the peak jitter of the PWM signal). For the $n$-the harmonic:
+where $d(t)$, $|d(t)| \le 1$ is a PWM modulation function and $a$ is the peak amplitude of the modulation (ie the peak jitter of the PWM signal). For the $n$-th harmonic:
 \begin{equation} \label{eq:pwm_n}
 \begin{split}
 x_n(t) &= sin(\pi n d) \\
@@ -42,17 +50,17 @@ x_n(t) &= sin(\pi n d) \\
      h &= \pi n a
 \end{split}
 \end{equation}
-where h is the peak amplitude of the modulation. It can be seen that $h$ is strong function of $a$, as small changes are multiplied by $n \pi$. For example for $n=100, a=0.01, h = \pi$.  Thus with just 1\% jitter of the PWM signal, a cycle of $d(t)$ would sweep the entire $\pm \pi$ range of the $sin()$ function.
+It can be seen that $h$ is strong function of $a$, as small changes are multiplied by $n \pi$. For example for $n=100, a=0.01, h = \pi$.  Thus with just 1\% jitter of the PWM signal, a cycle of $d(t)$ would modulate over the entire $\pm \pi$ range of the $sin()$ function.
 
 We would like to estimate the spectrum of $x(t)$. First we consider small $h << 1$:
 \begin{equation} \label{eq:small_h}
 \begin{split}
 x_n(t) &= sin(\pi n d_c)cos(hd(t)) + cos(\pi n d_c)sin(hd(t)) \\
-       &\approx sin(\pi n d_c)(1 - hd^2(t)/2) + cos(\pi n d_c)hd(t) \\
-       &= sin(\pi n d_c) + hcos(\pi n d_c)d(t)
+       &\approx sin(\pi n d_c)(1 - (hd(t))^2/2) + cos(\pi n d_c)hd(t) \\
+       &\approx sin(\pi n d_c) + hcos(\pi n d_c)d(t)
 \end{split}
 \end{equation}
-The LHS is a constant term related to the mean duty cycle of the PWM signal, the RHS is modulation term. When multiplied by the $n$-th harmonic $cos(n \omega t)$ in (\ref{eq_pwm}):
+The LHS is a constant term related to the mean duty cycle of the PWM signal, the RHS is linear modulation term, i.e. a small linear modulation about a mean set point.  When multiplied by the $n$-th harmonic $cos(n \omega t)$ in (\ref{eq_pwm}):
 \begin{equation} \label{eq:small_h}
 \begin{split}
 x_n(t)cos(n \omega t) &= \left[ sin(\pi n d_c) + hcos(\pi n d_c)d(t) \right] cos(n \omega t) \\
@@ -62,13 +70,72 @@ x_n(t)cos(n \omega t) &= \left[ sin(\pi n d_c) + hcos(\pi n d_c)d(t) \right] cos
                    c_2 &= hcos(\pi n d_c)
 \end{split}
 \end{equation}
-By examining the different frequency terms we can estimate the spectrum of the PWM signal near the n-th harmonic. Note $c_1$ and $c_2$ are constants that do not affect the number of different frequency termss. The LHS of (\ref{eq:small_h}) is a constant carrier term at the harmonic centre. The product of $d(t)cos(n \omega t))$ will produce images of the spectra of d(t) either side of $n \omega$. This is Amplitude Modulation (AM).  For example if $d(t)$ is a random variable with maximum frequency $\omega_m$ radians, we would see a uniform noise spectrum over the interval $n \omega \pm \omega_m$, with a central "carrier" spectral line at $n \omega$. If $\omega_m > \omega/2$, the entire region between each harmonic will have additive white noise generated from the PWM signal.
+By examining the different frequency terms we can estimate the spectrum of the PWM signal near the n-th harmonic. Note $c_1$ and $c_2$ are constants that do not affect the number of different frequency terms. The LHS of (\ref{eq:small_h}) is a constant carrier term at the harmonic centre. The product of $d(t)cos(n \omega t))$ will produce images of the spectra of d(t) either side of $n \omega$. This is Amplitude Modulation (AM).  For example if $d(t)$ is a random variable with maximum frequency $\omega_m$ radians, we would see a uniform noise spectrum over the interval $n \omega \pm \omega_m$, with a central "carrier" spectral line at $n \omega$. If $\omega_m > \omega/2$, the entire region between each harmonic will have additive white noise generated from the PWM signal.
 
 For larger $h$, Equation \ref{eq:pwm_n} can be interpreted as Phase Modulation (PM) \cite{wikipedia_phase} of a zero frequency carrier. Assuming a random $d(t)$, the resulting spectra of $x(t)$ can be approximated using Carsons Rule, as having 98\% of it's power contained within $B_c=2(h+1)f_m$ Hz, where $f_m$ is the maximum frequency component of $d(t)$. When multiplied by the $cos(n \omega t)$ term, the PM signal will spread the power of the carrier over range of adjacent frequencies, replacing the PWM carrier in the small $h$ case with a band of white noise.
 
-For example, let $a=0.02$ (a few percent jitter of the PWM duty cycle) and the bandwidth of the PWM control loop be $f_m=3$ kHz. At $n=100$ we have $h=\pi n a = 2\pi$, which implies a random deviation of $\pm 2\pi$ (twice the entire phase range of $sin()$), and an $x(t)$ bandwidth of $B_c=2(2 \pi+1)f_m = (4\pi+2)f_m = 43$ kHz.
+For example, let $a=0.02$ (a few percent jitter of the PWM duty cycle) and the bandwidth of the PWM control loop be $f_m=3$ kHz. At $n=100$ we have $h=\pi n a = 2\pi$, which implies a random deviation of $\pm 2\pi$ (two cycles of $sin()$), and an $x(t)$ bandwidth of $B_c=2(2 \pi+1)f_m = (4\pi+2)f_m = 43$ kHz.
 
 Given $h$ increases with $n$, we can expect to see AM type modulation either side of central harmonics lines at lower frequencies.  At intermediate frequencies a raised noise floor will be observed between harmonics.  As the frequency increases further the power of the harmonics lines will reduce and gradually be replaced by broadband noise.
+
+\subsection{Further Work}
+
+Figures illustrating effects above, perhaps an Octave simulation
+
+What would we expect to hear with a bandpass receiver (ie it's impact)?  I guess a band pass version of d(t), this may or may not be white.  If not white, it may have structure we can exploit.
+
+Key take away is mirror of signal about carrier. Estimation of signal from one sideband to cancel other.  Estimation of signal by AM demodulation (envelope). This will get awkward when it's spread so far that we get energy from n+1, n-1 near harmonic n.  However in that case it may not be as annoying/strong.
+
+Estimation of signal from adjacent harmonics.  $\omega$ and $n$ can be estimated, can we find $x_n(t)$ from $x_{n-1}(t)$?
+
+\section{Noise Blanker}
+
+Consider a signal $x(t)$ consisting of a wanted signal at $\omega_1$, an adjacent stronger signal at $\omega_2$, and a large impulse at time 0, such that $a_3>a_2>a_1$.
+\begin{equation}
+x(t) = a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} + a_3\delta(t) \\
+\end{equation}
+To remove the effects of the impulse, a blanking pulse $b(t)$ applied between $-T/2$ and $T/2$:
+\begin{equation}
+\begin{split}
+b(t) &= 1 - rect(t) \\
+rect(t) &= 
+	\begin{cases}
+      1, & |t| <= T/2 \\
+      0, & otherwise \\
+	\end{cases}
+\end{split}
+\end{equation} 
+
+The Fourier transform of the rectangular pulse $rect(t)$ over the interval $-T/2 \le t \le T/2$ and analytical sine wave $s(t)=e^{j \omega_1 t}$ over the interval $-W/2 \le t \le W/2$ are:
+\begin{equation}
+\begin{split}
+Rect(\omega) &= T sinc \left( \frac{\omega T}{2} \right)	\\
+S(\omega) &= W sinc \left( \frac{(\omega - \omega_1)W}{2} \right)
+\end{split}
+\end{equation} 
+
+
+Consider the output of the noise blanker at $\omega_1$, over an interval of $W$ seconds:
+\begin{equation}
+\begin{split}
+y(t) &= x(t)b(t) \\
+     &= a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} - a_1 e^{j \omega_1 t}rect(t) - a_2 e^{j \omega_2 t}rect(t) \\
+Y(w) &= \int_{-W/2}^{W/2} y(n) e^{-j \omega t} dt \\    
+Y(w) &= a_1 W sinc \left( \frac{(\omega-\omega_1)W}{2} \right) + a_2 W sinc \left( \frac{(\omega-\omega_2)W}{2}  \right)\\
+     &- a_1 T sinc \left( \frac{(\omega-\omega_1)T}{2} \right) - a_2 T sinc \left( \frac{(\omega-\omega_2)T}{2} \right) \\
+Y(w_1) &= a_1(W-T) + a_2 \left( W sinc \left( \frac{(\omega_1-\omega_2)W}{2} \right) - T sinc \left( \frac{(\omega_1-\omega_2)T}{2} \right) \right) \\
+Y(w_1) &= a_1(W-T) + a_2 I(\omega_1-\omega_2)
+\end{split}
+\end{equation} 
+The $I(\omega_1-\omega_2)$ term represents the intermodulation distortion from the rectangular analysis window $W$ and the noise blanker pulse $B$.  Letting $\Delta = (\omega_1-\omega_2)$ and expanding $sinc(x) = sin(x)/x$:
+\begin{equation}
+\begin{split}
+I(\Delta) &= W sinc (\Delta W/2) - T sinc (\Delta T/2) \\
+&= \frac{sin (\Delta W/2)}{\Delta} - \frac{sin (\Delta T/2)}{\Delta}
+\end{split}
+\end{equation} 
+As $\Delta$ increases the numerator in each term oscillates but has a maximum of 1.  Both terms have the same denominator so the envelope (or average) of both terms is the same for large $\Delta$.  For example at a 3kHz offset $\Delta = 2 \pi \times 10^3 $ rads/s the maximum contribution is $20log_{10}(1/\Delta) = -76$ dB. We can therefore conclude that for large $\Delta$, the blanking operation has no more distortion than windowing, and can be contained by a suitable choice of a blanking pulse shape. This is at odds with some online sources which report the blanking pulse can produce significant intermodulation distortion so should be investigated further.
+
 \bibliographystyle{plain}
 \bibliography{emi_refs}
 \end{document}

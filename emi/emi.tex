@@ -9,19 +9,48 @@
 
 \section{Introduction}
  
-Throughout the 20th century HF radio receiver technology evolved with the aim of detecting distant, narrow band signals.  Radio noise sets the limits of detection \cite{itu372}, and was assumed to be from natural sources or the receiver itself. However in the early 21st century, from lower HF right up to UHF noise from human activity now dominates the detection problem.  We are no longer seeking to maximise signal-to-noise ratio (SNR), but signal to human noise ratio (SHR).
+Throughout the 20th century HF radio receiver technology evolved with the aim of detecting distant, narrow band signals.  Radio noise sets the limits of detection \cite{itu372}, and was assumed to be from natural sources or the receiver itself. However in the early 21st century, from lower HF right up to UHF noise from human activity now dominates the detection problem.  We are no longer seeking to maximise signal-to-noise ratio (SNR), but signal to EMI ratio (SER).
 
-Our target radio signals are from distant sources, weak, narrow band, and evolve slowly in time. Human generated radio noise tends to be very strong, wideband from narrow pulse sources, with a time domain envelope that evolves quickly in time.  It is often radiated from nearby sources, such as electricity transmission lines and house wiring a few 10s of meters from our antenna.  It has significant structure, so can be interpreted as an interfering signal, rather than random noise.
+We are slowly losing the ability to use analog SSB in urban areas.  Many Hams report S9 noise levels, $9 \times 6 = 54$ dB Hams higher than a quiet S0 country station.  Consequently, digital modes that can operate operate at low SERs are becoming popular.  Digital modes are in an arms race with EMI.
+
+Our target radio signals are from distant sources, weak, narrow band, and evolve slowly in time. Human generated radio noise tends to be very strong, wideband, with a time domain envelope that evolves quickly in time.  It is often radiated from nearby sources, such as power lines lines and house wiring a few 10s of meters from our antenna.  It has significant structure, so can be interpreted as an interfering signal, rather than random noise.
 
 Modern radios are very good at rejecting strong unwanted narrowband signals, using frequency selectivity and good strong signal performance.  This report explores ways we can reject human made noise in the lower HF bands.
 
-\section{Summary of Human Generated Radio Noise Signals}
+\section{Radio Noise Signals from Human Activity}
 
-Table, with various categories, possible attacks.
+Table \ref{table:human_noise} is a summary of human generated noise sources.  The values are approximate and based on the authors experience - your mileage may vary!  This categorisation gives us some insight that can be used to classify signals, consider their impact, and possible attacks.
 
-Electricty line, part way between transmission lines and antennas.  RF does seem to propogate along them quite well.  ADSL on phone lines, likewise, part antenna and part transmision lines.  Buried electricity lines and fibre internet seem like a good combination.
+The Time and Frequency columns describes the distribution of energy in time and frequency, for example power line arcing can cause clicks in our radio similar to atmospheric lightning.  The noise signal consists of short, powerful time domain pulses that are randomly distributed in time, resulting in wideband energy uniformly distributed in frequency. It may be identified and removed via noise blanking techniques.
 
-Can we argue all our noise is impulsive now?  Guess not, impulsive becomes AWGN.
+In contrast DSL signals radiated from leaky phone lines looks like noise in the time domain and frequency domain, making it particularity hard to identify and remove.  It is very similar to AWGN from natural noise sources.
+
+Bandwidth relates the rate $R$ of the noise pulses to the bandwidth $B$ of a typical SSB HF receiver (around 3000 Hz).  When $R<<B$, we tend to hear individual noise pulses, and separate pulses can be observed in a time domain plot of the receiver output waveform.  When $R>B$, we hear just a bandpass segment of the EMI signal, for example a tone from a PWM harmonic, or some modulated wideband noise.
+
+Our narrow band receiver smooths the time domain envelope. As $R$ relative to $B$ increase, our receiver converts a series of short time domain pulses (such as a PWM waveform) into a longer pulses with a smooth time domain envelope (AWGN noise), making the EMI signal harder to identify and remove.
+
+If we position our receiver some distance from many urban noise signals (for example the middle of an urban park), we get the sum of many signals added together, which converges to AWGN noise.  The level reduces with distance, so an effective attack is decamping to a country location, and operating a portable station for the day.
+
+For an EMI signal to be transmitted, we need a source of AC current and an antenna. Domestic electricity lines appear to operate in a mode part way between transmission line and antenna.  RF does seem to propagate along them quite well, they then radiate quiet strong signals to nearby homes.  Likewise, DSL signals on ancient phone lines are poor transmission lines and and reasonably effective antennas, radiating significant local EMI. A home with buried electricity lines and fibre or wireless supplying Internet is desirable.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{l l l l l l}
+ \hline
+ Name & Rate & Time & Frequency & Antenna & BW \\
+ \hline
+ Power Line & 1 Hz & random pulse & uniform & power lines & $R < B$ \\
+ Downlights & 50-60 Hz & pulse train & harmonics & house wiring & $R < B$ \\
+ SMPS & 10-300 kHz & pulse train & harmonics & house wiring & $R > B$ \\
+ DSL & 1-12 MHz & AWGN & AWGN & phone lines & $R > B$ \\
+ Urban Sum & lower HF & AWGN & AWGN & power lines & $R > B$ \\
+ \hline
+\end{tabular}
+\caption{Summary of Radio signals from Human Activity}
+\label{table:human_noise}
+\end{table}
+
+The modulation used in our desired target signals is a factor.  Digital modes can operate at lower SNRs than analog SSB.  Digital modes can also use Forward Error Correction (FEC), for example we can correct a bit error caused by a noise impulse wiping out one bit.  Digital modulation also has a threshold effect - once the interference is a few dB lower than the wanted signals, it's impact on bit errors is small. FM, FSK \& PSK are more robust to impulsive noise than amplitude modulated modes like SSB.
 
 \section{Pulse Width Modulation}
 
@@ -80,13 +109,22 @@ Given $h$ increases with $n$, we can expect to see AM type modulation either sid
 
 \subsection{Further Work}
 
-Figures illustrating effects above, perhaps an Octave simulation
+Figures illustrating effects above, perhaps an Octave simulation, showing small and large beta, sine wave and band pass white noise.
 
-What would we expect to hear with a bandpass receiver (ie it's impact)?  I guess a band pass version of d(t), this may or may not be white.  If not white, it may have structure we can exploit.
+What would we expect to hear with a bandpass receiver (ie it's impact) with $\omega > B$?  I guess a band pass version of d(t), this may or may not be white.  If not white, it may have structure we can exploit. It may also be periodic, of quasi-stationary.
 
-Key take away is mirror of signal about carrier. Estimation of signal from one sideband to cancel other.  Estimation of signal by AM demodulation (envelope). This will get awkward when it's spread so far that we get energy from n+1, n-1 near harmonic n.  However in that case it may not be as annoying/strong.
+Attacks:
+\begin{enumerate}
+\item Estimation and subtraction of the signals. Key take away is mirror of signal about carrier. Estimation of signal from one sideband to cancel other.  Estimation of signal by AM demodulation (envelope). This will get awkward when it's spread so far that we get energy from n+1, n-1 near harmonic n.  However in that case it may not be as annoying/strong.
 
-Estimation of signal from adjacent harmonics.  $\omega$ and $n$ can be estimated, can we find $x_n(t)$ from $x_{n-1}(t)$?
+\item Estimation of signal from adjacent harmonics.  Can we find $x_n(t)$ from $x_{n-1}(t)$?  $\omega$ and $n$ can be estimated.  A direct form solution is unlikely however the equations are differentiable so an iterative solution could be found.
+
+\item Dual channel coherent removal.
+
+\item Noise blanking in the time domain.
+
+\item Training of time domain pulses, correlation and removal.
+\end{enumerate}
 
 \section{Noise Blanker}
 
@@ -105,6 +143,18 @@ rect(t) &=
 	\end{cases}
 \end{split}
 \end{equation} 
+
+\begin{figure}[h]
+\caption{Blanking Pulse $b(t)$ }
+\vspace{5mm}
+\label{fig:rect_time}
+\centering
+\begin{tikzpicture}
+\draw[thick,->] (1,0) -- (5,0) node [below]{t};
+\draw[thick,->] (3,0) -- (3,2) ;
+\draw (1,2) -- (2,2) -- (2,0) node [below]{$-T/2$} -- (4,0) node [below]{$T/2$} -- (4,2) -- (5,2);
+\end{tikzpicture}
+\end{figure}
 
 The Fourier transform of the rectangular pulse $rect(t)$ over the interval $-T/2 \le t \le T/2$ and analytical sine wave $s(t)=e^{j \omega_1 t}$ over the interval $-W/2 \le t \le W/2$ are:
 \begin{equation}
@@ -127,14 +177,16 @@ Y(w_1) &= a_1(W-T) + a_2 \left( W sinc \left( \frac{(\omega_1-\omega_2)W}{2} \ri
 Y(w_1) &= a_1(W-T) + a_2 I(\omega_1-\omega_2)
 \end{split}
 \end{equation} 
-The $I(\omega_1-\omega_2)$ term represents the intermodulation distortion from the rectangular analysis window $W$ and the noise blanker pulse $B$.  Letting $\Delta = (\omega_1-\omega_2)$ and expanding $sinc(x) = sin(x)/x$:
+The $I(\omega_1-\omega_2)$ term is the $\omega_2$ power shifted onto $\omega_1$ by the rectangular analysis window $W$ and the noise blanker pulse $B$.  Letting the frequency offset between the signals $\Delta = (\omega_1-\omega_2)$ and expanding $sinc(x) = sin(x)/x$:
 \begin{equation}
 \begin{split}
 I(\Delta) &= W sinc (\Delta W/2) - T sinc (\Delta T/2) \\
 &= \frac{sin (\Delta W/2)}{\Delta} - \frac{sin (\Delta T/2)}{\Delta}
 \end{split}
 \end{equation} 
-As $\Delta$ increases the numerator in each term oscillates but has a maximum of 1.  Both terms have the same denominator so the envelope (or average) of both terms is the same for large $\Delta$.  For example at a 3kHz offset $\Delta = 2 \pi \times 10^3 $ rads/s the maximum contribution is $20log_{10}(1/\Delta) = -76$ dB. We can therefore conclude that for large $\Delta$, the blanking operation has no more distortion than windowing, and can be contained by a suitable choice of a blanking pulse shape. This is at odds with some online sources which report the blanking pulse can produce significant intermodulation distortion so should be investigated further.
+As $\Delta$ increases the numerator in each term oscillates but has a maximum of 1.  Both terms have the same denominator so the envelope (or average) of both terms is the same for large $\Delta$.  For example at a 3kHz offset $\Delta = 2 \pi \times 10^3 $ rads/s the maximum contribution is $20log_{10}(1/\Delta) = -76$ dB. We can therefore conclude that for modest frequency offsets $\Delta$, the blanking operation has no more distortion than windowing, and can be contained by a suitable choice of a blanking pulse shape. This is at odds with some online sources which report the blanking pulse can produce significant intermodulation distortion so should be investigated further.
+
+TODO: Octave plots showing a few scenarios, e.g. $R>B$, $R<B$.
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

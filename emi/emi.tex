@@ -151,7 +151,6 @@ rect(t) &=
 \centering
 \begin{tikzpicture}
 \draw[thick,->] (1,0) -- (5,0) node [below]{t};
-\draw[thick,->] (3,0) -- (3,2) ;
 \draw (1,2) -- (2,2) -- (2,0) node [below]{$-T/2$} -- (4,0) node [below]{$T/2$} -- (4,2) -- (5,2);
 \end{tikzpicture}
 \end{figure}
@@ -186,7 +185,7 @@ I(\Delta) &= W sinc (\Delta W/2) - T sinc (\Delta T/2) \\
 \end{equation} 
 As $\Delta$ increases the numerator in each term oscillates but has a maximum of 1.  Both terms have the same denominator so the envelope (or average) of both terms is the same for large $\Delta$.  For example at a 3kHz offset $\Delta = 2 \pi \times 10^3 $ rads/s the maximum contribution is $20log_{10}(1/\Delta) = -76$ dB. We can therefore conclude that for modest frequency offsets $\Delta$, the blanking operation has no more distortion than windowing, and can be contained by a suitable choice of a blanking pulse shape. This is at odds with some online sources which report the blanking pulse can produce significant intermodulation distortion so should be investigated further.
 
-TODO: Octave plots showing a few scenarios, e.g. $R>B$, $R<B$.
+TODO: Consider $W>>B$ to remove analysis window effect, find limit. Octave plots showing a few scenarios, e.g. $R>B$, $R<B$.
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

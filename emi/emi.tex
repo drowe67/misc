@@ -128,14 +128,15 @@ Attacks:
 
 \section{Noise Blanker}
 
-Consider a signal $x(t)$ consisting of a wanted signal at $\omega_1$, an adjacent stronger signal at $\omega_2$, and a large impulse at time 0, such that $a_3>a_2>a_1$.
+Consider a signal $x(t)$ consisting of a wanted signal at $\omega_1$, an adjacent signal at $\omega_2$, and an impulse train that repeats every $T=1/R$ seconds.
 \begin{equation}
-x(t) = a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} + a_3\delta(t) \\
+x(t) = a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} + a_3\sum_{n=-\infty}^{\infty}\delta(t-nT)
 \end{equation}
-To remove the effects of the impulse, a blanking pulse $b(t)$ applied between $-T/2$ and $T/2$:
+To remove the effects of the impulse, a blanking pulse train $b(t)$ applied, each pulse having with $T$ seconds, and period $P$:
 \begin{equation}
 \begin{split}
-b(t) &= 1 - rect(t) \\
+b(t) &= 1 - p(t) \\
+p(t) &= \sum_{n=-\infty}^{\infty}rect(t-nP) \\
 rect(t) &= 
 	\begin{cases}
       1, & |t| <= T/2 \\
@@ -155,16 +156,34 @@ rect(t) &=
 \end{tikzpicture}
 \end{figure}
 
-The Fourier transform of the rectangular pulse $rect(t)$ over the interval $-T/2 \le t \le T/2$ and analytical sine wave $s(t)=e^{j \omega_1 t}$ over the interval $-W/2 \le t \le W/2$ are:
+The pulse train $p(t)$ can be expressed as Fourier series (\ref{eq_pwm})
 \begin{equation}
 \begin{split}
-Rect(\omega) &= T sinc \left( \frac{\omega T}{2} \right)	\\
-S(\omega) &= W sinc \left( \frac{(\omega - \omega_1)W}{2} \right)
+p(t) &= d+\frac{2}{\pi} \sum_{n=1}^{\infty} \frac{sin(\pi n d)}{n}cos(n \alpha t) \\
+     &= d + d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ e^{-j\alpha n} + e^{j \alpha n} \right]
 \end{split}
-\end{equation} 
+\end{equation}
+where $\alpha=2 \pi R$ is the angular frequency of the pulse train, and $d$ is the duty cycle.  The Fourier transform of $b(t)$ is:
+\begin{equation}
+\begin{split}
+B(w) &= \int_{-\infty}^{\infty}b(t)e^{-j \omega t}dt \\
+     &= \int_{-\infty}^{\infty} e^{-j \omega t}dt - \int_{-\infty}^{\infty} d e^{-j \omega t}dt \\
+     &- \int_{-\infty}^{\infty} d \sum_{n=1}^{\infty} sinc(\pi n d) e^{-j\alpha n}e^{-j \omega t}dt \\
+     &- \int_{-\infty}^{\infty} d \sum_{n=1}^{\infty} sinc(\pi n d) e^{j\alpha n}e^{-j \omega t}dt \\
+     &= (1-d) \delta(\omega) - d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n) + \delta(\omega - \alpha n) \right]
+\end{split}
+\end{equation}
 
+FT ....
+Freq shifted FT ...
+
+Then expand time domain
+Octave plots for R>B and R<B
+Exploring noise blanker
+what can we say about digital modulation?
 
 Consider the output of the noise blanker at $\omega_1$, over an interval of $W$ seconds:
+
 \begin{equation}
 \begin{split}
 y(t) &= x(t)b(t) \\

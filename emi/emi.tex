@@ -53,6 +53,7 @@ For an EMI signal to be transmitted, we need a source of AC current and an anten
 The modulation used in our desired target signals is a factor.  Digital modes can operate at lower SNRs than analog SSB.  Digital modes can also use Forward Error Correction (FEC), for example we can correct a bit error caused by a noise impulse wiping out one bit.  Digital modulation also has a threshold effect - once the interference is a few dB lower than the wanted signals, it's impact on bit errors is small. FM, FSK \& PSK are more robust to impulsive noise than amplitude modulated modes like SSB.
 
 \section{Pulse Width Modulation}
+\label{pwm}
 
 The PWM switch mode power supply is a ubiquitous source of interference.  Consider the Fourier Series of an ideal pulse train \cite{wikipedia_pulse}:
 \begin{equation} \label{eq_pwm}
@@ -128,12 +129,9 @@ Attacks:
 
 \section{Noise Blanker}
 
-Consider a signal $x(t)$ consisting of a wanted signal $s_1(t)$, an adjacent signal $s_2(t)$, and an unwanted impulse train that repeats every $1/R$ seconds.
+Consider a signal $x(t)$ consisting of a wanted signal $s(t)$, and an unwanted impulse train that repeats every $1/R$ seconds.
 \begin{equation}
-\begin{split}
-x(t) &= s_1(t) + s_2(t) + a_3\sum_{n=-\infty}^{\infty}\delta(t-n/R) \\
-     &= a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} + a_3\sum_{n=-\infty}^{\infty}\delta(t-n/R)
-\end{split}
+x(t) = a_1 e^{j \omega_1 t} + a_{imp}\sum_{n=-\infty}^{\infty}\delta(t-n/R)
 \end{equation}
 To remove the impulse, a blanking pulse train $b(t)$ is applied.  Each pulse is $T$ seconds wide:
 \begin{equation}
@@ -191,33 +189,26 @@ Consider the output of the noise blanker:
 \begin{equation}
 \begin{split}
 y(t) &= x(t)b(t) \\
-     &= a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} - a_1 e^{j \omega_1 t}p(t) - a_2 e^{j \omega_2 t}p(t) \\
-     &= a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} - a_1 e^{j \omega_1 t}(d + dh(t))- a_2 e^{j \omega_2 t}(d + dh(t)) \\    
-     &= a_1 (1-d) e^{j \omega_1 t} + a_2 (1-d) e^{j \omega_2 t} - a_1 d h(t) e^{j \omega_1 t} - a_2 d h(t) e^{j \omega_2 t} \\    
-Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) + a_2 (1-d) \delta(\omega - \omega_2) -a_1dH(\omega-\omega_1) - a_2dH(\omega-\omega_2) \\
-     &= a_1 (1-d) \delta(\omega - \omega_1) + a_2 (1-d) \\
-     &- a_1 d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n - \omega_1) + \delta(\omega - \alpha n - \omega_1) \right] \\
-     &- a_2 d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n - \omega_2) + \delta(\omega - \alpha n - \omega_2) \right]
+     &= a_1 e^{j \omega_1 t} - a_1 e^{j \omega_1 t}p(t) \\
+     &= a_1 e^{j \omega_1 t} - a_1 e^{j \omega_1 t}(d + dh(t)) \\    
+     &= a_1 (1-d) e^{j \omega_1 t} - a_1 d h(t) e^{j \omega_1 t} \\    
+Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
+     &= a_1 (1-d) \delta(\omega - \omega_1) \\
+     &- a_1 d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n - \omega_1) + \delta(\omega - \alpha n - \omega_1) \right]
 \end{split}
 \end{equation} 
 
-The fundamental terms have been reduced to $(1-d)$, and harmonic sidebands $H(\omega)$ has been introduced either side of $s_1$ and $s_2$.
+Observations:
+\begin{enumerate}
+\item The wanted signal has been reduced to $(1-d)$, and harmonics $H(\omega)$ have been introduced either side.
+\item The sideband level is proportional to the duty cycle $d$.
+\item If the harmonic levels approach $a_1$ they may cause interference.  However for PSK waveforms a margin of a few dB beneath the wanted signal would be acceptable.  This suggests digital waveforms are more robust to noise blanking that analog. 
+\item A second, strong signal in the pass band could introduce interference if one of it's harmonic sidebands approaches $a_1$ at $\omega_1$.  This is the intermodulation effect of noise blankers.
+\item The analysis in Section \ref{pwm} showed that even small amounts of jitter can cause broadband noise.  This analysis suggests a narrow time domain blanking pulse $T<<1/R$ can remove that noise with a modest impact on the wanted signal. 
+\item With noise/blanker pulse rates $R>B$, the harmonics are separated by $R$, so blanker harmonics are likely to be outside of our target pass band $B$.
+\end{enumerate}
+
 Octave plots for $R>B$ and $R<B$
-Exploring noise blanker
-what can we say about digital modulation?
-
-
-
-The $I(\omega_1-\omega_2)$ term is the $\omega_2$ power shifted onto $\omega_1$ by the rectangular analysis window $W$ and the noise blanker pulse $B$.  Letting the frequency offset between the signals $\Delta = (\omega_1-\omega_2)$ and expanding $sinc(x) = sin(x)/x$:
-\begin{equation}
-\begin{split}
-I(\Delta) &= W sinc (\Delta W/2) - T sinc (\Delta T/2) \\
-&= \frac{sin (\Delta W/2)}{\Delta} - \frac{sin (\Delta T/2)}{\Delta}
-\end{split}
-\end{equation} 
-As $\Delta$ increases the numerator in each term oscillates but has a maximum of 1.  Both terms have the same denominator so the envelope (or average) of both terms is the same for large $\Delta$.  For example at a 3kHz offset $\Delta = 2 \pi \times 10^3 $ rads/s the maximum contribution is $20log_{10}(1/\Delta) = -76$ dB. We can therefore conclude that for modest frequency offsets $\Delta$, the blanking operation has no more distortion than windowing, and can be contained by a suitable choice of a blanking pulse shape. This is at odds with some online sources which report the blanking pulse can produce significant intermodulation distortion so should be investigated further.
-
-TODO: Consider $W>>B$ to remove analysis window effect, find limit. Octave plots showing a few scenarios, e.g. $R>B$, $R<B$.
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

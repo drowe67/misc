@@ -128,20 +128,24 @@ Attacks:
 
 \section{Noise Blanker}
 
-Consider a signal $x(t)$ consisting of a wanted signal at $\omega_1$, an adjacent signal at $\omega_2$, and an impulse train that repeats every $T=1/R$ seconds.
+Consider a signal $x(t)$ consisting of a wanted signal $s_1(t)$, an adjacent signal $s_2(t)$, and an unwanted impulse train that repeats every $1/R$ seconds.
 \begin{equation}
-x(t) = a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} + a_3\sum_{n=-\infty}^{\infty}\delta(t-nT)
+\begin{split}
+x(t) &= s_1(t) + s_2(t) + a_3\sum_{n=-\infty}^{\infty}\delta(t-n/R) \\
+     &= a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} + a_3\sum_{n=-\infty}^{\infty}\delta(t-n/R)
+\end{split}
 \end{equation}
-To remove the effects of the impulse, a blanking pulse train $b(t)$ applied, each pulse having with $T$ seconds, and period $P$:
+To remove the impulse, a blanking pulse train $b(t)$ is applied.  Each pulse is $T$ seconds wide:
 \begin{equation}
 \begin{split}
 b(t) &= 1 - p(t) \\
-p(t) &= \sum_{n=-\infty}^{\infty}rect(t-nP) \\
+p(t) &= \sum_{n=-\infty}^{\infty}rect(t-n) \\
 rect(t) &= 
 	\begin{cases}
       1, & |t| <= T/2 \\
       0, & otherwise \\
-	\end{cases}
+	\end{cases} \\
+\sum_{n=-\infty}^{\infty}\delta(t-n/R) b(t) &= 0
 \end{split}
 \end{equation} 
 
@@ -156,45 +160,54 @@ rect(t) &=
 \end{tikzpicture}
 \end{figure}
 
-The pulse train $p(t)$ can be expressed as Fourier series (\ref{eq_pwm})
+The pulse train $p(t)$ can be expressed as Fourier Series (\ref{eq_pwm})
 \begin{equation}
 \begin{split}
 p(t) &= d+\frac{2}{\pi} \sum_{n=1}^{\infty} \frac{sin(\pi n d)}{n}cos(n \alpha t) \\
-     &= d + d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ e^{-j\alpha n} + e^{j \alpha n} \right]
+     &= d + d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ e^{-j\alpha n} + e^{j \alpha n} \right] \\
+     &= d + d h(t) \\
+h(t) &= \sum_{n=1}^{\infty} sinc(\pi n d) \left[ e^{-j\alpha n} + e^{j \alpha n} \right]  
 \end{split}
 \end{equation}
-where $\alpha=2 \pi R$ is the angular frequency of the pulse train, and $d$ is the duty cycle.  The Fourier transform of $b(t)$ is:
+where $\alpha=2 \pi R$ is the angular frequency of the pulse train, $d=TR$ is the duty cycle, and $h(t)$ is the RHS term containing the harmonics.  The Fourier Transform of $h(t)$ is:
 \begin{equation}
 \begin{split}
-B(w) &= \int_{-\infty}^{\infty}b(t)e^{-j \omega t}dt \\
-     &= \int_{-\infty}^{\infty} e^{-j \omega t}dt - \int_{-\infty}^{\infty} d e^{-j \omega t}dt \\
-     &- \int_{-\infty}^{\infty} d \sum_{n=1}^{\infty} sinc(\pi n d) e^{-j\alpha n}e^{-j \omega t}dt \\
-     &- \int_{-\infty}^{\infty} d \sum_{n=1}^{\infty} sinc(\pi n d) e^{j\alpha n}e^{-j \omega t}dt \\
-     &= (1-d) \delta(\omega) - d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n) + \delta(\omega - \alpha n) \right]
+H(w) &= \int_{-\infty}^{\infty}h(t)e^{-j \omega t}dt \\
+     &= \int_{-\infty}^{\infty} \sum_{n=1}^{\infty} sinc(\pi n d) e^{-j\alpha n}e^{-j \omega t}dt \\
+     &+ \int_{-\infty}^{\infty} \sum_{n=1}^{\infty} sinc(\pi n d) e^{j\alpha n}e^{-j \omega t}dt \\
+     &= \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n) + \delta(\omega - \alpha n) \right]
+\end{split}
+\end{equation}
+The frequency shifted Fourier transform of $h(t)e^{j \omega_1 t}$ is
+\begin{equation}
+\begin{split}
+\int_{-\infty}^{\infty} h(t)e^{j \omega_1 t} e^{-j \omega t}dt &= H(\omega-\omega_1) \\
+  &= \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n - \omega_1) + \delta(\omega - \alpha n - \omega_1) \right]
 \end{split}
 \end{equation}
 
-FT ....
-Freq shifted FT ...
-
-Then expand time domain
-Octave plots for R>B and R<B
-Exploring noise blanker
-what can we say about digital modulation?
-
-Consider the output of the noise blanker at $\omega_1$, over an interval of $W$ seconds:
+Consider the output of the noise blanker:
 
 \begin{equation}
 \begin{split}
 y(t) &= x(t)b(t) \\
-     &= a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} - a_1 e^{j \omega_1 t}rect(t) - a_2 e^{j \omega_2 t}rect(t) \\
-Y(w) &= \int_{-W/2}^{W/2} y(n) e^{-j \omega t} dt \\    
-Y(w) &= a_1 W sinc \left( \frac{(\omega-\omega_1)W}{2} \right) + a_2 W sinc \left( \frac{(\omega-\omega_2)W}{2}  \right)\\
-     &- a_1 T sinc \left( \frac{(\omega-\omega_1)T}{2} \right) - a_2 T sinc \left( \frac{(\omega-\omega_2)T}{2} \right) \\
-Y(w_1) &= a_1(W-T) + a_2 \left( W sinc \left( \frac{(\omega_1-\omega_2)W}{2} \right) - T sinc \left( \frac{(\omega_1-\omega_2)T}{2} \right) \right) \\
-Y(w_1) &= a_1(W-T) + a_2 I(\omega_1-\omega_2)
+     &= a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} - a_1 e^{j \omega_1 t}p(t) - a_2 e^{j \omega_2 t}p(t) \\
+     &= a_1 e^{j \omega_1 t} + a_2 e^{j \omega_2 t} - a_1 e^{j \omega_1 t}(d + dh(t))- a_2 e^{j \omega_2 t}(d + dh(t)) \\    
+     &= a_1 (1-d) e^{j \omega_1 t} + a_2 (1-d) e^{j \omega_2 t} - a_1 d h(t) e^{j \omega_1 t} - a_2 d h(t) e^{j \omega_2 t} \\    
+Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) + a_2 (1-d) \delta(\omega - \omega_2) -a_1dH(\omega-\omega_1) - a_2dH(\omega-\omega_2) \\
+     &= a_1 (1-d) \delta(\omega - \omega_1) + a_2 (1-d) \\
+     &- a_1 d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n - \omega_1) + \delta(\omega - \alpha n - \omega_1) \right] \\
+     &- a_2 d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n - \omega_2) + \delta(\omega - \alpha n - \omega_2) \right]
 \end{split}
 \end{equation} 
+
+The fundamental terms have been reduced to $(1-d)$, and harmonic sidebands $H(\omega)$ has been introduced either side of $s_1$ and $s_2$.
+Octave plots for $R>B$ and $R<B$
+Exploring noise blanker
+what can we say about digital modulation?
+
+
+
 The $I(\omega_1-\omega_2)$ term is the $\omega_2$ power shifted onto $\omega_1$ by the rectangular analysis window $W$ and the noise blanker pulse $B$.  Letting the frequency offset between the signals $\Delta = (\omega_1-\omega_2)$ and expanding $sinc(x) = sin(x)/x$:
 \begin{equation}
 \begin{split}

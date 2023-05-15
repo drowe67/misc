@@ -62,7 +62,7 @@ x(t) &= Ad+\frac{2A}{\pi} \sum_{n=1}^{\infty} \frac{sin(\pi n d)}{n}cos(n \omega
      &= Ad+\frac{2A}{\pi} \sum_{n=1}^{\infty} \frac{x(t)}{n} cos(n \omega t)
 \end{split}
 \end{equation}
-where $0<d<1$ is the duty cycle and $\omega=2 \pi f$ the fundamental frequency.  The Fourier series is a sequence of harmonics $cos(n \omega t)$, with the amplitude of each harmonic set by the $x(t)/n$ term. A typical value for $f$ is a few 10's of kHz to several hundred kHz. For example with f = 70kHz and $n=101$ we will have a harmonic at 7.1 MHz. The $1/n$ factor means the power of each harmonic falls off slowly with frequency, e.g. the $n=100$ harmonic will be just $10log_{10}(1/100)=-20$ dB down compared to the fundamental ($n=1$) power, and the $n=101$ harmonic almost the same power at $10log_{10}(1/101)=-20.043$ dB down.
+where $0<d<1$ is the duty cycle and $\omega=2 \pi R$ the fundamental frequency.  The Fourier series is a sequence of harmonics $cos(n \omega t)$, with the amplitude of each harmonic set by the $x(t)/n$ term. A typical value for $R$ is a few kHz to several hundred kHz. For example with R = 70kHz and $n=101$ we will have a harmonic at 7.1 MHz. The $1/n$ factor means the power of each harmonic falls off slowly with frequency, e.g. the $n=100$ harmonic will be just $10log_{10}(1/100)=-20$ dB down compared to the fundamental ($n=1$) power, and the $n=101$ harmonic almost the same power at $10log_{10}(1/101)=-20.043$ dB down.
 
 If the duty cycle $d$ is constant, then each harmonic is an unmodulated sine wave of constant amplitude. In practice $d$ is time varying, as the duty cycle is continuously adjusted by the power supply.  This leads to modulation of each harmonic $x(t)$, spreading the power to frequencies either side of the harmonic centre $n \omega$.
 
@@ -91,7 +91,7 @@ x_n(t) &= sin(\pi n d_c)cos(hd(t)) + cos(\pi n d_c)sin(hd(t)) \\
 \end{split}
 \end{equation}
 The LHS is a constant term related to the mean duty cycle of the PWM signal, the RHS is linear modulation term, i.e. a small linear modulation about a mean set point.  When multiplied by the $n$-th harmonic $cos(n \omega t)$ in (\ref{eq_pwm}):
-\begin{equation} \label{eq:small_h}
+\begin{equation}
 \begin{split}
 x_n(t)cos(n \omega t) &= \left[ sin(\pi n d_c) + hcos(\pi n d_c)d(t) \right] cos(n \omega t) \\
                       &= sin(\pi n d_c)cos(n \omega t)) + hcos(\pi n d_c)d(t)cos(n \omega t) \\
@@ -106,30 +106,60 @@ For larger $h$, Equation \ref{eq:pwm_n} can be interpreted as Phase Modulation (
 
 For example, let $a=0.02$ (a few percent jitter of the PWM duty cycle) and the bandwidth of the PWM control loop be $f_m=3$ kHz. At $n=100$ we have $h=\pi n a = 2\pi$, which implies a random deviation of $\pm 2\pi$ (two cycles of $sin()$), and an $x(t)$ bandwidth of $B_c=2(2 \pi+1)f_m = (4\pi+2)f_m = 43$ kHz.
 
-Given $h$ increases with $n$, we can expect to see AM type modulation either side of central harmonics lines at lower frequencies.  At intermediate frequencies a raised noise floor will be observed between harmonics.  As the frequency increases further the power of the harmonics lines will reduce and gradually be replaced by broadband noise.
+\subsection{Discussion}
 
-\subsection{Further Work}
-
-Figures illustrating effects above, perhaps an Octave simulation, showing small and large beta, sine wave and band pass white noise.
-
-What would we expect to hear with a bandpass receiver (ie it's impact) with $\omega > B$?  I guess a band pass version of d(t), this may or may not be white.  If not white, it may have structure we can exploit. It may also be periodic, of quasi-stationary.
-
-Attacks:
 \begin{enumerate}
-\item Estimation and subtraction of the signals. Key take away is mirror of signal about carrier. Estimation of signal from one sideband to cancel other.  Estimation of signal by AM demodulation (envelope). This will get awkward when it's spread so far that we get energy from n+1, n-1 near harmonic n.  However in that case it may not be as annoying/strong.
+\item Given $h$ increases with $n$, we can expect to see AM type modulation either side of central harmonics lines at lower frequencies.  At intermediate frequencies a raised noise floor will be observed between harmonics.  As the frequency increases further the power of the harmonics lines will reduce and gradually be replaced by broadband noise.
+\item With the common scenario of a receiver of bandwidth $B<R$, we would encounter sine wave "carriers" every R kHz as we tune.  Tuning between carriers would expect to hear a bandpass version of $d(t)$, this may or may not be white.  If not white, it may have structure we can exploit. It may also be periodic, of quasi-stationary.
+\item With a large number of PWM sources, the central limit theorem suggests the sum will converge to AWGN noise with very little structure in time or frequency.  This may the case with signals radiated from electricity power lines that are coupled to thousands of switch mode power supplies in a city.
+\item In the local case, it is possible that switch mode PWM or impulse noise may dominate a particular receiving station.
+\end{enumerate}
 
-\item Estimation of signal from adjacent harmonics.  Can we find $x_n(t)$ from $x_{n-1}(t)$?  $\omega$ and $n$ can be estimated.  A direct form solution is unlikely however the equations are differentiable so an iterative solution could be found.
+\subsection{Periodic Impulse Noise}
+
+This section attempted to explore the spectra of PWM power supplies which typically have a pulse rate $R$ greater than the receiver bandwidth $B$ (e.g. $B=3000$Hz for SSB signals on HF radio). A low frequency pulse train (such as ignition or $R=50 \ldots 60$ Hz impulses from domestic lighting) can also be interpreted as a pulse train with small duty cycle $d$, and $R<<B$.  In this case there will be a number of harmonics inside our receiver passband.  Consider (\ref{eq_pwm}), band pass filtered such that only harmonics $n_1 \ldots n_2$ remain:
+\begin{equation}
+\begin{split}
+x(t) &= Ad+Ad\sum_{n=1}^{\infty} sinc(\pi n d) cos(n \omega t) \\
+BPF \left[ x(t) \right] &= Ad\sum_{n=n_1}^{n=n_2} sinc(\pi n d) cos(n \omega t)
+\end{split}
+\end{equation}
+Shifting down to baseband, and making the substitution $k=n-n_1$:
+\begin{equation}
+\begin{split}
+BPF \left[ x(t) \right] cos(n_1 \omega t) &= \frac{Ad}{2} \sum_{k=0}^{n=n_2-n_1} sinc(\pi (k+n_1) d) cos(k \omega t) \\
+&+ \frac{Ad}{2} \sum_{k=0}^{n=n_2-n_1} sinc(\pi (k+n_1) d) cos((k+n_1) \omega t) \\
+&= b(t) + c(t)
+\end{split}
+\end{equation}
+By applying a low pass filter we are left with the baseband term $b(t)$:
+\begin{equation}
+\begin{split}
+b(t) &= \frac{Ad}{2} \sum_{k=0}^{n=n_2-n_1} sinc(\pi (k+n_1) d) cos(k \omega t) \\
+     &= \frac{Ad}{2} + \frac{Ad}{2} \sum_{k=1}^{n=n_2-n_1} sinc(\pi n_1 d + \pi k d) cos(k \omega t)
+\end{split}
+\end{equation}
+This expression is similar to the Fourier Series for a pulse train (\ref{eq_pwm}), but limited to $n_2-n_1$ harmonics by the bandwidth $B$ of the receiver.  The baseband signal $b(t)$ can therefore be interpreted as a periodic signal with the same period $\omega$ as the wideband periodic impulse noise $x(t)$.  The shape of the pulse train will be a modified version of the $x(t)$, as we are using a band pass set of $sinc()$ coefficients.  Given $d$ is likely to be small (e.g a $10 \mu$s pulse every 20ms), and $n_2-n_1 << n_1$, the coefficients are likely to be similar in amplitude across $n_1 \ldots n_2$, producing a high peak to average power (low duty cycle) ratio pulse train.
+
+Given $d$ is small, and there is still significant power at high harmonic numbers, $A$ must be very large for these impulse noise sources.
+
+\subsection{Attacks}
+
+\begin{enumerate}
+\item Estimation and subtraction of the signals. Key take away is mirror of $d(t)$ about harmonic centre. Estimation of signal from one sideband to cancel other, or from AM demodulation (envelope). This will be problematic when it's spread so far that we get energy from $n+1$, $n-1$ near harmonic $n$.  However in that case it may not be as annoying/strong.
+
+\item Estimation of signal from adjacent harmonics.  Can we find $x_n(t)$ from $x_{n-1}(t)$?  $\omega$ and $n$ can be estimated from the spectrum.  A direct form solution is unlikely however the equations are differentiable so an iterative solution could be found.
 
 \item Dual channel coherent removal.
 
-\item Noise blanking in the time domain.
+\item Noise blanking in the time domain.  This may be challenging with $R>100$ kHz, as the period becomes $< 10\mu$s, implying the need for a wide bandwidth and sample rate $>>100$ kHz in order to resolve individual noise pulses in the time domain.
 
 \item Training of time domain pulses, correlation and removal.
 \end{enumerate}
 
 \section{Noise Blanker}
 
-Consider a signal $x(t)$ consisting of a wanted signal $s(t)$, and an unwanted impulse train that repeats every $1/R$ seconds.
+Consider a signal $x(t)$ consisting of a wanted sinusoidal signal and an unwanted impulse train that repeats every $1/R$ seconds.
 \begin{equation}
 x(t) = a_1 e^{j \omega_1 t} + a_{imp}\sum_{n=-\infty}^{\infty}\delta(t-n/R)
 \end{equation}
@@ -162,17 +192,17 @@ The pulse train $p(t)$ can be expressed as Fourier Series (\ref{eq_pwm})
 \begin{equation}
 \begin{split}
 p(t) &= d+\frac{2}{\pi} \sum_{n=1}^{\infty} \frac{sin(\pi n d)}{n}cos(n \alpha t) \\
-     &= d + d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ e^{-j\alpha n} + e^{j \alpha n} \right] \\
+     &= d + d \sum_{n=1}^{\infty} sinc(\pi n d) \left[ e^{-j\alpha n t} + e^{j \alpha n t} \right] \\
      &= d + d h(t) \\
-h(t) &= \sum_{n=1}^{\infty} sinc(\pi n d) \left[ e^{-j\alpha n} + e^{j \alpha n} \right]  
+h(t) &= \sum_{n=1}^{\infty} sinc(\pi n d) \left[ e^{-j\alpha n t} + e^{j \alpha n t} \right]  
 \end{split}
 \end{equation}
 where $\alpha=2 \pi R$ is the angular frequency of the pulse train, $d=TR$ is the duty cycle, and $h(t)$ is the RHS term containing the harmonics.  The Fourier Transform of $h(t)$ is:
 \begin{equation}
 \begin{split}
 H(w) &= \int_{-\infty}^{\infty}h(t)e^{-j \omega t}dt \\
-     &= \int_{-\infty}^{\infty} \sum_{n=1}^{\infty} sinc(\pi n d) e^{-j\alpha n}e^{-j \omega t}dt \\
-     &+ \int_{-\infty}^{\infty} \sum_{n=1}^{\infty} sinc(\pi n d) e^{j\alpha n}e^{-j \omega t}dt \\
+     &= \int_{-\infty}^{\infty} \sum_{n=1}^{\infty} sinc(\pi n d) e^{-j\alpha n t}e^{-j \omega t}dt \\
+     &+ \int_{-\infty}^{\infty} \sum_{n=1}^{\infty} sinc(\pi n d) e^{j\alpha n t}e^{-j \omega t}dt \\
      &= \sum_{n=1}^{\infty} sinc(\pi n d) \left[ \delta(\omega + \alpha n) + \delta(\omega - \alpha n) \right]
 \end{split}
 \end{equation}
@@ -198,17 +228,25 @@ Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
 \end{split}
 \end{equation} 
 
-Observations:
+\begin{figure}[h]
+\caption{Two examples of Noise Blanker output spectrum $|Y(f)|$.  The green lines show a typical SSB radio bandwidth of $B=3000$ Hz. Top is pulse rate $R<B$, bottom with $R>B$.  Note the harmonic level increasing with duty cycle $d=TR$, and how the harmonics fall outside of $B$ on the bottom plot. }
+\label{fig:train_e_mean}
+\begin{center}
+\input blanker.tex
+\end{center}
+\end{figure}
+
+\subsection{Discussion}
+
 \begin{enumerate}
 \item The wanted signal has been reduced to $(1-d)$, and harmonics $H(\omega)$ have been introduced either side.
-\item The sideband level is proportional to the duty cycle $d$.
-\item If the harmonic levels approach $a_1$ they may cause interference.  However for PSK waveforms a margin of a few dB beneath the wanted signal would be acceptable.  This suggests digital waveforms are more robust to noise blanking that analog. 
-\item A second, strong signal in the pass band could introduce interference if one of it's harmonic sidebands approaches $a_1$ at $\omega_1$.  This is the intermodulation effect of noise blankers.
-\item The analysis in Section \ref{pwm} showed that even small amounts of jitter can cause broadband noise.  This analysis suggests a narrow time domain blanking pulse $T<<1/R$ can remove that noise with a modest impact on the wanted signal. 
-\item With noise/blanker pulse rates $R>B$, the harmonics are separated by $R$, so blanker harmonics are likely to be outside of our target pass band $B$.
+\item The harmonics level are proportional to the duty cycle $d$.
+\item If the harmonic levels approach $a_1$ they may cause interference.  However for PSK waveforms a margin of only a few dB beneath the wanted signal would be acceptable.  This suggests digital waveforms can benefit more from noise blanking than analog. 
+\item A second, strong signal in the processing bandwidth could introduce interference if one of it's harmonic sidebands approaches $a_1$ at $\omega_1$.  This is the intermodulation effect of noise blankers.
+\item The PWM analysis in Section \ref{pwm} showed that a small duty cycle/small jitter signal can cause broadband noise.  This suggests a narrow time domain blanking pulse $T<<1/R$ can remove that noise with acceptable impact on the wanted signal. 
+\item With noise/blanker pulse rates $R>B$, the harmonics are separated by $R$, so blanker harmonics are likely to be outside of our target pass band $B$.  However intermodulation effects are larger, so strong signals further away could be aliased into our passband. 
+\item So far a rectangular blanking pulse has been assumed. A smoother function for $p(t)$ is likely to reduce the level of $H(\omega)$. 
 \end{enumerate}
-
-Octave plots for $R>B$ and $R<B$
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

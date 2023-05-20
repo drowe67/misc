@@ -40,8 +40,8 @@ For an EMI signal to be transmitted, we need a source of AC current and an anten
  Name & Rate & Time & Frequency & Antenna & BW \\
  \hline
  Power Line & 1 Hz & random pulse & uniform & power lines & $R < B$ \\
- Lighting & 50-60 Hz & pulse train & harmonics & house wiring & $R < B$ \\
- SMPS & 3-300 kHz & pulse train & harmonics & house wiring & $R > B$ \\
+ Downlights & 50-60 Hz & pulse train & harmonics & house wiring & $R < B$ \\
+ SMPS & 10-300 kHz & pulse train & harmonics & house wiring & $R > B$ \\
  DSL & 1-12 MHz & AWGN & AWGN & phone lines & $R > B$ \\
  Urban Sum & lower HF & AWGN & AWGN & power lines & $R > B$ \\
  \hline
@@ -52,8 +52,11 @@ For an EMI signal to be transmitted, we need a source of AC current and an anten
 
 The modulation used in our desired target signals is a factor.  Digital modes can operate at lower SNRs than analog SSB.  Digital modes can also use Forward Error Correction (FEC), for example we can correct a bit error caused by a noise impulse wiping out one bit.  Digital modulation also has a threshold effect - once the interference is a few dB lower than the wanted signals, it's impact on bit errors is small. FM, FSK \& PSK are more robust to impulsive noise than amplitude modulated modes like SSB.
 
-\section{Pulse Width Modulation}
+\section{EMI from Pulse Trains}
 \label{pwm}
+
+\subsection{Pulse Width Modulation}
+\label{smps}
 
 The PWM switch mode power supply is a ubiquitous source of interference.  Consider the Fourier Series of an ideal pulse train \cite{wikipedia_pulse}:
 \begin{equation} \label{eq_pwm}
@@ -117,7 +120,7 @@ For example, let $a=0.02$ (a few percent jitter of the PWM duty cycle) and the b
 
 \subsection{Periodic Impulse Noise}
 
-This section attempted to explore the spectra of PWM power supplies which typically have a pulse rate $R$ greater than the receiver bandwidth $B$ (e.g. $B=3000$Hz for SSB signals on HF radio). A low frequency pulse train (such as ignition or $R=50 \ldots 60$ Hz impulses from domestic lighting) can also be interpreted as a pulse train with small duty cycle $d$, and $R<<B$.  In this case there will be a number of harmonics inside our receiver passband.  Consider (\ref{eq_pwm}), band pass filtered such that only harmonics $n_1 \ldots n_2$ remain:
+Section \ref{smps} explored the spectra of PWM power supplies which typically have a pulse rate $R$ greater than the receiver bandwidth $B$ (e.g. $B=3000$Hz for SSB signals on HF radio). A low frequency pulse train (such as ignition or $R=50 \ldots 60$ Hz impulses from domestic lighting) can also be interpreted as a pulse train with small duty cycle $d$, and $R<<B$.  In this case there will be a number of harmonics inside our receiver passband.  Consider (\ref{eq_pwm}), band pass filtered such that only harmonics $n_1 \ldots n_2$ remain:
 \begin{equation}
 \begin{split}
 x(t) &= Ad+Ad\sum_{n=1}^{\infty} sinc(\pi n d) cos(n \omega t) \\

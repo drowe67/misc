@@ -251,6 +251,66 @@ Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
 \item So far a rectangular blanking pulse has been assumed. A smoother function for $p(t)$ is likely to reduce the level of $H(\omega)$. 
 \end{enumerate}
 
+\section{Experimental Results}
+
+In May 2023 a series some experimental work was conducted at the authors suburban home.  The goal was to gain experience in measuring EMI and attempt to fit the experimental results to the theoretical framework above.
+
+The home is located Adelaide (population 1 million), South Australia and is on a suburban square corner block of 500 m^2.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using 70 year old twisted pair.  
+
+The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house, the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between low noise levels and completely unusable (time varying).
+
+TODO figure, Google map?
+
+TODO table of noise levels, levels, frequency, classification
+
+If we want to manage noise, we first need to measure it.
+use of S-meter, spec-an, waterfall displays, scope
+
+establish baseline goal against these measurements
+
+Dual antenna experiments, Afredri, had to wind gain dowsn due to strong local broadcast signals, increased noise figure.
+
+\subsection{Discussion and Conclusion}
+
+The dominant EMI on both bands is AWGN, which is the sum of many urban EMI signals. We cannot attack this with blanking, as it has no time domain pulse structure.  This leaves diversity, which requires the received signal on antenna 1 to be related to the signal received on antenna 2 by a single complex coefficient:
+\begin{equation}
+r_1(t)=cr_2(t)
+\end{equation}
+This implies the target EMI signal must be above the receiver noise floor in both channels (TODO extend expression for this, maybe include uncorrelated near field).
+
+In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the EMI fields must be fully resolved far field signals for the diversity attack to work.  Alternatively antennas with very small separation should be used such that near field signals are detected at adequate levels in both antennas.
+
+Near field signals can be induced in antenna systems by common mode injection into feed lines and antenna conductors. We should take steps to reduce any near field signals by routing feed lines and antennas away from near field sources such as house and street wiring, and using balanced antenna systems.
+
+However physical distancing is problematic on small urban blocks, where any antenna is likely to be less than one wavelength from conductors radiating EMI.
+
+Antenna topologies may help reduce near field detection.  For example the conductors of physically small, non resonant loops and dipoles can be placed further away from near field sources compared to a full length dipole that must extend across the entire side of an urban block.
+
+Height rather than x-y separation
+Preamplifier located at feedpoint, so increase teh ratio of rx signal to common mode feedline (maybe, depends how it gets in I guess).
+common mode chokes
+
+Need for objective testing
+
+Beam antenna, as AWGN noise field is likely not a point source, but the sum of many signals received from all directions, so N the same, S will increase for point source wanted signal
+
+
+TODO: figure
+
+The loop in/on ground topilogy has been proposed.  While this would not naturally reduce 
+
+discussion of antenna topologies (refs to log in ground, small loops), common mode feedline.  Small non resonant loops that don't couple (ref)
+
+next steps, core aim of testing theory that AWGN "urban sum" can be supressed using coherent methods
+
+identical antennas, loops to ensure good balance, small to enable placing away from near field.
+measure noise figure
+BCI filter
+A way to measure SNR, e.g. car Tx, log signal as I drive around, on two channels, try loop v diople, control for azimuth
+ 
+model, EMI as sum of several signals
+
+
 \bibliographystyle{plain}
 \bibliography{emi_refs}
 \end{document}

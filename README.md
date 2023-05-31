@@ -8,7 +8,7 @@ Some small projects on miscellaneous topics.
 | Mar 2023 | ldpc_even | Proving an expression used in LDPC decoders to determine the probability that a sequence of bits has an even number of ones |
 | April 2023 | gt_sun | Derivation of the expression for estimating receiver G/T from power measurements obtained by pointing an antenna at the sun and quiet sky |
 | May 2023 | rect_ft | Fourier Transforms of rectangular functions |
-| May 2023 | emi | EMI study |
+| May 2023 | emi | HF EMI study: Qualitative discussion of EMI on lower HF bands, expressions for PWM noise and noise blanking, experimental EMI measurements |
 
 I build the Latex documents using Texmaker:
 

@@ -2,6 +2,7 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usepackage{siunitx}
 \begin{document}
 
 \title{Electro Magnetic Interference and HF Radio Receivers}
@@ -11,7 +12,7 @@
  
 Throughout the 20th century HF radio receiver technology evolved with the aim of detecting distant, narrow band signals.  Radio noise sets the limits of detection \cite{itu372}, and was assumed to be from natural sources or the receiver itself. However in the early 21st century, from lower HF right up to UHF noise from human activity now dominates the detection problem.  We are no longer seeking to maximise signal-to-noise ratio (SNR), but signal to EMI ratio (SER).
 
-We are slowly losing the ability to use analog SSB in urban areas.  Many Hams report S9 noise levels, $9 \times 6 = 54$ dB Hams higher than a quiet S0 country station.  Consequently, digital modes that can operate operate at low SERs are becoming popular.  Digital modes are in an arms race with EMI.
+We are slowly losing the ability to use analog SSB in urban areas.  Many Hams report S9 noise levels, $9 \times 6 = 54$ dB higher than a quiet S0 country station.  Consequently, digital modes that can operate operate at low SERs are becoming popular.  Digital modes are in an arms race with EMI.
 
 Our target radio signals are from distant sources, weak, narrow band, and evolve slowly in time. Human generated radio noise tends to be very strong, wideband, with a time domain envelope that evolves quickly in time.  It is often radiated from nearby sources, such as power lines lines and house wiring a few 10s of meters from our antenna.  It has significant structure, so can be interpreted as an interfering signal, rather than random noise.
 
@@ -25,13 +26,15 @@ The Time and Frequency columns describes the distribution of energy in time and 
 
 In contrast DSL signals radiated from leaky phone lines looks like noise in the time domain and frequency domain, making it particularity hard to identify and remove.  It is very similar to AWGN from natural noise sources.
 
-Bandwidth relates the rate $R$ of the noise pulses to the bandwidth $B$ of a typical SSB HF receiver (around 3000 Hz).  When $R<<B$, we tend to hear individual noise pulses, and separate pulses can be observed in a time domain plot of the receiver output waveform.  When $R>B$, we hear just a bandpass segment of the EMI signal, for example a tone from a PWM harmonic, or some modulated wideband noise.
+Bandwidth relates the rate $R$ of the noise pulses to the bandwidth $B$ of a typical SSB HF receiver (around 2000 Hz).  When $R<<B$, we tend to hear individual noise pulses, and separate pulses can be observed in a time domain plot of the receiver output waveform.  When $R>B$, we hear just a bandpass segment of the EMI signal, for example a tone from a PWM harmonic, or some modulated noise.
 
-Our narrow band receiver smooths the time domain envelope. As $R$ relative to $B$ increase, our receiver converts a series of short time domain pulses (such as a PWM waveform) into a longer pulses with a smooth time domain envelope (AWGN noise), making the EMI signal harder to identify and remove.
+Our narrow band receiver smooths the time domain envelope of noise impulses. As $R$ relative to $B$ increase, our receiver smears the short time domain pulses (such as a PWM waveform) into a longer pulses with a smoother time domain envelope (such as damped sinusoids and in the limiting case AWGN noise), making the EMI signal harder to identify and remove.
 
-If we position our receiver some distance from many urban noise signals (for example the middle of an urban park), we get the sum of many signals added together, which converges to AWGN noise.  The level reduces with distance, so an effective attack is decamping to a country location, and operating a portable station for the day.
+For EMI signal to be detected by our receiver, we need a source of RF currents and a way of coupling those current into our antenna system (which includes the antenna and feed line).  On lower HF our antenna systems are typically located less than one wavelength from the source of AC currents so both near and far field coupling is possible, and indeed a combination of both seems likely.
 
-For an EMI signal to be transmitted, we need a source of AC current and an antenna. Domestic electricity lines appear to operate in a mode part way between transmission line and antenna.  RF does seem to propagate along them quite well, they then radiate quiet strong signals to nearby homes.  Likewise, DSL signals on ancient phone lines are poor transmission lines and and reasonably effective antennas, radiating significant local EMI. A home with buried electricity lines and fibre or wireless supplying Internet is desirable.
+If we position our receiver some distance from many urban noise signals (for example the middle of an urban park), we get the sum of many signals added together, which converges to far field AWGN noise.  The level reduces with distance, so an effective attack is decamping to a country location, and operating a portable station for the day.
+
+Domestic electricity lines appear to operate in a mode part way between transmission line and antenna.  RF does seem to propagate along them quite well, they then couple quite strong signals to nearby antennas.  Likewise, DSL signals on ancient phone lines are poor transmission lines and and reasonably effective antennas, radiating significant local EMI. A home with buried electricity lines and fibre or wireless supplying Internet is an effective attack on these sources.
 
 \begin{table}[h]
 \centering
@@ -95,7 +98,7 @@ x_n(t) &= sin(\pi n d_c)cos(hd(t)) + cos(\pi n d_c)sin(hd(t)) \\
 \end{equation}
 The LHS is a constant term related to the mean duty cycle of the PWM signal, the RHS is linear modulation term, i.e. a small linear modulation about a mean set point.  When multiplied by the $n$-th harmonic $cos(n \omega t)$ in (\ref{eq_pwm}):
 \begin{equation}
-\begin{split}
+\begin{split} \label{eq:small_h2}
 x_n(t)cos(n \omega t) &= \left[ sin(\pi n d_c) + hcos(\pi n d_c)d(t) \right] cos(n \omega t) \\
                       &= sin(\pi n d_c)cos(n \omega t)) + hcos(\pi n d_c)d(t)cos(n \omega t) \\
                       &= c_1 cos(n \omega t)) + c_2 d(t)cos(n \omega t) \\
@@ -103,9 +106,9 @@ x_n(t)cos(n \omega t) &= \left[ sin(\pi n d_c) + hcos(\pi n d_c)d(t) \right] cos
                    c_2 &= hcos(\pi n d_c)
 \end{split}
 \end{equation}
-By examining the different frequency terms we can estimate the spectrum of the PWM signal near the n-th harmonic. Note $c_1$ and $c_2$ are constants that do not affect the number of different frequency terms. The LHS of (\ref{eq:small_h}) is a constant carrier term at the harmonic centre. The product of $d(t)cos(n \omega t))$ will produce images of the spectra of d(t) either side of $n \omega$. This is Amplitude Modulation (AM).  For example if $d(t)$ is a random variable with maximum frequency $\omega_m$ radians, we would see a uniform noise spectrum over the interval $n \omega \pm \omega_m$, with a central "carrier" spectral line at $n \omega$. If $\omega_m > \omega/2$, the entire region between each harmonic will have additive white noise generated from the PWM signal.
+By examining the different frequency terms we can estimate the spectrum of the PWM signal near the n-th harmonic. Note $c_1$ and $c_2$ are constants that do not affect the number of different frequency terms. The LHS of (\ref{eq:small_h2}) is a constant carrier term at the harmonic centre. The product of $d(t)cos(n \omega t))$ will produce images of the spectra of d(t) either side of $n \omega$. Thus (\ref{eq:small_h2}) is Amplitude Modulated (AM) signal.  For example if $d(t)$ is a random variable with maximum frequency $\omega_m$ radians, we would see a uniform noise spectrum over the interval $n \omega \pm \omega_m$, with a central "carrier" spectral line at $n \omega$. If $\omega_m > \omega/2$, the entire region between each harmonic will have additive white noise generated from the PWM signal.
 
-For larger $h$, Equation \ref{eq:pwm_n} can be interpreted as Phase Modulation (PM) \cite{wikipedia_phase} of a zero frequency carrier. Assuming a random $d(t)$, the resulting spectra of $x(t)$ can be approximated using Carsons Rule, as having 98\% of it's power contained within $B_c=2(h+1)f_m$ Hz, where $f_m$ is the maximum frequency component of $d(t)$. When multiplied by the $cos(n \omega t)$ term, the PM signal will spread the power of the carrier over range of adjacent frequencies, replacing the PWM carrier in the small $h$ case with a band of white noise.
+For larger $h$, Equation \ref{eq:pwm_n} can be interpreted as Phase Modulation (PM) \cite{wikipedia_phase} of a zero frequency carrier. Assuming a random $d(t)$, the resulting spectra of $x(t)$ can be approximated using Carsons Rule, as having 98\% of it's power contained within $B_c=2(h+1)f_m$ Hz, where $f_m$ is the maximum frequency component of $d(t)$. When multiplied by the $cos(n \omega t)$ term, the PM signal will spread the power of the carrier over range of adjacent frequencies, replacing the PWM carrier in the small $h$ case with a wideband signal.
 
 For example, let $a=0.02$ (a few percent jitter of the PWM duty cycle) and the bandwidth of the PWM control loop be $f_m=3$ kHz. At $n=100$ we have $h=\pi n a = 2\pi$, which implies a random deviation of $\pm 2\pi$ (two cycles of $sin()$), and an $x(t)$ bandwidth of $B_c=2(2 \pi+1)f_m = (4\pi+2)f_m = 43$ kHz.
 
@@ -113,14 +116,14 @@ For example, let $a=0.02$ (a few percent jitter of the PWM duty cycle) and the b
 
 \begin{enumerate}
 \item Given $h$ increases with $n$, we can expect to see AM type modulation either side of central harmonics lines at lower frequencies.  At intermediate frequencies a raised noise floor will be observed between harmonics.  As the frequency increases further the power of the harmonics lines will reduce and gradually be replaced by broadband noise.
-\item With the common scenario of a receiver of bandwidth $B<R$, we would encounter sine wave "carriers" every R kHz as we tune.  Tuning between carriers would expect to hear a bandpass version of $d(t)$, this may or may not be white.  If not white, it may have structure we can exploit. It may also be periodic, of quasi-stationary.
+\item With the common scenario of a receiver of bandwidth $B<R$, we would encounter sine wave "carriers" every R kHz as we tune.  Tuning between carriers would expect to hear a bandpass version of $d(t)$, this may or may not be white.  If not white, it may have structure we can exploit.
 \item With a large number of PWM sources, the central limit theorem suggests the sum will converge to AWGN noise with very little structure in time or frequency.  This may the case with signals radiated from electricity power lines that are coupled to thousands of switch mode power supplies in a city.
 \item In the local case, it is possible that switch mode PWM or impulse noise may dominate a particular receiving station.
 \end{enumerate}
 
 \subsection{Periodic Impulse Noise}
 
-Section \ref{smps} explored the spectra of PWM power supplies which typically have a pulse rate $R$ greater than the receiver bandwidth $B$ (e.g. $B=3000$Hz for SSB signals on HF radio). A low frequency pulse train (such as ignition or $R=50 \ldots 60$ Hz impulses from domestic lighting) can also be interpreted as a pulse train with small duty cycle $d$, and $R<<B$.  In this case there will be a number of harmonics inside our receiver passband.  Consider (\ref{eq_pwm}), band pass filtered such that only harmonics $n_1 \ldots n_2$ remain:
+Section \ref{smps} explored the spectra of PWM power supplies which typically have a pulse rate $R$ greater than the receiver bandwidth $B$ (e.g. $B=2000$Hz for SSB signals on HF radio). A low frequency pulse train (such as ignition or $R=50 \ldots 60$ Hz impulses from domestic lighting) can also be interpreted as a pulse train with small duty cycle $d$, and $R<<B$.  In this case there will be a number of harmonics inside our receiver passband.  Consider (\ref{eq_pwm}), band pass filtered such that only harmonics $n_1 \ldots n_2$ remain:
 \begin{equation}
 \begin{split}
 x(t) &= Ad+Ad\sum_{n=1}^{\infty} sinc(\pi n d) cos(n \omega t) \\
@@ -142,7 +145,7 @@ b(t) &= \frac{Ad}{2} \sum_{k=0}^{n=n_2-n_1} sinc(\pi (k+n_1) d) cos(k \omega t) 
      &= \frac{Ad}{2} + \frac{Ad}{2} \sum_{k=1}^{n=n_2-n_1} sinc(\pi n_1 d + \pi k d) cos(k \omega t)
 \end{split}
 \end{equation}
-This expression is similar to the Fourier Series for a pulse train (\ref{eq_pwm}), but limited to $n_2-n_1$ harmonics by the bandwidth $B$ of the receiver.  The baseband signal $b(t)$ can therefore be interpreted as a periodic signal with the same period $\omega$ as the wideband periodic impulse noise $x(t)$.  The shape of the pulse train will be a modified version of the $x(t)$, as we are using a band pass set of $sinc()$ coefficients.  Given $d$ is likely to be small (e.g a $10 \mu$s pulse every 20ms), and $n_2-n_1 << n_1$, the coefficients are likely to be similar in amplitude across $n_1 \ldots n_2$, producing a high peak to average power (low duty cycle) ratio pulse train.
+This expression is similar to the Fourier Series for a pulse train (\ref{eq_pwm}), but limited to $n_2-n_1$ harmonics by the bandwidth $B$ of the receiver.  The baseband signal $b(t)$ can therefore be interpreted as a periodic signal with the same period $\omega$ as the wideband periodic impulse noise $x(t)$.  The shape of the pulse train will be a modified version of the $x(t)$, as we are using a band pass set of $sinc()$ coefficients.  Given the duty cycle $d$ is likely to be small (e.g a $10 \mu$s pulse every 20ms), and $n_2-n_1 << n_1$, the coefficients are likely to be similar in amplitude across $n_1 \ldots n_2$, producing a high peak to average power (low duty cycle) ratio pulse train.
 
 Given $d$ is small, and there is still significant power at high harmonic numbers, $A$ must be very large for these impulse noise sources.
 
@@ -153,7 +156,7 @@ Given $d$ is small, and there is still significant power at high harmonic number
 
 \item Estimation of signal from adjacent harmonics.  Can we find $x_n(t)$ from $x_{n-1}(t)$?  $\omega$ and $n$ can be estimated from the spectrum.  A direct form solution is unlikely however the equations are differentiable so an iterative solution could be found.
 
-\item Dual channel coherent removal.
+\item Dual channel coherent removal (diversity receiver).
 
 \item Noise blanking in the time domain.  This may be challenging with $R>100$ kHz, as the period becomes $< 10\mu$s, implying the need for a wide bandwidth and sample rate $>>100$ kHz in order to resolve individual noise pulses in the time domain.
 
@@ -232,7 +235,7 @@ Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
 \end{equation} 
 
 \begin{figure}[h]
-\caption{Two examples of Noise Blanker output spectrum $|Y(f)|$.  The green lines show a typical SSB radio bandwidth of $B=3000$ Hz. Top is pulse rate $R<B$, bottom with $R>B$.  Note the harmonic level increasing with duty cycle $d=TR$, and how the harmonics fall outside of $B$ on the bottom plot. }
+\caption{Two examples of Noise Blanker output spectrum $|Y(f)|$.  The green lines show a sample SSB radio bandwidth of $B=3000$ Hz. Top is pulse rate $R<B$, bottom with $R>B$.  Note the harmonic level increasing with duty cycle $d=TR$, and how the harmonics fall outside of $B$ on the bottom plot. }
 \label{fig:train_e_mean}
 \begin{center}
 \input blanker.tex
@@ -242,23 +245,31 @@ Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
 \subsection{Discussion}
 
 \begin{enumerate}
-\item The wanted signal has been reduced to $(1-d)$, and harmonics $H(\omega)$ have been introduced either side.
+\item The wanted signal has been reduced to $(1-d)$, and harmonics $H(\omega)$ have been introduced either side.  
+\item An attenuation of $(1-d)$ is quite modest, for example if half of the signal is blanked ($d=0.5$), we lose just 3dB of the wanted signal.  So quite heavy blanking is feasible, if it improves the output SNR by removing the noise pulse.
 \item The harmonics level are proportional to the duty cycle $d$.
-\item If the harmonic levels approach $a_1$ they may cause interference.  However for PSK waveforms a margin of only a few dB beneath the wanted signal would be acceptable.  This suggests digital waveforms can benefit more from noise blanking than analog. 
+\item If the harmonic levels approach $a_1$ they may cause interference.  However for digital waveforms a margin of only a few dB beneath the wanted signal would be acceptable.  This suggests digital waveforms can benefit more from noise blanking than analog. 
 \item A second, strong signal in the processing bandwidth could introduce interference if one of it's harmonic sidebands approaches $a_1$ at $\omega_1$.  This is the intermodulation effect of noise blankers.
 \item The PWM analysis in Section \ref{pwm} showed that a small duty cycle/small jitter signal can cause broadband noise.  This suggests a narrow time domain blanking pulse $T<<1/R$ can remove that noise with acceptable impact on the wanted signal. 
 \item With noise/blanker pulse rates $R>B$, the harmonics are separated by $R$, so blanker harmonics are likely to be outside of our target pass band $B$.  However intermodulation effects are larger, so strong signals further away could be aliased into our passband. 
 \item So far a rectangular blanking pulse has been assumed. A smoother function for $p(t)$ is likely to reduce the level of $H(\omega)$. 
 \end{enumerate}
 
-\section{Experimental Results}
+\section{Experimental Measurements}
 
 In May 2023 a series some experimental work was conducted at the authors suburban home.  The goal was to gain experience in measuring EMI and attempt to fit the experimental results to the theoretical framework above.
 
-The home is located Adelaide (population 1 million), South Australia and is on a suburban square corner block of 500 m^2.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using 70 year old twisted pair.  
+The home is located Adelaide (population 1.3 million), South Australia and is on a suburban square corner block of 550 \si{\metre\squared}.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using overhead 70 year old phone lines.  There are two adjacent houses, and the home has a 4 kw solar PV system.
 
-The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house, the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between low noise levels and completely unusable (time varying).
+The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house, the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
 
+\begin{figure}[h]
+\caption{Map of the authors home.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and roof mounted solar PV system}
+\label{fig:home_map}
+\begin{center}
+\includegraphics[width=12cm]{house_map.png}
+\end{center}
+\end{figure}
 TODO figure, Google map?
 
 TODO table of noise levels, levels, frequency, classification
@@ -270,7 +281,7 @@ establish baseline goal against these measurements
 
 Dual antenna experiments, Afredri, had to wind gain dowsn due to strong local broadcast signals, increased noise figure.
 
-\subsection{Discussion and Conclusion}
+\subsection{Discussion}
 
 The dominant EMI on both bands is AWGN, which is the sum of many urban EMI signals. We cannot attack this with blanking, as it has no time domain pulse structure.  This leaves diversity, which requires the received signal on antenna 1 to be related to the signal received on antenna 2 by a single complex coefficient:
 \begin{equation}

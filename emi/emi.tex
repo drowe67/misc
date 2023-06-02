@@ -173,16 +173,18 @@ To remove the impulse, a blanking pulse train $b(t)$ is applied.  Each pulse is 
 \begin{equation}
 \begin{split}
 b(t) &= 1 - p(t) \\
-p(t) &= \sum_{n=-\infty}^{\infty}rect(t-n) \\
+p(t) &= \sum_{n=-\infty}^{\infty}rect(t-n/R) \\
 rect(t) &= 
 	\begin{cases}
       1, & |t| <= T/2 \\
       0, & otherwise \\
 	\end{cases} \\
-\sum_{n=-\infty}^{\infty}\delta(t-n/R) b(t) &= 0
 \end{split}
 \end{equation} 
-
+The blanking pulse train removes the impulse pulse train such that:
+\begin{equation}
+\sum_{n=-\infty}^{\infty}\delta(t-n/R) b(t) = 0
+\end{equation}
 \begin{figure}[h]
 \caption{Blanking Pulse $b(t)$ }
 \vspace{5mm}
@@ -245,74 +247,108 @@ Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
 \subsection{Discussion}
 
 \begin{enumerate}
-\item The wanted signal has been reduced to $(1-d)$, and harmonics $H(\omega)$ have been introduced either side.  
+\item The wanted signal has been reduced to $(1-d)$, and harmonics $H(\omega)$ have been introduced either side.  These are spectral copies of the input signal, spaced every $\alpha$ radians/s.
 \item An attenuation of $(1-d)$ is quite modest, for example if half of the signal is blanked ($d=0.5$), we lose just 3dB of the wanted signal.  So quite heavy blanking is feasible, if it improves the output SNR by removing the noise pulse.
-\item The harmonics level are proportional to the duty cycle $d$.
+\item The harmonic levels are proportional to the duty cycle $d$.
 \item If the harmonic levels approach $a_1$ they may cause interference.  However for digital waveforms a margin of only a few dB beneath the wanted signal would be acceptable.  This suggests digital waveforms can benefit more from noise blanking than analog. 
-\item A second, strong signal in the processing bandwidth could introduce interference if one of it's harmonic sidebands approaches $a_1$ at $\omega_1$.  This is the intermodulation effect of noise blankers.
+\item A second, strong signal in the passband could introduce interference if one of it's harmonic sidebands approaches $a_1$ at $\omega_1$.  This is the intermodulation effect of noise blankers.
 \item The PWM analysis in Section \ref{pwm} showed that a small duty cycle/small jitter signal can cause broadband noise.  This suggests a narrow time domain blanking pulse $T<<1/R$ can remove that noise with acceptable impact on the wanted signal. 
 \item With noise/blanker pulse rates $R>B$, the harmonics are separated by $R$, so blanker harmonics are likely to be outside of our target pass band $B$.  However intermodulation effects are larger, so strong signals further away could be aliased into our passband. 
 \item So far a rectangular blanking pulse has been assumed. A smoother function for $p(t)$ is likely to reduce the level of $H(\omega)$. 
 \end{enumerate}
 
+\section{Antenna Systems}
+
+Noise signals can be induced in antenna systems and hence receivers by injection of common mode currents into feed lines. We should take steps to reduce coupling by routing feed lines away from EMI sources such as household wiring.  The injection of common mode feed line currents into our receiver can be reduced by using balanced antenna systems and common mode chokes. A preamplifier located at the feedpoint may increase the ratio of wanted Rx signal to common mode feedline noise, depending on how the common mode signal is coupled into the antenna system. 
+
+Physical distancing of the antenna elements from noise sources will help reduce near field coupling more than far field, due to the strong relationship between near field strength and distance.  However physical distancing is problematic on small urban blocks, where any antenna is likely to be less than one wavelength from conductors radiating EMI.  Increased antenna height can help increase physical separation, if permitted by local government regulations.
+
+\subsection{Diversity}
+
+Consider an EMI signal $e(t)$ received on two nearby antennas:
+\begin{equation}
+\begin{split}
+r_1(t) &= a_1 e(t) \\
+r_2(t) &= a_2 e(t) \\
+\end{split}
+\end{equation}
+where $a_1$ and $a_2$ are complex constants that model gain and phase shift variations on the two antennas. It can be shown that:
+\begin{equation} \label{eq_diversity1}
+r_1(t) = cr_2(t)
+\end{equation}
+where $c=a_1/a_2$, the ratio of two complex gains.  Thus if we can estimate $c$, we can use (\ref{eq_diversity1}) to estimate and remove the EMI $r_1(t)$ received on antenna 1. To satisfy (\ref{eq_diversity1}), we need to choose $c$ to minimise the cost function:
+\begin{equation} 
+E = r_1(t) - cr_2(t)
+\end{equation}
+This model implies the EMI signal must be present in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the EMI fields must be fully resolved far field signals for the diversity attack to work.  Alternatively antennas with small separation should be used such that near field signals are detected at adequate levels in both antennas.
+
+\subsection{Directional Antennas}
+
+Consider a isotropic antenna that receives power equally from all directions.  The gain pattern can be visualised a sphere of constant radius, with a solid angle of $4 \pi$ steradians. Now consider an ideal directional antenna with a cone shaped pattern that receives all it's power from a solid angle of $\theta$ steradians, and no power from any other angle.  It's power gain is $G=\frac{4 \pi}{\theta}$. 
+
+If the EMI is the sum of many sources it is likely to have equal power flux density in all directions.  Consider an isotropic antenna placed at the centre of this field. If the total noise power received from an isotropic antenna is $N$ watts, the noise power in a solid angle of $\theta$ radians is $N \frac{\theta}{4 \pi}$ Watts, and the noise power at the directional antenna terminals is:
+\begin{equation}
+\begin{split}
+ P &= N \frac{\theta}{4 \pi} G \\
+   &= N \frac{\theta}{4 \pi} \frac{4 \pi}{\theta} \\
+   &= N
+\end{split}
+\end{equation}
+Thus the noise power for a directional antenna is the same as an isotropic antenna and the same in any direction. In contrast our far field wanted signal is a point source. If that signal develops a power of $S$ watts into an isotropic antenna, it will develop a power of $GS$ watts at the terminals of our directional antenna. The S/N improvement using a directional antenna in a uniform EMI field is therefore improved by the antenna gain $G$.
+
+If the EMI is a point source, we may be able to place it in a pattern null using a directional antenna or diversity/beamforming techniques, further improving the effectiveness of the attack.
+
+\subsection{Topologies}
+
+Antenna topologies may help reduce near field coupling.  For example the conductors of physically small, non resonant loops and dipoles can be placed further away from near field sources compared to a full length dipole that must extend across the entire width of an urban block \cite{lz1aq}.
+
+There is some experimental evidence that the loop in/on ground topology \cite{k5jy_log}\cite{duffy_lig} increases SNR in suburban locations compared to traditional antennas such as dipoles.  The low gain (e.g. -30 dB) is usable for Rx operation as noise external to the receiver generally dominates system noise figure at HF.   It is a balanced design, and the use of common mode chokes on either end of the feedline is recommended.
+
+How this antenna reduces EMI (as implied by the improved SNR) is unclear. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than far field signals by the low (or subterranian) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to overhead power lines and nearby houses. 
+
+Loop antennas (either tuned or untuned) have been claimed to help EMI in some circumstances, by virtue of lower sensitivity to near electric fields at certain distances from the loop.
+
+However despite many claims and subjective reports it seems likely that antenna topology alone cannot distinguish far field EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
+
 \section{Experimental Measurements}
 
-In May 2023 a series some experimental work was conducted at the authors suburban home.  The goal was to gain experience in measuring EMI and attempt to fit the experimental results to the theoretical framework above.
+In May 2023 a some experimental work was conducted at the authors suburban home.  The goal was to gain experience in measuring EMI and attempt to fit the experimental results to the theoretical framework above.
 
 The home is located Adelaide (population 1.3 million), South Australia and is on a suburban square corner block of 550 \si{\metre\squared}.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using overhead 70 year old phone lines.  There are two adjacent houses, and the home has a 4 kw solar PV system.
 
 The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house, the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
 
 \begin{figure}[h]
-\caption{Map of the authors home.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and roof mounted solar PV system}
+\caption{Map of the authors home station.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and roof mounted solar PV system}
 \label{fig:home_map}
 \begin{center}
 \includegraphics[width=12cm]{house_map.png}
 \end{center}
 \end{figure}
-TODO figure, Google map?
 
+\subsection{Observations}
+
+A series of observations were made using a spectrum analyser
 TODO table of noise levels, levels, frequency, classification
 
+Maths to relate 
 If we want to manage noise, we first need to measure it.
 use of S-meter, spec-an, waterfall displays, scope
+
+\subsection{Disucssion}
 
 establish baseline goal against these measurements
 
 Dual antenna experiments, Afredri, had to wind gain dowsn due to strong local broadcast signals, increased noise figure.
 
-\subsection{Discussion}
+If the EMI is AWGN, which is the sum of many urban EMI signals. We cannot attack this with blanking, as it has no time domain pulse structure.  This leaves diversity.  
 
-The dominant EMI on both bands is AWGN, which is the sum of many urban EMI signals. We cannot attack this with blanking, as it has no time domain pulse structure.  This leaves diversity, which requires the received signal on antenna 1 to be related to the signal received on antenna 2 by a single complex coefficient:
-\begin{equation}
-r_1(t)=cr_2(t)
-\end{equation}
-This implies the target EMI signal must be above the receiver noise floor in both channels (TODO extend expression for this, maybe include uncorrelated near field).
+\subsection{Further Work}
 
-In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the EMI fields must be fully resolved far field signals for the diversity attack to work.  Alternatively antennas with very small separation should be used such that near field signals are detected at adequate levels in both antennas.
+Determine if my noise floor is near field or far field
 
-Near field signals can be induced in antenna systems by common mode injection into feed lines and antenna conductors. We should take steps to reduce any near field signals by routing feed lines and antennas away from near field sources such as house and street wiring, and using balanced antenna systems.
-
-However physical distancing is problematic on small urban blocks, where any antenna is likely to be less than one wavelength from conductors radiating EMI.
-
-Antenna topologies may help reduce near field detection.  For example the conductors of physically small, non resonant loops and dipoles can be placed further away from near field sources compared to a full length dipole that must extend across the entire side of an urban block.
-
-Height rather than x-y separation
-Preamplifier located at feedpoint, so increase teh ratio of rx signal to common mode feedline (maybe, depends how it gets in I guess).
-common mode chokes
-
-Need for objective testing
-
-Beam antenna, as AWGN noise field is likely not a point source, but the sum of many signals received from all directions, so N the same, S will increase for point source wanted signal
-
-
-TODO: figure
-
-The loop in/on ground topilogy has been proposed.  While this would not naturally reduce 
-
-discussion of antenna topologies (refs to log in ground, small loops), common mode feedline.  Small non resonant loops that don't couple (ref)
-
-next steps, core aim of testing theory that AWGN "urban sum" can be supressed using coherent methods
+There is much hearsay. Measurement of SNR, measure/detect common mode ccurrents, comparsion to theory.
+next steps, core aim of testing theory that AWGN "urban sum" can be supressed using diversity coherent methods
 
 identical antennas, loops to ensure good balance, small to enable placing away from near field.
 measure noise figure
@@ -320,6 +356,9 @@ BCI filter
 A way to measure SNR, e.g. car Tx, log signal as I drive around, on two channels, try loop v diople, control for azimuth
  
 model, EMI as sum of several signals
+
+ITUT levels
+
 
 
 \bibliographystyle{plain}

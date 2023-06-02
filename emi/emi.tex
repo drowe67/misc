@@ -265,6 +265,23 @@ Physical distancing of the antenna elements from noise sources will help reduce 
 
 \subsection{Diversity}
 
+\begin{figure}[h]
+\caption{Diversity noise cancellation model}
+\label{fig:diveristy_model}
+\begin{center}
+\begin{tikzpicture}
+\draw [->] (1,2) -- (3,2);
+\draw [->] (1,2) -- (2.1,0.4);
+
+\node[] at (0.6,2) {$e(t)$};
+\node[] at (3.5,2) {$r_1(t)$};
+\node[] at (2.5,0.25) {$r_2(t)$};
+\node[] at (2.0,2.25) {$a_1$};
+\node[] at (2.0,1.1) {$a_2$};
+\end{tikzpicture}
+\end{center}
+\end{figure}
+
 Consider an EMI signal $e(t)$ received on two nearby antennas:
 \begin{equation}
 \begin{split}
@@ -272,7 +289,7 @@ r_1(t) &= a_1 e(t) \\
 r_2(t) &= a_2 e(t) \\
 \end{split}
 \end{equation}
-where $a_1$ and $a_2$ are complex constants that model gain and phase shift variations on the two antennas. It can be shown that:
+where $a_1$ and $a_2$ are complex constants that model path loss and phase shift due to propogation to the two antennas. It can be shown that:
 \begin{equation} \label{eq_diversity1}
 r_1(t) = cr_2(t)
 \end{equation}
@@ -280,7 +297,7 @@ where $c=a_1/a_2$, the ratio of two complex gains.  Thus if we can estimate $c$,
 \begin{equation} 
 E = r_1(t) - cr_2(t)
 \end{equation}
-This model implies the EMI signal must be present in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the EMI fields must be fully resolved far field signals for the diversity attack to work.  Alternatively antennas with small separation should be used such that near field signals are detected at adequate levels in both antennas.
+This model requires the EMI signal to be present (i.e. above the noise floor) in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the effectivness of diversity will be very sensitive to antenna placement with near field EMI signals.  However when suppressing far field EMI signals diversity should work quite well and be less sensitive to antenna placement.
 
 \subsection{Directional Antennas}
 
@@ -294,7 +311,7 @@ If the EMI is the sum of many sources it is likely to have equal power flux dens
    &= N
 \end{split}
 \end{equation}
-Thus the noise power for a directional antenna is the same as an isotropic antenna and the same in any direction. In contrast our far field wanted signal is a point source. If that signal develops a power of $S$ watts into an isotropic antenna, it will develop a power of $GS$ watts at the terminals of our directional antenna. The S/N improvement using a directional antenna in a uniform EMI field is therefore improved by the antenna gain $G$.
+Thus the noise power received by a directional antenna is the same as an isotropic antenna and the same in any direction. In contrast our far field wanted signal is a point source. If that signal develops a power of $S$ watts into an isotropic antenna, it will develop a power of $GS$ watts at the terminals of our directional antenna. The S/N improvement using a directional antenna in a uniform EMI field is therefore improved by the antenna gain $G$.
 
 If the EMI is a point source, we may be able to place it in a pattern null using a directional antenna or diversity/beamforming techniques, further improving the effectiveness of the attack.
 
@@ -328,48 +345,79 @@ The station antenna is an inverted V fan dipole with 40m and 20m elements, suspe
 
 \subsection{Observations}
 
-Figure \ref{fig:noise_measurements} is a series of noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023.  The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  A 3kHz resolution bandwidth was used, span 200 kHz, the pre-amp was on, the attenuation set to 0, and the power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to a HF radio to monitor the signal.
+Figure \ref{fig:noise_measurements} is a series of noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023.  The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  A 3kHz resolution bandwidth was used, span 200 kHz, the pre-amp was on, the attenuation set to 0, and the power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to an IC7300 HF radio to monitor the signal.
 
 \begin{figure}[h]
-\caption{A sequence of HF noise power measurements over a period of 1 week.  The 7.1 MHz readings were high but quite stable, the 14.2 MHz noise fluctuated from acceptable to high, sometimes over a period of a few minutes}
+\caption{A sequence of HF noise power measurements over a period of 1 week, made in a 3 kHz resolution bandwidth (top), and converted to a 1 Hz bandwidth at bottom. The 7.1 MHz readings were high but quite stable, the 14.2 MHz noise fluctuated from acceptable to high, sometimes over a period of a few minutes}
 \label{fig:noise_measurements}
 \begin{center}
 \input measurement.tex
 \end{center}
 \end{figure}
 
+There were three clusters (Table \ref{table:measurment_clusters}). From the clusters the external noise figure is given by $F_a = N_0 - 174$, and calibrated S-unit $S=N_0/6+27$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-12 \cite[Fig. 10]{itu372}. The author has made no effort to calibrate for the antenna, splitter (-3.5dB) or feedline (-1dB), so the comparsion should be considered rough.  The measured noise power is consistent with previous efforts by the author to measure urban noise using a small tuned loop \cite{rowetel_noise_city}.
 
-TODO table of noise levels, levels, frequency, classification
+\begin{table}[h]
+\centering
+\begin{tabular}{l c c c c}
+ \hline
+ Cluster & Freq (MHz) & $N_0$ (dBm/Hz) & $F_a$ Meas (dB) & S-unit \\
+ \hline
+ 7.1 Nominal & 7.1 & -125 & 49 & S6 \\
+ 14.2 Low & 14.2 & -145 &  29 & S6 \\
+ 14.2 High & 14.2 & -125 & 49 & S3 \\
+\end{tabular}
+\caption{Measurement clusters and equivalent External Noise Figure $F_a$ and S-units.  The S-unit is derived from $N_0$ assuming 6dB steps, S9=-73dBm, and a 3kHz noise bandwidth.}
+\label{table:measurment_clusters}
+\end{table}
 
-Maths to relate 
-If we want to manage noise, we first need to measure it.
-usefullness of S-meter, spec-an, waterfall displays, scope
+\begin{table}[h]
+\centering
+\begin{tabular}{l c c c}
+ \hline
+ Cluster & Freq (MHz) & $F_a$ P.372 (dB) & $F_a$ Meas (dB) \\
+ \hline
+ 7.1 Nominal & 7.1 & 49 & 49 \\
+ 14.2 Low & 14.2 & 41 &  29 \\
+ 14.2 High & 14.2 & 41 & 49 \\
+\end{tabular}
+\caption{P.372 Residential External Noise Figure $F_a$ compared to Measurements}
+\label{table:external_noise_figure}
+\end{table}
 
 \subsection{Discussion}
 
-establish baseline goal against these measurements
+\begin{enumerate}
+\item The IC7300 S-meter was found to be uncalibrated (6dB power change not equal to one S unit) and could not be relied upon to measure noise power.  However the IC7300 waterfall is quite useful as a single plot shows both $R<B$ impulse noise (lines across all frequencies) and $R>B$ PWM (harmonics spaced at $R$ Hz).
+\item The site has strong 50 Hz impulse noise however the IC7300 noise blanker removes this quite effectively.  The zero span feature of the spec-an (set to 100ms sweep time) is useful for observing these short impulses - it turns the spec-an into a tuned oscilliscope with adjustable centre frequency and bandwidth.  A sweep time of 100ms and resolution bandwidth of 30 kHz was useful for observing 10ms period pulses typical of 50 Hz impulses (one per edge).
+\item In the "low/nominal" clusters AWGN noise floor was the dominant EMI signal, although at times PWM harmonics could be observed on both bands. The presence of the harmonics had no affect on the observed noise power between the harmonics, which suggests a small modulation index $h$.
+\item The 14.2 high cluster corresponded to wideband noise with harmonics about 30kHz apart just visible on the waterfall.  From our PWM analysis in Section \ref{pwm}, this suggests $R>B$ with a fairly high modulation index $h$.  The time varying amplitude (low and high clusters) could be due to shifts in the mean PWM duty cycle $d$, leading to shifts in the $sin(\pi n d)$ Fourier coefficients across the observed band.  Given $n$ is so high, even small shifts in $d$ can cause large changes in the amplitudes of the Fourier components.
+\item A 500MHz bandwidth oscilliscope with a 50 ohm input was connected instead of the spec-an but was not found to be very useful; nearby AM broadcast stations tend to dominate the wideband time domain signal.
+\end{enumerate}
 
-Dual antenna experiments, Afredri, had to wind gain dowsn due to strong local broadcast signals, increased noise figure.
+\subsection{Diversity Receiver}
 
-If the EMI is AWGN, which is the sum of many urban EMI signals. We cannot attack this with blanking, as it has no time domain pulse structure.  This leaves diversity.  
+A set of experiments was conducted with the Linrad application \cite{linrad_home} configured to use an Afedri AFE822x Dual channel SDR \cite{afedri_dual}.  The second antenna was a portable end-fed diople erected in the front of the property, about 10m from the inverted V dipole, sloping from 7m down to 2m.
 
+Due to strong AM broadcast signals beneath 2 MHz, the AFE822x gain had to be reduced to avoid clipping, raising the noise floor of the receiver, and limiting the amount of diversity cancellation possible. The signals from both antennas were often quite different.  This suggests signals local to each antenna such as near field EMI, or feed line pick up.
+
+Using the Linrad phasing feature \cite{linrad_phasing} it was possible to suppress signals that were common to both receivers, for example strong PWM harmonics.  When tuned to segments of the "noise floor", supression was not possible, which suggests the noise signals being received by both receivers were different.
+
+An experiment was conducted where the signal from one antenna was split, and fed into each receiver.  In this case, the noise could be supressed by Linrad, demonstrating that if the noise is both receivers satisfies (\ref{eq_diversity1}), it can be cancelled.
+  
 \subsection{Further Work}
 
-Determine if my noise floor is near field or far field
+The measurements suggest the dominant noise problem (2/3 clusters) is AWGN. $R<B$ impulse noise is already being handled well by the IC7300, and the energy from occasional PWM signals in the low/nominal clusters seems localised to the harmonics (not affecting the AWGN noise floor between harmonics).  If the EMI is AWGN, is it likely the sum of many urban EMI signals, which suggests far field.  We cannot attack AWGN signals this with blanking, as it has no time domain pulse structure.
 
-There is much hearsay. Measurement of SNR, measure/detect common mode ccurrents, comparsion to theory.
-next steps, core aim of testing theory that AWGN "urban sum" can be supressed using diversity coherent methods
+This leaves diversity, and is based on the assumption that the EMI signals received by the two receivers, despite being AWGN, satisfies (\ref{eq_diversity1}).
 
-identical antennas, loops to ensure good balance, small to enable placing away from near field.
-measure noise figure
-BCI filter
-A way to measure SNR, e.g. car Tx, log signal as I drive around, on two channels, try loop v diople, control for azimuth
- 
-model, EMI as sum of several signals
-
-ITUT levels
-
-
+So the next experimental steps are:
+\begin{enumerate}
+\item Set up a diversity system and attempt to suppress correlated AWGN noise received in both antennas.
+\item Use small, identical antennas placed close together to ensure similar received signals. Use physically small loops to enable placing them away from near field sources.  Route feedlines away from the house, and consider common mode chokes.
+\item Insert broadcast band filters into the diversity Rx inputs 2and measure noise figure to ensure our receiver noise floor is well below the target noise signals.
+\item If AWGN noise can be supressed, determine a method to measure SNR from far field test signals and determine if there is any improvement.
+\end{enumerate}
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

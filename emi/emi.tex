@@ -16,7 +16,7 @@ We are slowly losing the ability to use analog SSB in urban areas.  Many Hams re
 
 Our target radio signals are from distant sources, weak, narrow band, and evolve slowly in time. Human generated radio noise tends to be very strong, wideband, with a time domain envelope that evolves quickly in time.  It is often radiated from nearby sources, such as power lines lines and house wiring a few 10s of meters from our antenna.  It has significant structure, so can be interpreted as an interfering signal, rather than random noise.
 
-Modern radios are very good at rejecting strong unwanted narrowband signals, using frequency selectivity and good strong signal performance.  This report explores ways we can reject human made noise in the lower HF bands.
+Modern radios are very good at removing unwanted narrowband signals, using frequency selectivity and good strong signal performance.  This report explores the nature of human generated noise and explores techniques for reducing it's effects and increasing the SNR of received signals at urban locations.
 
 \section{Radio Noise Signals from Human Activity}
 
@@ -289,7 +289,7 @@ r_1(t) &= a_1 e(t) \\
 r_2(t) &= a_2 e(t) \\
 \end{split}
 \end{equation}
-where $a_1$ and $a_2$ are complex constants that model path loss and phase shift due to propogation to the two antennas. It can be shown that:
+where $a_1$ and $a_2$ are complex constants that model path loss and phase shift due to propogation delay. It can be shown that:
 \begin{equation} \label{eq_diversity1}
 r_1(t) = cr_2(t)
 \end{equation}
@@ -297,7 +297,9 @@ where $c=a_1/a_2$, the ratio of two complex gains.  Thus if we can estimate $c$,
 \begin{equation} 
 E = r_1(t) - cr_2(t)
 \end{equation}
-This model requires the EMI signal to be present (i.e. above the noise floor) in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the effectivness of diversity will be very sensitive to antenna placement with near field EMI signals.  However when suppressing far field EMI signals diversity should work quite well and be less sensitive to antenna placement.
+This model requires the EMI signal to be present (i.e. above the receiver internal noise) in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the effectivness of diversity will be very sensitive to antenna placement with near field EMI signals.
+
+When suppressing far field EMI signals amplitude will be less sensitive to antenna placement. However this model also requires that the noise $e(n)$ be a point source.  Consider the case where the there are several independant noise sources $e_n(t)$ located at different locations, e.g. an urban location in the middle of a city.  It is unlikely the phase and amplitude relationships will be the same for each sources so the solution of (\ref{eq_diversity1}) will be different for each source.  If we rely on a single coefficient $c$ cancellation will be ineffective.  So the effectiveness of diversity with rely on how well the noise resolves to a single point source.
 
 \subsection{Directional Antennas}
 
@@ -403,19 +405,19 @@ Due to strong AM broadcast signals beneath 2 MHz, the AFE822x gain had to be red
 
 Using the Linrad phasing feature \cite{linrad_phasing} it was possible to suppress signals that were common to both receivers, for example strong PWM harmonics.  When tuned to segments of the "noise floor", supression was not possible, which suggests the noise signals being received by both receivers were different.
 
-An experiment was conducted where the signal from one antenna was split, and fed into each receiver.  In this case, the noise could be supressed by Linrad, demonstrating that if the noise is both receivers satisfies (\ref{eq_diversity1}), it can be cancelled.
+An experiment was conducted where the signal from one antenna was split, and fed into each receiver.  In this case, the noise could be supressed by Linrad, demonstrating that if the noise in both receivers satisfies (\ref{eq_diversity1}), it can be cancelled.
   
 \subsection{Further Work}
 
-The measurements suggest the dominant noise problem (2/3 clusters) is AWGN. $R<B$ impulse noise is already being handled well by the IC7300, and the energy from occasional PWM signals in the low/nominal clusters seems localised to the harmonics (not affecting the AWGN noise floor between harmonics).  If the EMI is AWGN, is it likely the sum of many urban EMI signals, which suggests far field.  We cannot attack AWGN signals this with blanking, as it has no time domain pulse structure.
+The measurements suggest the dominant noise problem (2/3 clusters) is AWGN. $R<B$ impulse noise is already being handled well by the IC7300, and the energy from occasional PWM signals in the low/nominal clusters seems localised to the harmonics (not affecting the AWGN noise floor between harmonics).  If the EMI is AWGN, is it likely the sum of many urban EMI signals, which suggests far field.  We cannot attack AWGN signals with blanking, as it has no time domain pulse structure.
 
-This leaves diversity, and is based on the assumption that the EMI signals received by the two receivers, despite being AWGN, satisfies (\ref{eq_diversity1}).
+This leaves diversity as a possible attack.  This requires the EMI signals received by the two receivers to satisfy (\ref{eq_diversity1}), implying the AWGN noise resolves to a point source.
 
 So the next experimental steps are:
 \begin{enumerate}
-\item Set up a diversity system and attempt to suppress correlated AWGN noise received in both antennas.
+\item Set up a diversity system and attempt to suppress AWGN noise received in both antennas.
 \item Use small, identical antennas placed close together to ensure similar received signals. Use physically small loops to enable placing them away from near field sources.  Route feedlines away from the house, and consider common mode chokes.
-\item Insert broadcast band filters into the diversity Rx inputs 2and measure noise figure to ensure our receiver noise floor is well below the target noise signals.
+\item Insert broadcast band filters into the diversity Rx inputs and measure noise figure to ensure our receiver noise floor is well below the target noise signals.
 \item If AWGN noise can be supressed, determine a method to measure SNR from far field test signals and determine if there is any improvement.
 \end{enumerate}
 

@@ -13,7 +13,7 @@ Some small projects on miscellaneous topics.
 I build the Latex documents using Texmaker:
 
 ```
-$ sudo apt install texmaker texlive-bibtex-extra
+$ sudo apt install texmaker texlive-bibtex-extra texlive-science
 $ texmaker your_doc.tex &
 ```
 

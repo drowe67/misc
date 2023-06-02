@@ -238,7 +238,7 @@ Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
 
 \begin{figure}[h]
 \caption{Two examples of Noise Blanker output spectrum $|Y(f)|$.  The green lines show a sample SSB radio bandwidth of $B=3000$ Hz. Top is pulse rate $R<B$, bottom with $R>B$.  Note the harmonic level increasing with duty cycle $d=TR$, and how the harmonics fall outside of $B$ on the bottom plot. }
-\label{fig:train_e_mean}
+\label{fig:blanker}
 \begin{center}
 \input blanker.tex
 \end{center}
@@ -306,7 +306,7 @@ There is some experimental evidence that the loop in/on ground topology \cite{k5
 
 How this antenna reduces EMI (as implied by the improved SNR) is unclear. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than far field signals by the low (or subterranian) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to overhead power lines and nearby houses. 
 
-Loop antennas (either tuned or untuned) have been claimed to help EMI in some circumstances, by virtue of lower sensitivity to near electric fields at certain distances from the loop.
+There are many subjective reports that small loop antennas (either tuned or untuned) provide signficant reductions in EMI, by virtue of lower sensitivity to near electric fields at certain distances from the loop.
 
 However despite many claims and subjective reports it seems likely that antenna topology alone cannot distinguish far field EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
 
@@ -314,12 +314,12 @@ However despite many claims and subjective reports it seems likely that antenna 
 
 In May 2023 a some experimental work was conducted at the authors suburban home.  The goal was to gain experience in measuring EMI and attempt to fit the experimental results to the theoretical framework above.
 
-The home is located Adelaide (population 1.3 million), South Australia and is on a suburban square corner block of 550 \si{\metre\squared}.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using overhead 70 year old phone lines.  There are two adjacent houses, and the home has a 4 kw solar PV system.
+The home is located Adelaide (population 1.3 million), South Australia and is on a suburban square corner block of 550 \si{\metre\squared}.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using overhead 70 year old phone lines.  There are two adjacent houses, and the home has a 4 kW solar PV system.
 
-The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house, the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
+The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house, the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun at the feedpoint. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
 
 \begin{figure}[h]
-\caption{Map of the authors home station.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and roof mounted solar PV system}
+\caption{Map of the authors home station.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and a roof mounted solar PV system.}
 \label{fig:home_map}
 \begin{center}
 \includegraphics[width=12cm]{house_map.png}
@@ -328,14 +328,24 @@ The station antenna is an inverted V fan dipole with 40m and 20m elements, suspe
 
 \subsection{Observations}
 
-A series of observations were made using a spectrum analyser
+Figure \ref{fig:noise_measurements} is a series of noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023.  The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  A 3kHz resolution bandwidth was used, span 200 kHz, the pre-amp was on, the attenuation set to 0, and the power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to a HF radio to monitor the signal.
+
+\begin{figure}[h]
+\caption{A sequence of HF noise power measurements over a period of 1 week.  The 7.1 MHz readings were high but quite stable, the 14.2 MHz noise fluctuated from acceptable to high, sometimes over a period of a few minutes}
+\label{fig:noise_measurements}
+\begin{center}
+\input measurement.tex
+\end{center}
+\end{figure}
+
+
 TODO table of noise levels, levels, frequency, classification
 
 Maths to relate 
 If we want to manage noise, we first need to measure it.
-use of S-meter, spec-an, waterfall displays, scope
+usefullness of S-meter, spec-an, waterfall displays, scope
 
-\subsection{Disucssion}
+\subsection{Discussion}
 
 establish baseline goal against these measurements
 

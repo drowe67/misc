@@ -357,7 +357,7 @@ Figure \ref{fig:noise_measurements} is a series of noise power measurements were
 \end{center}
 \end{figure}
 
-There were three clusters (Table \ref{table:measurment_clusters}). From the clusters the external noise figure is given by $F_a = N_0 - 174$, and calibrated S-unit $S=N_0/6+27$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-12 \cite[Fig. 10]{itu372}. The author has made no effort to calibrate for the antenna, splitter (-3.5dB) or feedline (-1dB), so the comparsion should be considered rough.  The measured noise power is consistent with previous efforts by the author to measure urban noise using a small tuned loop \cite{rowetel_noise_city}.
+There were three clusters (Table \ref{table:measurement_clusters}). From the clusters the external noise figure is given by $F_a = N_0 - 174$, and calibrated S-unit $S=N_0/6+27$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-12 \cite[Fig. 10]{itu372}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent with previous efforts by the author to measure urban noise using a small tuned loop \cite{rowetel_noise_city}.
 
 \begin{table}[h]
 \centering
@@ -365,12 +365,12 @@ There were three clusters (Table \ref{table:measurment_clusters}). From the clus
  \hline
  Cluster & Freq (MHz) & $N_0$ (dBm/Hz) & $F_a$ Meas (dB) & S-unit \\
  \hline
- 7.1 Nominal & 7.1 & -125 & 49 & S6 \\
- 14.2 Low & 14.2 & -145 &  29 & S6 \\
- 14.2 High & 14.2 & -125 & 49 & S3 \\
+ Nominal & 7.1  & -121 & 53 & S7 \\
+ Low     & 14.2 & -139 & 35 & S4 \\
+ High    & 14.2 & -125 & 52 & S7 \\
 \end{tabular}
 \caption{Measurement clusters and equivalent External Noise Figure $F_a$ and S-units.  The S-unit is derived from $N_0$ assuming 6dB steps, S9=-73dBm, and a 3kHz noise bandwidth.}
-\label{table:measurment_clusters}
+\label{table:measurement_clusters}
 \end{table}
 
 \begin{table}[h]
@@ -379,9 +379,9 @@ There were three clusters (Table \ref{table:measurment_clusters}). From the clus
  \hline
  Cluster & Freq (MHz) & $F_a$ P.372 (dB) & $F_a$ Meas (dB) \\
  \hline
- 7.1 Nominal & 7.1 & 49 & 49 \\
- 14.2 Low & 14.2 & 41 &  29 \\
- 14.2 High & 14.2 & 41 & 49 \\
+ Nominal & 7.1  & 49 & 53 \\
+ Low     & 14.2 & 41 & 35 \\
+ High    & 14.2 & 41 & 52 \\
 \end{tabular}
 \caption{P.372 Residential External Noise Figure $F_a$ compared to Measurements}
 \label{table:external_noise_figure}
@@ -391,10 +391,10 @@ There were three clusters (Table \ref{table:measurment_clusters}). From the clus
 
 \begin{enumerate}
 \item The IC7300 S-meter was found to be uncalibrated (6dB power change not equal to one S unit) and could not be relied upon to measure noise power.  However the IC7300 waterfall is quite useful as a single plot shows both $R<B$ impulse noise (lines across all frequencies) and $R>B$ PWM (harmonics spaced at $R$ Hz).
-\item The site has strong 50 Hz impulse noise however the IC7300 noise blanker removes this quite effectively.  The zero span feature of the spec-an (set to 100ms sweep time) is useful for observing these short impulses - it turns the spec-an into a tuned oscilliscope with adjustable centre frequency and bandwidth.  A sweep time of 100ms and resolution bandwidth of 30 kHz was useful for observing 10ms period pulses typical of 50 Hz impulses (one per edge).
+\item The site has strong 50 Hz impulse noise however the IC7300 noise blanker removes this quite effectively.  The zero span feature of the spec-an (set to 100ms sweep time) is useful for observing these short impulses - it turns the spec-an into a tuned oscilloscope with adjustable centre frequency and bandwidth.  A sweep time of 100ms and resolution bandwidth of 30 kHz was useful for observing 10ms period pulses typical of 50 Hz impulses (one per edge).
 \item In the "low/nominal" clusters AWGN noise floor was the dominant EMI signal, although at times PWM harmonics could be observed on both bands. The presence of the harmonics had no affect on the observed noise power between the harmonics, which suggests a small modulation index $h$.
 \item The 14.2 high cluster corresponded to wideband noise with harmonics about 30kHz apart just visible on the waterfall.  From our PWM analysis in Section \ref{pwm}, this suggests $R>B$ with a fairly high modulation index $h$.  The time varying amplitude (low and high clusters) could be due to shifts in the mean PWM duty cycle $d$, leading to shifts in the $sin(\pi n d)$ Fourier coefficients across the observed band.  Given $n$ is so high, even small shifts in $d$ can cause large changes in the amplitudes of the Fourier components.
-\item A 500MHz bandwidth oscilliscope with a 50 ohm input was connected instead of the spec-an but was not found to be very useful; nearby AM broadcast stations tend to dominate the wideband time domain signal.
+\item A 500MHz bandwidth oscilloscope with a 50 ohm input was connected instead of the spec-an but was not found to be very useful; nearby AM broadcast stations tend to dominate the wideband time domain signal.
 \end{enumerate}
 
 \subsection{Diversity Receiver}
@@ -418,7 +418,7 @@ So the next experimental steps are:
 \item Set up a diversity system and attempt to suppress AWGN noise received in both antennas.
 \item Use small, identical antennas placed close together to ensure similar received signals. Use physically small loops to enable placing them away from near field sources.  Route feedlines away from the house, and consider common mode chokes.
 \item Insert broadcast band filters into the diversity Rx inputs and measure noise figure to ensure our receiver noise floor is well below the target noise signals.
-\item If AWGN noise can be supressed, determine a method to measure SNR from far field test signals and determine if there is any improvement.
+\item If AWGN noise can be suppressed, determine a method to measure SNR from far field test signals and determine if there is any improvement.
 \end{enumerate}
 
 \bibliographystyle{plain}

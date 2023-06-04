@@ -323,7 +323,7 @@ Antenna topologies may help reduce near field coupling.  For example the conduct
 
 There is some experimental evidence that the loop in/on ground topology \cite{k5jy_log}\cite{duffy_lig} increases SNR in suburban locations compared to traditional antennas such as dipoles.  The low gain (e.g. -30 dB) is usable for Rx operation as noise external to the receiver generally dominates system noise figure at HF.   It is a balanced design, and the use of common mode chokes on either end of the feedline is recommended.
 
-How this antenna reduces EMI (as implied by the improved SNR) is unclear. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than far field signals by the low (or subterranian) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to overhead power lines and nearby houses. 
+How this antenna reduces EMI (as implied by the improved SNR) is unclear. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranian) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to near field signals such as overhead power lines and nearby houses. 
 
 There are many subjective reports that small loop antennas (either tuned or untuned) provide signficant reductions in EMI, by virtue of lower sensitivity to near electric fields at certain distances from the loop.
 
@@ -347,7 +347,7 @@ The station antenna is an inverted V fan dipole with 40m and 20m elements, suspe
 
 \subsection{Observations}
 
-Figure \ref{fig:noise_measurements} is a series of noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023.  The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  A 3kHz resolution bandwidth was used, span 200 kHz, the pre-amp was on, the attenuation set to 0, and the power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to an IC7300 HF radio to monitor the signal.
+Figure \ref{fig:noise_measurements} is a series of noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023.  The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  A 3kHz resolution bandwidth was used, span 200 kHz, the pre-amp was on, the attenuator set to 0, and the power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to an IC7300 HF radio to monitor the signal.
 
 \begin{figure}[h]
 \caption{A sequence of HF noise power measurements over a period of 1 week, made in a 3 kHz resolution bandwidth (top), and converted to a 1 Hz bandwidth at bottom. The 7.1 MHz readings were high but quite stable, the 14.2 MHz noise fluctuated from acceptable to high, sometimes over a period of a few minutes}
@@ -399,13 +399,13 @@ There were three clusters (Table \ref{table:measurement_clusters}). From the clu
 
 \subsection{Diversity Receiver}
 
-A set of experiments was conducted with the Linrad application \cite{linrad_home} configured to use an Afedri AFE822x Dual channel SDR \cite{afedri_dual}.  The second antenna was a portable end-fed diople erected in the front of the property, about 10m from the inverted V dipole, sloping from 7m down to 2m.
+A set of experiments was conducted with the Linrad application \cite{linrad_home} configured to use an Afedri AFE822x Dual channel SDR \cite{afedri_dual}.  The second antenna was a portable end-fed dipole erected in the front of the property, about 10m from the inverted V dipole, sloping from 7m down to 2m.
 
 Due to strong AM broadcast signals beneath 2 MHz, the AFE822x gain had to be reduced to avoid clipping, raising the noise floor of the receiver, and limiting the amount of diversity cancellation possible. The signals from both antennas were often quite different.  This suggests signals local to each antenna such as near field EMI, or feed line pick up.
 
-Using the Linrad phasing feature \cite{linrad_phasing} it was possible to suppress signals that were common to both receivers, for example strong PWM harmonics.  When tuned to segments of the "noise floor", supression was not possible, which suggests the noise signals being received by both receivers were different.
+Using the Linrad phasing feature \cite{linrad_phasing} it was possible to suppress signals that were common to both receivers, for example strong PWM harmonics.  When tuned to segments of the "noise floor", suppression was not possible, which suggests the noise signals being received by both receivers were different.
 
-An experiment was conducted where the signal from one antenna was split, and fed into each receiver.  In this case, the noise could be supressed by Linrad, demonstrating that if the noise in both receivers satisfies (\ref{eq_diversity1}), it can be cancelled.
+An experiment was conducted where the signal from one antenna was split, and fed into each receiver.  In this case, the noise could be suppressed by Linrad, demonstrating that if the noise in both receivers satisfies (\ref{eq_diversity1}), it can be cancelled.
   
 \subsection{Further Work}
 

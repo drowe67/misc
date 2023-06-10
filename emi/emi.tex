@@ -384,6 +384,29 @@ The station antenna is an inverted V fan dipole with 40m and 20m elements, suspe
 
 \subsection{Observations}
 
+\begin{figure}[h]
+\caption{Experimental set up for measurements}
+\label{fig:meas_config_1}
+\begin{center}
+\begin{tikzpicture}
+\draw (1.5,3) -- (2.5,3) -- (2,2.5) -- (1.5,3);
+\draw (2,2.5) -- (2,2);
+\draw (2,2) -- (4,2);
+\draw (4,1.5) rectangle (5,2.5);
+\draw (4,1.5) -- (5,2.5);
+\draw (4,2.5) -- (5,1.5);
+\draw (5,2) -- (6,2);
+\draw (6,1.5) rectangle (8,2.5);
+\draw (4.5,1.5) -- (4.5,0.5);
+\draw (4.5,0.5) -- (6,0.5);
+\draw (6,0) rectangle (8,1);
+
+\node[align=center] at (7,2) {Spec-an};
+\node[align=center] at (7,0.5) {Receiver};
+\end{tikzpicture}
+\end{center}
+\end{figure}
+
 The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  The spec-an settings were: 3kHz resolution bandwidth, span 200 kHz, pre-amp on, attenuator 0dB, RMS detector, power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to an IC7300 HF radio to monitor the signal.
 
 \begin{figure}[h]
@@ -394,31 +417,31 @@ The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectr
 \end{center}
 \end{figure}
 
-Figure \ref{fig:noise_measurements} shows noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023.  There were three clusters (Table \ref{table:measurement_clusters}). From the clusters the external noise figure is given by $F_a = N_0 - 174$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-16 \cite{itu372-16}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent my previous efforts using a small tuned loop \cite{rowetel_noise_city}.
+Figure \ref{fig:noise_measurements} shows noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023 on the 40M and 20M bands.  There were three clusters (Table \ref{table:measurement_clusters}), that were used as a first step in charactering the noise. Each cluster was allocated a label (noise A, B \& C). The external noise figure is given by $F_a = N_0 - 174$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-16 \cite{itu372-16}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent my previous efforts using a small tuned loop \cite{rowetel_noise_city}.
 
 Fitting a straight line to the S-unit standard calibration of S9 = -73dBm, and 6dB per S-unit we can find S units from received power $R$ in dBm:
 \begin{equation}
 S = R/6 + 21.17
 \end{equation}
-If we assume the receiver summs all noise in a 2000 Hz bandwidth:
+If we assume the receiver sums noise power in a 2000 Hz bandwidth:
 \begin{equation} \label{eq:s_unit}
 \begin{split}
 S &= \frac{N_0+10log_{10}(2000)}{6} + 21.17 \\
 S &= N_0/6 + 26.7
 \end{split}
 \end{equation}
-
+The S units are not sensitive to filter bandwidth, e.g. for a 3000Hz bandwidth $S = N_0/6 + 27$.
 \begin{table}[h]
 \centering
 \begin{tabular}{l c c c c}
  \hline
- Cluster & Freq (MHz) & $N_0$ (dBm/Hz) & $F_a$ Meas (dB) & S-unit \\
+ Label & Freq (MHz) & $N_0$ (dBm/Hz) & $F_a$ Meas (dB) & S-unit \\
  \hline
- Nominal & 7.1  & -121 & 53 & S6.5 \\
- Low     & 14.2 & -139 & 35 & S3.6 \\
- High    & 14.2 & -125 & 52 & S6.4 \\
+ A & 7.1  & -121 & 53 & S6.5 \\
+ B & 14.2 & -139 & 35 & S3.6 \\
+ C & 14.2 & -125 & 52 & S6.4 \\
 \end{tabular}
-\caption{Measurement clusters and equivalent External Noise Figure $F_a$ and S-units.}
+\caption{Noise sources and equivalent External Noise Figure $F_a$ and S-units.}
 \label{table:measurement_clusters}
 \end{table}
 
@@ -426,11 +449,11 @@ S &= N_0/6 + 26.7
 \centering
 \begin{tabular}{l c c c}
  \hline
- Cluster & Freq (MHz) & $F_a$ P.372 (dB) & $F_a$ Meas (dB) \\
+ Label & Freq (MHz) & $F_a$ P.372 (dB) & $F_a$ Meas (dB) \\
  \hline
- Nominal & 7.1  & 49 & 53 \\
- Low     & 14.2 & 41 & 35 \\
- High    & 14.2 & 41 & 52 \\
+ A & 7.1  & 49 & 53 \\
+ B & 14.2 & 41 & 35 \\
+ C & 14.2 & 41 & 52 \\
 \end{tabular}
 \caption{Median P.372-16 Residential External Noise Figure $F_a$ compared to measurements.}
 \label{table:external_noise_figure}
@@ -440,9 +463,9 @@ S &= N_0/6 + 26.7
 
 \begin{enumerate}
 \item The IC7300 S-meter was found to be uncalibrated \cite{vu2nsb_s_meter} (6dB power change not equal to one S unit) and could not be relied upon to measure noise power.  Instead, the S-units in Table \ref{table:measurement_clusters} where calulated using equation (\ref{eq:s_unit}). However the IC7300 waterfall is quite useful as a single plot shows both $R<B$ impulse noise (lines across all frequencies) and $R>B$ PWM (harmonics spaced at $R$ Hz).
-\item The site has strong 50 Hz impulse noise however the IC7300 noise blanker removes this quite effectively. especially on 7.1 MHz.  The zero span feature of the spec-an (set to 100ms sweep time) is useful for observing these short impulses - it turns the spec-an into a tuned oscilloscope with adjustable centre frequency and bandwidth.  A sweep time of 100ms and resolution bandwidth of 30 kHz was useful for observing 10ms period pulses typical of 50 Hz impulses (one per edge).
-\item In the "low/nominal" clusters AWGN noise floor was the dominant EMI signal, although at times PWM harmonics could be observed on both bands. The presence of the harmonics had no affect on the observed noise power between the harmonics, which suggests a small modulation index $h$.
-\item The 14.2 high cluster corresponded to wideband noise with harmonics about 30kHz apart just visible on the waterfall.  From our PWM analysis in Section \ref{pwm}, this suggests $R>B$ with a fairly high modulation index $h$.  The time varying amplitude (low and high clusters) could be due to shifts in the mean PWM duty cycle $d$, leading to shifts in the $sin(\pi n d)$ Fourier coefficients across the observed band.  Given $n$ is so high, even small shifts in $d$ can cause large changes in the amplitudes of the Fourier components.
+\item The site has strong 50 Hz impulse noise however the IC7300 noise blanker removes this quite effectively, especially on 7.1 MHz.  The zero span feature of the spec-an (set to 100ms sweep time) is useful for observing these short impulses - it turns the spec-an into a tuned oscilloscope with adjustable centre frequency and bandwidth.  A sweep time of 100ms and resolution bandwidth of 30 kHz was useful for observing 10ms period pulses typical of 50 Hz impulses (one per edge).
+\item Noise A/B appeared to be mainly AWGN, although at times PWM harmonics could be observed on both bands. The presence of the harmonics had no affect on the observed noise power between the harmonics, which suggests a small modulation index $h$.
+\item The 14.2 high level noise C corresponded to wideband noise with quite wide harmonics about 30kHz apart just visible on the waterfall.  From our PWM analysis in Section \ref{pwm}, this suggests $R>B$ with a fairly high modulation index $h$.  The time varying power between B and C could be due to shifts in the mean PWM duty cycle $d$, leading to shifts in the $sin(\pi n d)$ Fourier coefficients across the observed band.  Given $n$ is so high, even small shifts in $d$ can cause large changes in the amplitudes of the Fourier components.
 \item A 500MHz bandwidth oscilloscope with a 50 ohm input was connected instead of the spec-an but was not found to be very useful; nearby AM broadcast stations tend to dominate the wideband time domain signal.  Fitting a 7MHz high pass filter fixed this problem and made the oscilliscope more useful (see below). 
 \end{enumerate}
 
@@ -459,13 +482,27 @@ An experiment was conducted where the signal from one antenna was split, and fed
 \subsection{Conclusions}
 
 \begin{enumerate}
-\item The Nominal and Low clusters are close to P.372, AWGN in nature, and cannot be reduced further with diversity.  This suggests far field noise from the surrounding city (many sources, many directions), which means I'm doing as well as expected (perhaps a little better than the median at 14.2 MHz).  Turns out I'm normal after all!  Experimentation with antennas is the best way to improve the SNR of received signals. 
-\item The High cluster on 14.2 MHz look like local PWM noise, and needs further investigation.
+\item Noise A \& B are close to P.372, AWGN in nature, and cannot be reduced further with diversity.  This suggests far field noise from the surrounding city (many sources, many directions), which means I'm doing as well as expected (perhaps a little better than the median at 14.2 MHz).  Turns out I'm normal after all!  Experimentation with antennas is the best way to improve the SNR of received signals. 
+\item Noise C on 14.2 MHz look like local PWM noise, and needs further investigation.
 \end{enumerate}
 
 \section{Experimental Measurements 2}
 
+Loop Antenna, different positions
 
+\subsection{Observations}
+
+Figure of experimental setup
+
+\subsection{Noise D}
+
+An additional noise source D Varies in the range between B and C.  No PWM harmonic structure on the spectogram, but is characterised by powerful time domain impulse when viewed on the oscilliscope.
+
+More obvious on loop, as it's bandwidth is wider.  However buzzy/raspy background noise sound is present on the audio with both antennas.
+
+\subsection{Discussion}
+
+Noise, comes in layers.
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

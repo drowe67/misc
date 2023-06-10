@@ -3,6 +3,7 @@
 \usepackage{hyperref}
 \usepackage{tikz}
 \usepackage{siunitx}
+\usepackage{array}
 \begin{document}
 
 \title{EMI on Lower HF}
@@ -34,9 +35,25 @@ This report is a my personal study, written to further my understanding of the t
 \item If possible, find and remove the local noise sources.
 \end{enumerate}
 
+\begin{table}[h]
+\centering
+\begin{tabular}{ | m{1.2cm} | m{4cm} | m{3cm} | m{2cm} |}
+ \hline\hline
+ Name & Characteristics & Example & Sound \\
+ \hline
+ AWGN & Constant in time and frequency & Natural noise, or sum of many sources & Ssshhh \\
+ \hline
+ Impulse & Short pulses far apart in time $R<B$, wideband in frequency & Power lines, Ignition & clicks or buzzing \\
+\hline PWM & Short pulses close together in time $R>B$, harmonics in frequency & Switch mode power supplies & tones or hash \\
+ \hline
+\end{tabular}
+\caption{How I classify noise. AWGN is Additive White Gaussian Noise, PWM is Pulse Width Modulation, $R$ is the frequency of the noise pulses, $B$ is your receiver bandwidth.}
+\label{table:noise_classes}
+\end{table}
+
 \subsection{Selected References}
 
-My favourite references include ITUT-R P372 \cite{itu372-16}, the W8JI web site \cite{w8ji_radio_noise} for a concise overview of HF noise, and the web site of LZ1AQ \cite{lz1aq} for his studies on small loop antenna arrays. After some experimentation \cite{rowetel_noise_city} I've settled on the approach suggested by Owen Duffy \cite{duffy_lig} and Basu \cite{vu2nsb_s_meter} - comparing my ambient noise floor to that suggested by P.372 to check my baseline, then seeing what I can do about local noise sources. 
+References I recommend are ITUT-R P372 \cite{itu372-16}, the W8JI web site \cite{w8ji_radio_noise} for a concise overview of HF noise and small loop antenna myths; and the web site of LZ1AQ \cite{lz1aq} for his studies on small loop antenna arrays. After some experimentation \cite{rowetel_noise_city} I've settled on the approach suggested by Owen Duffy \cite{duffy_lig} and Basu \cite{vu2nsb_s_meter} - comparing my ambient noise floor to P.372 to check my baseline, then seeing what I can do about local noise sources. John Fallows VE6EY \cite{ve6ey} has some fine material on noise reductiuon using diversity receivers on his blog and YouTube channel.
 
 \section{Radio Noise Signals from Human Activity}
 
@@ -50,7 +67,7 @@ Bandwidth relates the rate $R$ of the noise pulses to the bandwidth $B$ of a typ
 
 Our narrow band receiver smooths the time domain envelope of noise impulses. As $R$ relative to $B$ increase, our receiver smears the short time domain pulses (such as a PWM waveform) into a longer pulses with a smoother time domain envelope (such as damped sinusoids and in the limiting case AWGN noise), making the EMI signal harder to identify and remove.
 
-For EMI signal to be detected by our receiver, we need a source of RF currents and a way of coupling those current into our antenna system (which includes the antenna and feed line).  On lower HF our antenna systems are typically located less than one wavelength from the source of RF currents so both near and far field coupling is possible, and indeed a combination of both seems likely.
+For EMI signals to be detected by our receiver, we need a source of RF currents and a way of coupling those current into our antenna system (which includes the antenna and feed line).  On lower HF our antenna systems are typically located less than one wavelength from the source of RF currents so both near and far field coupling is possible, and indeed a combination of both seems likely.
 
 If we position our receiver some distance from many noise signals, we get the sum of many signals added together, which converges to far field AWGN noise.  The level reduces with distance, so an effective attack is travelling to a country location, and operating a portable station for the day.
 
@@ -343,9 +360,9 @@ Antenna topologies may help reduce near field coupling.  For example the conduct
 
 There is some experimental evidence that the loop in/on ground topology \cite{k5jy_log}\cite{duffy_lig} increases SNR in suburban locations compared to traditional antennas such as dipoles.  The low gain (e.g. -30 dB) is usable for Rx operation as noise external to the receiver generally dominates system noise figure at HF. So both signal and noise is reduced, and S/N remains the same. It is a balanced design, and the use of common mode chokes on either end of the feedline is recommended.
 
-How this antenna reduces EMI (as implied by the improved SNR) is unclear. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranian) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to near field signals such as overhead power lines and nearby houses. 
+How this antenna reduces EMI (as implied by the improved SNR) is unclear, but worthy of further investigation. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranian) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to near field signals such as overhead power lines and nearby houses. 
 
-There are many subjective reports that small loop antennas (either tuned or untuned) provide signficant reductions in EMI, by virtue of lower sensitivity to near electric fields.  However loop antennas are not magic \cite{w8ji_radio_noise}, and perform worse than dipoles in the presence of strong magnetic fields or at certain distances from electric fields.  Their principle benefit appears to be small size and inherent balance, making them easier to position away from near fields radiating from homes and power lines.
+There are many subjective reports that small loop antennas (either tuned or untuned) provide signficant reductions in EMI, by virtue of lower sensitivity to near electric fields.  However loop antennas are not magic \cite{w8ji_radio_noise}, and perform worse than dipoles in the presence of strong magnetic fields and even at certain distances from electric fields.  Their principle benefit appears to be small overall dimensions, making them easier to position away from near fields radiating from homes and power lines.
 
 It seems likely that antenna topology alone cannot distinguish far field EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
 
@@ -442,7 +459,7 @@ An experiment was conducted where the signal from one antenna was split, and fed
 \subsection{Conclusions}
 
 \begin{enumerate}
-\item The Nominal and Low clusters are close to P.372, AWGN in nature, and cannot be reduced further with diversity.  This suggests far field noise from the surrounding city (many sources, many directions), which means I'm doing as well as expected (perhaps a little better than the median at 14.2 MHz).  Turns out I'm normal after all!  Experimentation with antennas (e.g a beam with gain) would be the best way to improve the SNR of received signals. 
+\item The Nominal and Low clusters are close to P.372, AWGN in nature, and cannot be reduced further with diversity.  This suggests far field noise from the surrounding city (many sources, many directions), which means I'm doing as well as expected (perhaps a little better than the median at 14.2 MHz).  Turns out I'm normal after all!  Experimentation with antennas is the best way to improve the SNR of received signals. 
 \item The High cluster on 14.2 MHz look like local PWM noise, and needs further investigation.
 \end{enumerate}
 

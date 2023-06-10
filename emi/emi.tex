@@ -12,27 +12,37 @@
 
 \section{Introduction}
  
-Throughout the 20th century HF radio receiver technology evolved with the aim of detecting distant, narrow band signals.  Radio noise sets the limits of detection \cite{itu372}, and was assumed to be from natural sources or the receiver itself. However in the early 21st century, from lower HF right up to UHF noise from human activity now dominates the detection problem.  We are no longer seeking to maximise signal-to-noise ratio (SNR), but signal to EMI ratio (SER).
+Throughout the 20th century HF radio receiver technology evolved with the aim of detecting distant, narrow band signals.  Radio noise sets the limits of detection, and was assumed to be from natural sources or the receiver itself.  However in the early 21st century, noise from human activity now dominates the detection problem.  We are no longer seeking to maximise signal-to-noise ratio (SNR), but signal to EMI ratio (SER).
 
-We are slowly losing the ability to use analog SSB in urban areas.  Many Hams report S9 noise levels, $9 \times 6 = 54$ dB higher than a quiet S0 country station.  Consequently, digital modes that can operate operate at low SERs are becoming popular.  Digital modes are in an arms race with EMI.
+We are slowly losing the ability to use analog SSB in urban areas.  Many Hams report S9 noise levels, $9 \times 6 = 54$ dB higher than a quiet S0 country station.  Consequently, digital modes that can operate operate at low SNRs are becoming popular.
 
-Our target radio signals are from distant sources, weak, narrow band, and evolve slowly in time. Human generated radio noise tends to be very strong, wideband, with a time domain envelope that evolves quickly in time.  It is often radiated from nearby sources, such as power lines lines and house wiring a few 10s of meters from our antenna.  It has significant structure, so can be interpreted as an interfering signal, rather than random noise.
+Our target radio signals are from distant sources, weak, narrow band, and evolve slowly in time. Human generated radio noise tends to be very strong, wideband, with a time domain envelope that evolves quickly in time.  It is often radiated from nearby sources, such as power lines lines and house wiring a few meters from our antenna.  Some EMI has significant structure, so can be interpreted as an interfering signal, rather than random noise.
 
-Modern radios are very good at removing unwanted narrowband signals, using frequency selectivity and good strong signal performance.  This document is a study of human generated noise and techniques for reducing it's effects and increasing the SNR of wanted signals at urban locations.
+There are a lot of on-line opinions, hearsay, rules of thumb, and subjective reports on this topic.  I have found this topic to be very complex, with many inter-related variables. Everyone else seems to work DX ok. I often wondered if my site was the exception - is it just my house or suburb?  
 
-This report is a personal study by the author, written in order to further his understanding of the topic. No claim of any orginal work is made.
+This report is a my personal study, written to further my understanding of the topic, and hopefully improve conditions at my home station. No claim of any original work is made.
 
 \subsection{Summary}
 
+\begin{enumerate}
+\item S-meters can't be trusted \cite{vu2nsb_s_meter}, you'll need a calibrated way to measure noise power at your site.
+\item Measure your ambient noise figure $F_a$ and compare to P.372 \cite{itu372-16}.
+\item If your noise is AWGN and your $F_a$ is similar to P.372 it's probably city wide noise, rather than something local. Congratulations you are doing as well as can be reasonably expected. Your options are a directional antenna, or moving your antenna to the country.
+\item If you see harmonics on your waterfall (and hear tones as your tune across the band) it's PWM and likely very local.
+\item If it's rapid clicks or buzzing it's impulse noise which is also local, but can travel down power lines around suburbs. 
+\item To address PWM and impulse local noise, position your antenna at least 6m from any buildings, power and phone lines.  Look for and address any common modem feedline issues, use a balun on your dipole, or use antennas with good balance (like loops).  Try Diversity.  Your noise blanker might work for impulse noise.  A small loop antenna might help as it is easier to place away from noise sources than a wire antenna.
+\item If possible, find and remove the local noise sources.
+\end{enumerate}
+
 \subsection{Selected References}
 
-There are a lot of on-line opinions, hearsay, rules of thumb, and subjective reports on this topic.  Favourites sources of the author include the W8JI web site \cite{w8ji_radio_noise} for an excellent and concise overview of HF noise, Owen Duffy's blog \cite{duffy_lig}	for in depth and knowledgable treatment of many antenna topics, and the web site of LZ1AQ \cite{lz1aq} for his treatment of phasing and small loop antennas. 
+My favourite references include ITUT-R P372 \cite{itu372-16}, the W8JI web site \cite{w8ji_radio_noise} for a concise overview of HF noise, and the web site of LZ1AQ \cite{lz1aq} for his studies on small loop antenna arrays. After some experimentation \cite{rowetel_noise_city} I've settled on the approach suggested by Owen Duffy \cite{duffy_lig} and Basu \cite{vu2nsb_s_meter} - comparing my ambient noise floor to that suggested by P.372 to check my baseline, then seeing what I can do about local noise sources. 
 
 \section{Radio Noise Signals from Human Activity}
 
-Table \ref{table:human_noise} is a summary of human generated noise sources.  The values are approximate and based on the authors experience - your mileage may vary!  This categorisation gives us some insight that can be used to classify signals, consider their impact, and possible attacks.
+Table \ref{table:human_noise} is a summary of human generated noise sources.  The values are approximate and based on my experience - your mileage may vary!  This categorisation gives us some insight that can be used to classify signals, consider their impact, and possible attacks.
 
-The Time and Frequency columns describes the distribution of energy in time and frequency, for example power line arcing can cause clicks in our radio similar to atmospheric lightning.  The noise signal consists of short, powerful time domain pulses that are randomly distributed in time, resulting in wideband energy uniformly distributed in frequency. It may be identified and removed via noise blanking techniques.
+The Time and Frequency columns describe the distribution of energy in time and frequency, for example power line arcing can cause clicks similar to atmospheric lightning.  The noise signal consists of short, powerful time domain pulses that are randomly distributed in time, resulting in wideband energy uniformly distributed in frequency. It may be identified and removed via noise blanking techniques.
 
 In contrast DSL signals radiated from leaky phone lines looks like noise in the time domain and frequency domain, making it particularity hard to identify and remove.  It is very similar to AWGN from natural noise sources.
 
@@ -40,11 +50,11 @@ Bandwidth relates the rate $R$ of the noise pulses to the bandwidth $B$ of a typ
 
 Our narrow band receiver smooths the time domain envelope of noise impulses. As $R$ relative to $B$ increase, our receiver smears the short time domain pulses (such as a PWM waveform) into a longer pulses with a smoother time domain envelope (such as damped sinusoids and in the limiting case AWGN noise), making the EMI signal harder to identify and remove.
 
-For EMI signal to be detected by our receiver, we need a source of RF currents and a way of coupling those current into our antenna system (which includes the antenna and feed line).  On lower HF our antenna systems are typically located less than one wavelength from the source of AC currents so both near and far field coupling is possible, and indeed a combination of both seems likely.
+For EMI signal to be detected by our receiver, we need a source of RF currents and a way of coupling those current into our antenna system (which includes the antenna and feed line).  On lower HF our antenna systems are typically located less than one wavelength from the source of RF currents so both near and far field coupling is possible, and indeed a combination of both seems likely.
 
-If we position our receiver some distance from many urban noise signals (for example the middle of an urban park), we get the sum of many signals added together, which converges to far field AWGN noise.  The level reduces with distance, so an effective attack is decamping to a country location, and operating a portable station for the day.
+If we position our receiver some distance from many noise signals, we get the sum of many signals added together, which converges to far field AWGN noise.  The level reduces with distance, so an effective attack is travelling to a country location, and operating a portable station for the day.
 
-Domestic electricity lines appear to operate in a mode part way between transmission line and antenna.  RF does seem to propagate along them quite well, they then couple quite strong signals to nearby antennas.  Likewise, DSL signals on ancient phone lines are poor transmission lines and and reasonably effective antennas, radiating significant local EMI. A home with buried electricity lines and fibre or wireless supplying Internet is an effective attack on these sources.
+Domestic electricity lines appear to operate in a mode part way between transmission line and antenna.  RF does seem to propagate along them quite well, they then couple quite well into nearby antennas.  Likewise, DSL signals on ancient phone lines are poor transmission lines and reasonably effective antennas, radiating significant local EMI. A home with buried electricity lines and fibre or wireless supplying Internet is an effective attack on these sources.
 
 \begin{table}[h]
 \centering
@@ -63,7 +73,7 @@ Domestic electricity lines appear to operate in a mode part way between transmis
 \label{table:human_noise}
 \end{table}
 
-The modulation used in our desired target signals is a factor.  Digital modes can operate at lower SNRs than analog SSB.  Digital modes can also use Forward Error Correction (FEC), for example we can correct a bit error caused by a noise impulse wiping out one bit.  Digital modulation also has a threshold effect - once the interference is a few dB lower than the wanted signals, it's impact on bit errors is small. FM, FSK \& PSK are more robust to impulsive noise than amplitude modulated modes like SSB.
+The modulation used in our desired target signals is a factor.  Digital modes can operate at lower SNRs than analog SSB.  Digital modes can also use Forward Error Correction (FEC), e.g. we can correct a bit error caused by a noise impulse wiping out one bit.  Digital modulation also has a threshold effect - once the interference is a few dB lower than the wanted signals, it's impact on bit errors is small. FM, FSK \& PSK are more robust to impulsive noise than amplitude modulated modes like SSB.  However digital modes (just like analog) can't penetrate high AWGN noise levels.
 
 \section{EMI from Pulse Trains}
 \label{pwm}
@@ -269,9 +279,9 @@ Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
 
 \section{Antenna Systems}
 
-Noise signals can be induced in antenna systems and hence receivers by injection of common mode currents into feed lines. We should take steps to reduce coupling by routing feed lines away from EMI sources such as household wiring.  The injection of common mode feed line currents into our receiver can be reduced by using balanced antenna systems and common mode chokes. A preamplifier located at the feedpoint may increase the ratio of wanted Rx signal to common mode feedline noise, depending on how the common mode signal is coupled into the antenna system. 
+Noise signals can be induced in antenna systems and hence receivers by injection of common mode currents into feed lines. We should take steps to reduce coupling by using routing feed lines away from EMI sources such as household wiring.  The injection of common mode feed line currents into our receiver can be reduced by using balanced antenna systems (e.g. a balun on your dipole) and common mode chokes. A preamplifier located at the feedpoint may increase the ratio of wanted Rx signal to common mode feedline noise, depending on how the common mode signal is coupled into the antenna system. 
 
-Physical distancing of the antenna elements from noise sources will help reduce near field coupling more than far field, due to the strong relationship between near field strength and distance.  However physical distancing is problematic on small urban blocks, where any antenna is likely to be less than one wavelength from conductors radiating EMI.  Increased antenna height can help increase physical separation, if permitted by local government regulations.
+Physical distancing of the antenna elements from noise sources will help reduce near field coupling due to the strong inverse relationship between near field strength and distance.  A separation of greater than $\lambda/10$ or 6m from homes and street wiring is recommended by \cite{lz1aq}\cite{wellbrook}\cite{w8ji_radio_noise}.  However even 6m can be problematic on small urban blocks.  Increased antenna height can help increase physical separation, if permitted by local government regulations.
 
 \subsection{Diversity}
 
@@ -307,13 +317,13 @@ where $c=a_1/a_2$, the ratio of two complex gains.  Thus if we can estimate $c$,
 \begin{equation} 
 E = r_1(t) - cr_2(t)
 \end{equation}
-This model requires the EMI signal to be present (i.e. above the receiver internal noise) in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the effectivness of diversity will be very sensitive to antenna placement with near field EMI signals.
+This model requires the EMI signal to be present (i.e. above the receiver internal noise) in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the effectiveness of diversity will be very sensitive to antenna placement.
 
-When suppressing far field EMI signals amplitude will be less sensitive to antenna placement. However this model also requires that the noise $e(n)$ be a point source.  Consider the case where the there are several independant noise sources $e_n(t)$ located at different locations, e.g. an urban location in the middle of a city.  It is unlikely the phase and amplitude relationships will be the same for each sources so the solution of (\ref{eq_diversity1}) will be different for each source.  If we rely on a single coefficient $c$ cancellation will be ineffective.  So the effectiveness of diversity with rely on how well the noise resolves to a single point source.
+When suppressing far field EMI signals amplitude will be less sensitive to antenna placement. However this model also requires that the noise $e(n)$ be a point source.  Consider the case where the there are several independent noise sources $e_n(t)$ located at different locations, e.g. an urban location in the middle of a city.  It is unlikely the phase and amplitude relationships will be the same for each sources so the solution of (\ref{eq_diversity1}) will be different for each source.  If we rely on a single coefficient $c$ cancellation will be ineffective.  So the effectiveness of diversity with rely on how well the noise resolves to a single point source.
 
 \subsection{Directional Antennas}
 
-Consider a isotropic antenna that receives power equally from all directions.  The gain pattern can be visualised a sphere of constant radius, with a solid angle of $4 \pi$ steradians. Now consider an ideal directional antenna with a cone shaped pattern that receives all it's power from a solid angle of $\theta$ steradians, and no power from any other angle.  It's power gain is $G=\frac{4 \pi}{\theta}$. 
+Consider a isotropic antenna that receives power equally from all directions.  The gain pattern can be visualised as a sphere of constant radius, with a solid angle of $4 \pi$ steradians. Now consider an ideal directional antenna with a cone shaped pattern that receives all it's power from a solid angle of $\theta$ steradians, and no power from any other angle.  It's power gain is $G=\frac{4 \pi}{\theta}$. 
 
 If the EMI is the sum of many sources it is likely to have equal power flux density in all directions.  Consider an isotropic antenna placed at the centre of this field. If the total noise power received from an isotropic antenna is $N$ watts, the noise power in a solid angle of $\theta$ radians is $N \frac{\theta}{4 \pi}$ Watts, and the noise power at the directional antenna terminals is:
 \begin{equation}
@@ -329,23 +339,23 @@ If the EMI is a point source, we may be able to place it in a pattern null using
 
 \subsection{Topologies}
 
-Antenna topologies may help reduce near field coupling.  For example the conductors of physically small, non resonant loops and dipoles can be placed further away from near field sources compared to a full length dipole that must extend across the entire width of an urban block \cite{lz1aq}.
+Antenna topologies may help reduce near field coupling.  For example the conductors of physically small loops and dipoles can be placed further away from near field sources compared to a full length dipole that must extend across the entire width of an urban block \cite{lz1aq}.
 
-There is some experimental evidence that the loop in/on ground topology \cite{k5jy_log}\cite{duffy_lig} increases SNR in suburban locations compared to traditional antennas such as dipoles.  The low gain (e.g. -30 dB) is usable for Rx operation as noise external to the receiver generally dominates system noise figure at HF.   It is a balanced design, and the use of common mode chokes on either end of the feedline is recommended.
+There is some experimental evidence that the loop in/on ground topology \cite{k5jy_log}\cite{duffy_lig} increases SNR in suburban locations compared to traditional antennas such as dipoles.  The low gain (e.g. -30 dB) is usable for Rx operation as noise external to the receiver generally dominates system noise figure at HF. So both signal and noise is reduced, and S/N remains the same. It is a balanced design, and the use of common mode chokes on either end of the feedline is recommended.
 
 How this antenna reduces EMI (as implied by the improved SNR) is unclear. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranian) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to near field signals such as overhead power lines and nearby houses. 
 
-There are many subjective reports that small loop antennas (either tuned or untuned) provide signficant reductions in EMI, by virtue of lower sensitivity to near electric fields at certain distances from the loop.
+There are many subjective reports that small loop antennas (either tuned or untuned) provide signficant reductions in EMI, by virtue of lower sensitivity to near electric fields.  However loop antennas are not magic \cite{w8ji_radio_noise}, and perform worse than dipoles in the presence of strong magnetic fields or at certain distances from electric fields.  Their principle benefit appears to be small size and inherent balance, making them easier to position away from near fields radiating from homes and power lines.
 
-However despite many claims and subjective reports it seems likely that antenna topology alone cannot distinguish far field EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
+It seems likely that antenna topology alone cannot distinguish far field EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
 
-\section{Experimental Measurements}
+\section{Experimental Measurements 1}
 
-In May 2023 a some experimental work was conducted at the authors suburban home.  The goal was to gain experience in measuring EMI and attempt to fit the experimental results to the theoretical framework above.
+In May 2023 I perfomed some measurements at my suburban home.  The goal was to gain experience in measuring EMI and attempt to fit experimental results to the theoretical framework above.
 
-The home is located Adelaide (population 1.3 million), South Australia and is on a suburban square corner block of 550 \si{\metre\squared}.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using overhead 70 year old phone lines.  There are two adjacent houses, and the home has a 4 kW solar PV system.
+The home is located in Adelaide (population 1.3 million), South Australia and is on a suburban square corner block of 550 \si{\metre\squared}.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using overhead 70 year old phone lines.  There are two adjacent houses, and the home and it's Southern neighbour have roof mounted solar PV systems.
 
-The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house, the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun at the feedpoint. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
+The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house (and solar panels), the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun at the feedpoint. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
 
 \begin{figure}[h]
 \caption{Map of the authors home station.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and a roof mounted solar PV system.}
@@ -357,17 +367,29 @@ The station antenna is an inverted V fan dipole with 40m and 20m elements, suspe
 
 \subsection{Observations}
 
-Figure \ref{fig:noise_measurements} is a series of noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023.  The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  A 3kHz resolution bandwidth was used, span 200 kHz, the pre-amp was on, the attenuator set to 0, and the power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to an IC7300 HF radio to monitor the signal.
+The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  The spec-an settings were: 3kHz resolution bandwidth, span 200 kHz, pre-amp on, attenuator 0dB, RMS detector, power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to an IC7300 HF radio to monitor the signal.
 
 \begin{figure}[h]
-\caption{A sequence of HF noise power measurements over a period of 1 week, made in a 3 kHz resolution bandwidth (top), and converted to a 1 Hz bandwidth at bottom. The 7.1 MHz readings were high but quite stable, the 14.2 MHz noise fluctuated from acceptable to high, sometimes over a period of a few minutes}
+\caption{Scatter plot of noise power measurements over a period of 1 week, made in a 3 kHz resolution bandwidth (top), and converted to a 1 Hz bandwidth at bottom.  Red circles indicate clusters.}
 \label{fig:noise_measurements}
 \begin{center}
 \input measurement.tex
 \end{center}
 \end{figure}
 
-There were three clusters (Table \ref{table:measurement_clusters}). From the clusters the external noise figure is given by $F_a = N_0 - 174$, and calibrated S-unit $S=N_0/6+27$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-12 \cite[Fig. 10]{itu372}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent with previous efforts by the author to measure urban noise using a small tuned loop \cite{rowetel_noise_city}.
+Figure \ref{fig:noise_measurements} shows noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023.  There were three clusters (Table \ref{table:measurement_clusters}). From the clusters the external noise figure is given by $F_a = N_0 - 174$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-16 \cite{itu372-16}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent my previous efforts using a small tuned loop \cite{rowetel_noise_city}.
+
+Fitting a straight line to the S-unit standard calibration of S9 = -73dBm, and 6dB per S-unit we can find S units from received power $R$ in dBm:
+\begin{equation}
+S = R/6 + 21.17
+\end{equation}
+If we assume the receiver summs all noise in a 2000 Hz bandwidth:
+\begin{equation} \label{eq:s_unit}
+\begin{split}
+S &= \frac{N_0+10log_{10}(2000)}{6} + 21.17 \\
+S &= N_0/6 + 26.7
+\end{split}
+\end{equation}
 
 \begin{table}[h]
 \centering
@@ -375,11 +397,11 @@ There were three clusters (Table \ref{table:measurement_clusters}). From the clu
  \hline
  Cluster & Freq (MHz) & $N_0$ (dBm/Hz) & $F_a$ Meas (dB) & S-unit \\
  \hline
- Nominal & 7.1  & -121 & 53 & S7 \\
- Low     & 14.2 & -139 & 35 & S4 \\
- High    & 14.2 & -125 & 52 & S7 \\
+ Nominal & 7.1  & -121 & 53 & S6.5 \\
+ Low     & 14.2 & -139 & 35 & S3.6 \\
+ High    & 14.2 & -125 & 52 & S6.4 \\
 \end{tabular}
-\caption{Measurement clusters and equivalent External Noise Figure $F_a$ and S-units.  The S-unit is derived from $N_0$ assuming 6dB steps, S9=-73dBm, and a 3kHz noise bandwidth.}
+\caption{Measurement clusters and equivalent External Noise Figure $F_a$ and S-units.}
 \label{table:measurement_clusters}
 \end{table}
 
@@ -393,18 +415,18 @@ There were three clusters (Table \ref{table:measurement_clusters}). From the clu
  Low     & 14.2 & 41 & 35 \\
  High    & 14.2 & 41 & 52 \\
 \end{tabular}
-\caption{P.372 Residential External Noise Figure $F_a$ compared to Measurements}
+\caption{Median P.372-16 Residential External Noise Figure $F_a$ compared to measurements.}
 \label{table:external_noise_figure}
 \end{table}
 
 \subsection{Discussion}
 
 \begin{enumerate}
-\item The IC7300 S-meter was found to be uncalibrated (6dB power change not equal to one S unit) and could not be relied upon to measure noise power.  However the IC7300 waterfall is quite useful as a single plot shows both $R<B$ impulse noise (lines across all frequencies) and $R>B$ PWM (harmonics spaced at $R$ Hz).
-\item The site has strong 50 Hz impulse noise however the IC7300 noise blanker removes this quite effectively.  The zero span feature of the spec-an (set to 100ms sweep time) is useful for observing these short impulses - it turns the spec-an into a tuned oscilloscope with adjustable centre frequency and bandwidth.  A sweep time of 100ms and resolution bandwidth of 30 kHz was useful for observing 10ms period pulses typical of 50 Hz impulses (one per edge).
+\item The IC7300 S-meter was found to be uncalibrated \cite{vu2nsb_s_meter} (6dB power change not equal to one S unit) and could not be relied upon to measure noise power.  Instead, the S-units in Table \ref{table:measurement_clusters} where calulated using equation (\ref{eq:s_unit}). However the IC7300 waterfall is quite useful as a single plot shows both $R<B$ impulse noise (lines across all frequencies) and $R>B$ PWM (harmonics spaced at $R$ Hz).
+\item The site has strong 50 Hz impulse noise however the IC7300 noise blanker removes this quite effectively. especially on 7.1 MHz.  The zero span feature of the spec-an (set to 100ms sweep time) is useful for observing these short impulses - it turns the spec-an into a tuned oscilloscope with adjustable centre frequency and bandwidth.  A sweep time of 100ms and resolution bandwidth of 30 kHz was useful for observing 10ms period pulses typical of 50 Hz impulses (one per edge).
 \item In the "low/nominal" clusters AWGN noise floor was the dominant EMI signal, although at times PWM harmonics could be observed on both bands. The presence of the harmonics had no affect on the observed noise power between the harmonics, which suggests a small modulation index $h$.
 \item The 14.2 high cluster corresponded to wideband noise with harmonics about 30kHz apart just visible on the waterfall.  From our PWM analysis in Section \ref{pwm}, this suggests $R>B$ with a fairly high modulation index $h$.  The time varying amplitude (low and high clusters) could be due to shifts in the mean PWM duty cycle $d$, leading to shifts in the $sin(\pi n d)$ Fourier coefficients across the observed band.  Given $n$ is so high, even small shifts in $d$ can cause large changes in the amplitudes of the Fourier components.
-\item A 500MHz bandwidth oscilloscope with a 50 ohm input was connected instead of the spec-an but was not found to be very useful; nearby AM broadcast stations tend to dominate the wideband time domain signal.
+\item A 500MHz bandwidth oscilloscope with a 50 ohm input was connected instead of the spec-an but was not found to be very useful; nearby AM broadcast stations tend to dominate the wideband time domain signal.  Fitting a 7MHz high pass filter fixed this problem and made the oscilliscope more useful (see below). 
 \end{enumerate}
 
 \subsection{Diversity Receiver}
@@ -416,20 +438,17 @@ Due to strong AM broadcast signals beneath 2 MHz, the AFE822x gain had to be red
 Using the Linrad phasing feature \cite{linrad_phasing} it was possible to suppress signals that were common to both receivers, for example strong PWM harmonics.  When tuned to segments of the "noise floor", suppression was not possible, which suggests the noise signals being received by both receivers were different.
 
 An experiment was conducted where the signal from one antenna was split, and fed into each receiver.  In this case, the noise could be suppressed by Linrad, demonstrating that if the noise in both receivers satisfies (\ref{eq_diversity1}), it can be cancelled.
-  
-\subsection{Further Work}
 
-The measurements suggest the dominant noise problem (2/3 clusters) is AWGN. $R<B$ impulse noise is already being handled well by the IC7300, and the energy from occasional PWM signals in the low/nominal clusters seems localised to the harmonics (not affecting the AWGN noise floor between harmonics).  If the EMI is AWGN, is it likely the sum of many urban EMI signals, which suggests far field.  We cannot attack AWGN signals with blanking, as it has no time domain pulse structure.
+\subsection{Conclusions}
 
-This leaves diversity as a possible attack.  This requires the EMI signals received by the two receivers to satisfy (\ref{eq_diversity1}), implying the AWGN noise resolves to a point source.
-
-So the next experimental steps are:
 \begin{enumerate}
-\item Set up a diversity system and attempt to suppress AWGN noise received in both antennas.
-\item Use small, identical antennas placed close together to ensure similar received signals. Use physically small loops to enable placing them away from near field sources.  Route feedlines away from the house, and consider common mode chokes.
-\item Insert broadcast band filters into the diversity Rx inputs and measure noise figure to ensure our receiver noise floor is well below the target noise signals.
-\item If AWGN noise can be suppressed, determine a method to measure SNR from far field test signals and determine if there is any improvement.
+\item The Nominal and Low clusters are close to P.372, AWGN in nature, and cannot be reduced further with diversity.  This suggests far field noise from the surrounding city (many sources, many directions), which means I'm doing as well as expected (perhaps a little better than the median at 14.2 MHz).  Turns out I'm normal after all!  Experimentation with antennas (e.g a beam with gain) would be the best way to improve the SNR of received signals. 
+\item The High cluster on 14.2 MHz look like local PWM noise, and needs further investigation.
 \end{enumerate}
+
+\section{Experimental Measurements 2}
+
+
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

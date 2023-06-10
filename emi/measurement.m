@@ -27,8 +27,13 @@ function measurement()
     hold on;
     plot(7.1*ones(1,length(a)), a-RBW_dB,'b+'); plot(14.2*ones(1,length(b)), b-RBW_dB,'b+');
     plot([7.1 14.2 14.2],[nominal_No low_No high_No],'ro', 'markersize',10);
+    
+    c = 72.5; d = 27.7; f = 7:15;
+    Fa = c - d *log10(f);
+    plot(f,Fa-174,'g--;P.372 Residential;');
+
     grid; xlabel('Freq (MHz)'); ylabel('dBm/Hz');
-    axis([6 15 -150 -110]); legend('off')
+    axis([6 15 -150 -110]); legend('boxoff')
     hold off;
 
     fn = "measurement.tex";
@@ -38,8 +43,8 @@ function measurement()
    % Fa from P.372-16 Sect 6.1, residential
     Fa_p372_forty = 72.5 - 27.7*log10(7.1); Fa_p372_twenty = 72.5 - 27.7*log10(14.2);
     printf("         3kHz  1Hz Sunit FaP372 Fa\n");
-    printf("nominal: %4.0f %4.0f %2.0f    %2.0f     %2.0f\n", nominal, nominal_No, nominal_No/6+27, Fa_p372_forty, nominal_No+174);
-    printf("low:     %4.0f %4.0f %2.0f    %2.0f     %2.0f\n", low, low_No, low_No/6+27, Fa_p372_twenty, low_No+174);
-    printf("high:    %4.0f %4.0f %2.0f    %2.0f     %2.0f\n", high, high_No, high_No/6+27, Fa_p372_twenty, high_No+174);    
+    printf("nominal: %4.0f %4.0f %3.1f    %2.0f     %2.0f\n", nominal, nominal_No, nominal_No/6+26.7, Fa_p372_forty, nominal_No+174);
+    printf("low:     %4.0f %4.0f %3.1f    %2.0f     %2.0f\n", low, low_No, low_No/6+26.7, Fa_p372_twenty, low_No+174);
+    printf("high:    %4.0f %4.0f %3.1f    %2.0f     %2.0f\n", high, high_No, high_No/6+26.7, Fa_p372_twenty, high_No+174);    
 endfunction
 

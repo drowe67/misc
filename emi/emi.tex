@@ -21,7 +21,7 @@ Our target radio signals are from distant sources, weak, narrow band, and evolve
 
 There are a lot of on-line opinions, hearsay, rules of thumb, and subjective reports on this topic.  I have found this topic to be very complex, with many inter-related variables. Everyone else seems to work DX ok. I often wondered if my site was the exception - is it just my house or suburb?  
 
-This report is a my personal study, written to further my understanding of the topic, and hopefully improve conditions at my home station. No claim of any original work is made.
+This report was written to further my understanding of the topic, and hopefully improve conditions at my home station. No claim of any original work is made.
 
 \subsection{Summary}
 
@@ -53,7 +53,7 @@ This report is a my personal study, written to further my understanding of the t
 
 \subsection{Selected References}
 
-References I recommend are ITUT-R P372 \cite{itu372-16}, the W8JI web site \cite{w8ji_radio_noise} for a concise overview of HF noise and small loop antenna myths; and the web site of LZ1AQ \cite{lz1aq} for his studies on small loop antenna arrays. After some experimentation \cite{rowetel_noise_city} I've settled on the approach suggested by Owen Duffy \cite{duffy_lig} and Basu \cite{vu2nsb_s_meter} - comparing my ambient noise floor to P.372 to check my baseline, then seeing what I can do about local noise sources. John Fallows VE6EY \cite{ve6ey} has some fine material on noise reductiuon using diversity receivers on his blog and YouTube channel.
+References I recommend are ITUT-R P372 \cite{itu372-16}, the W8JI web site \cite{w8ji_radio_noise} for a concise overview of HF noise and small loop antenna myths; and the web site of LZ1AQ \cite{lz1aq} for his studies on small loop antenna arrays. After some experimentation \cite{rowetel_noise_city} I've settled on the approach suggested by Owen Duffy \cite{duffy_lig} and Basu \cite{vu2nsb_s_meter} - comparing my ambient noise floor to P.372 to check my baseline, then seeing what I can do about local noise sources. John Fallows VE6EY \cite{ve6ey} has some fine material on noise reduction using diversity receivers on his blog and YouTube channel.
 
 \section{Radio Noise Signals from Human Activity}
 
@@ -360,9 +360,9 @@ Antenna topologies may help reduce near field coupling.  For example the conduct
 
 There is some experimental evidence that the loop in/on ground topology \cite{k5jy_log}\cite{duffy_lig} increases SNR in suburban locations compared to traditional antennas such as dipoles.  The low gain (e.g. -30 dB) is usable for Rx operation as noise external to the receiver generally dominates system noise figure at HF. So both signal and noise is reduced, and S/N remains the same. It is a balanced design, and the use of common mode chokes on either end of the feedline is recommended.
 
-How this antenna reduces EMI (as implied by the improved SNR) is unclear, but worthy of further investigation. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranian) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to near field signals such as overhead power lines and nearby houses. 
+How this antenna reduces EMI (as implied by the improved SNR) is unclear, but worthy of further investigation. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranean) placement of the antenna.  It has some directivity, and a balanced design which is useful in rejecting common mode feedline currents.  It's low placement may also increase physical distance to near field signals such as overhead power lines and nearby houses. 
 
-There are many subjective reports that small loop antennas (either tuned or untuned) provide signficant reductions in EMI, by virtue of lower sensitivity to near electric fields.  However loop antennas are not magic \cite{w8ji_radio_noise}, and perform worse than dipoles in the presence of strong magnetic fields and even at certain distances from electric fields.  Their principle benefit appears to be small overall dimensions, making them easier to position away from near fields radiating from homes and power lines.
+There are many subjective reports that small loop antennas (either tuned or untuned) provide significant reductions in EMI, by virtue of lower sensitivity to near electric fields.  However loop antennas are not magic \cite{w8ji_radio_noise}, and perform worse than dipoles in the presence of strong magnetic fields and even at certain distances from electric fields.  Their principle benefit appears to be small overall dimensions, making them easier to position away from near fields radiating from homes and power lines.
 
 It seems likely that antenna topology alone cannot distinguish far field EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
 
@@ -375,7 +375,7 @@ The home is located in Adelaide (population 1.3 million), South Australia and is
 The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house (and solar panels), the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun at the feedpoint. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
 
 \begin{figure}[h]
-\caption{Map of the authors home station.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and a roof mounted solar PV system.}
+\caption{Map of my home.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and a roof mounted solar PV system.}
 \label{fig:home_map}
 \begin{center}
 \includegraphics[width=12cm]{house_map.png}
@@ -417,7 +417,7 @@ The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectr
 \end{center}
 \end{figure}
 
-Figure \ref{fig:noise_measurements} shows noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023 on the 40M and 20M bands.  There were three clusters (Table \ref{table:measurement_clusters}), that were used as a first step in charactering the noise. Each cluster was allocated a label (noise A, B \& C). The external noise figure is given by $F_a = N_0 - 174$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-16 \cite{itu372-16}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent my previous efforts using a small tuned loop \cite{rowetel_noise_city}.
+Figure \ref{fig:noise_measurements} shows noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023 on the 40M and 20M bands.  There were three clusters (Table \ref{table:measurement_clusters}), that were used as a first step in characterising the noise. Each cluster was allocated a label (noise A, B \& C). The external noise figure is given by $F_a = N_0 - 174$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-16 \cite{itu372-16}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent my previous efforts using a small tuned loop \cite{rowetel_noise_city}.
 
 Fitting a straight line to the S-unit standard calibration of S9 = -73dBm, and 6dB per S-unit we can find S units from received power $R$ in dBm:
 \begin{equation}
@@ -462,11 +462,11 @@ The S units are not sensitive to filter bandwidth, e.g. for a 3000Hz bandwidth $
 \subsection{Discussion}
 
 \begin{enumerate}
-\item The IC7300 S-meter was found to be uncalibrated \cite{vu2nsb_s_meter} (6dB power change not equal to one S unit) and could not be relied upon to measure noise power.  Instead, the S-units in Table \ref{table:measurement_clusters} where calulated using equation (\ref{eq:s_unit}). However the IC7300 waterfall is quite useful as a single plot shows both $R<B$ impulse noise (lines across all frequencies) and $R>B$ PWM (harmonics spaced at $R$ Hz).
+\item The IC7300 S-meter was found to be uncalibrated \cite{vu2nsb_s_meter} (6dB power change not equal to one S unit) and could not be relied upon to measure noise power.  Instead, the S-units in Table \ref{table:measurement_clusters} where calulcated using equation (\ref{eq:s_unit}). However the IC7300 waterfall is quite useful as a single plot shows both $R<B$ impulse noise (lines across all frequencies) and $R>B$ PWM (harmonics spaced at $R$ Hz).
 \item The site has strong 50 Hz impulse noise however the IC7300 noise blanker removes this quite effectively, especially on 7.1 MHz.  The zero span feature of the spec-an (set to 100ms sweep time) is useful for observing these short impulses - it turns the spec-an into a tuned oscilloscope with adjustable centre frequency and bandwidth.  A sweep time of 100ms and resolution bandwidth of 30 kHz was useful for observing 10ms period pulses typical of 50 Hz impulses (one per edge).
 \item Noise A/B appeared to be mainly AWGN, although at times PWM harmonics could be observed on both bands. The presence of the harmonics had no affect on the observed noise power between the harmonics, which suggests a small modulation index $h$.
 \item The 14.2 high level noise C corresponded to wideband noise with quite wide harmonics about 30kHz apart just visible on the waterfall.  From our PWM analysis in Section \ref{pwm}, this suggests $R>B$ with a fairly high modulation index $h$.  The time varying power between B and C could be due to shifts in the mean PWM duty cycle $d$, leading to shifts in the $sin(\pi n d)$ Fourier coefficients across the observed band.  Given $n$ is so high, even small shifts in $d$ can cause large changes in the amplitudes of the Fourier components.
-\item A 500MHz bandwidth oscilloscope with a 50 ohm input was connected instead of the spec-an but was not found to be very useful; nearby AM broadcast stations tend to dominate the wideband time domain signal.  Fitting a 7MHz high pass filter fixed this problem and made the oscilliscope more useful (see below). 
+\item A 500MHz bandwidth oscilloscope with a 50 ohm input was connected instead of the spec-an but was not found to be very useful; nearby AM broadcast stations tend to dominate the wideband time domain signal.  Fitting a 7MHz high pass filter fixed this problem and made the oscilloscope more useful (see below). 
 \end{enumerate}
 
 \subsection{Diversity Receiver}
@@ -482,18 +482,36 @@ An experiment was conducted where the signal from one antenna was split, and fed
 \subsection{Conclusions}
 
 \begin{enumerate}
-\item Noise A \& B are close to P.372, AWGN in nature, and cannot be reduced further with diversity.  This suggests far field noise from the surrounding city (many sources, many directions), which means I'm doing as well as expected (perhaps a little better than the median at 14.2 MHz).  Turns out I'm normal after all!  Experimentation with antennas is the best way to improve the SNR of received signals. 
-\item Noise C on 14.2 MHz look like local PWM noise, and needs further investigation.
+\item Noise A \& B are close to P.372, AWGN in nature, and cannot be reduced further with diversity.  This suggests far field noise from the surrounding city (many sources, many directions), which means I'm doing as well as expected (perhaps a little better than the median at 14.2 MHz).  Turns out I'm normal after all!  Experimentation with antennas is one of the few options to improve the SNR of signals I receive at my site. 
+\item Noise C on 14.2 MHz look like time varying local PWM noise, and needs further investigation.
 \end{enumerate}
 
 \section{Experimental Measurements 2}
 
-Loop Antenna, different positions
+\subsection{Loop Antenna}
+
+Am I suffering from near field noise? I have Wellbrook ALA1530LN Loop Antenna, so I placing it on a tripod at various sites around my block, and measured the received power in a 3kHz bandwidth. The gain of the Wellbook is different to the dipole, so the powers cannot be directly compared.  Figure \ref{fig:home_map_loop} shows the noise power.  It peaks in the area closest to buildings, and drops off when equidistant from buildings and electricity lines.  The Wellbrook manual suggests placement 6m from buildings and other noise sources - good advice!
+
+I'm not nerdy enough to leave it set up in the middle of the front yard, so settled for the "X" position where its obscured by a tree.
+
+\begin{figure}[h]
+\caption{Map of noise power at 14.2 MHz (dBm in 3 kHz) measured around my home on the Wellbrook.}
+\label{fig:home_map_loop}
+\begin{center}
+\includegraphics[width=12cm]{house_map_loop.png}
+\end{center}
+\end{figure}
+
+When receiving off air signals, the Wellbrook performs roughly the same as the dipole on 40m and 20m.  Sometimes one sounds better, sometimes the other, as would be expected from different patterns and polarisation.  Listening tests are confused by the different gain of the antennas, the dipole is "louder" (both signal and noise increase) than the Wellbrook on 40m, and the opposite on 20m.  So when I flip the antenna switch, the noise I hear leaps up or down while the AGC adjusts.
 
 \subsection{Observations}
 
+I used a more elaborate setup for my next set of observations (Figure \ref{fig:meas_config_2}).  With the addition of the 7 MHz HPF I found the scope much more useful, especially in identifying impulse noise.  Impulse noise viewed on the scope is much more obvious using the Wellbrook, presumably due to it's wide bandwidth. Note impulse noise may sound the same on the SSB receiver with either antenna (same raspy, buzzing sound), it's just harder to observe when the dipole is connected to the scope. Switching between the loop and dipole allows me to see if the noise signal is present in both antennas, for example to determine if it's near field noise in just one of them.
+
+So I can observe noise signals with the spec-an, oscilloscope, the IC7300 (or Linrad) receiver waterfall, and by listening to the receiver audio.  I can select how I collect the noise by selecting between my two antennas.
+
 \begin{figure}[h]
-\caption{Experimental set up for second set of measurements.  The oscilliscope enables the noise to be observed in the time and frequenmcy domain.  The 7 MHz Band Pass Filter (BPF) removes the strong broadcast signals, making the oscilliscope more useful.}
+\caption{Experimental set up for second set of measurements.  A loop antenna, switch, and oscilloscope has been added. The 7 MHz Band Pass Filter (BPF) removes the strong broadcast signals, making the oscilloscope more useful.}
 \label{fig:meas_config_2}
 \begin{center}
 \begin{tikzpicture}

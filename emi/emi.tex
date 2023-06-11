@@ -564,16 +564,50 @@ So I can observe noise signals with the spec-an, oscilloscope, the IC7300 (or Li
 \end{center}
 \end{figure}
 
-
 \subsection{Noise D}
 
-An additional noise source D Varies in the range between B and C.  No PWM harmonic structure on the spectogram, but is characterised by powerful time domain impulse when viewed on the oscilliscope.
+Shortly after setting up the new measurement system, an additional impulse noise source D was discovered.  I can hear it equally well on the radio using either antenna (as a buzzy noise), although it is somewhat more obvious as on the scope using the Wellbrook.  It's power (measured into the dipole) varies between B \& C, but has no obvious harmonic structure.  It tends to occur in the morning for a few hours, disappearing by about 10am.
 
-More obvious on loop, as it's bandwidth is wider.  However buzzy/raspy background noise sound is present on the audio with both antennas.
+Zooming in at various time bases is instructive (Figures \ref{fig:D_dipole_10ms}, \ref{fig:D_dipole_2us} and \ref{fig:D_dipole_50ns}).  This shows complex pattern of impulses.  Each impulse is causing the antenna system to ring for a few $\mu$s.
+
+Figure \ref{fig:D_wellbrook_5ms} is noise D received on the Wellbrook. Note the peak of the impulse is 150mVpp.  Taking into account 7dB of splitter loss, that's around 400mVpp from the antenna.  These are very high peak power signals, and I am amazed that modern receivers can deal with 400mVpp input signals at all.
+
+\begin{figure}[h]
+\caption{Impulse noise D received on dipole at 10ms/division.  A complex sequence of impulses and bursts of impulses.  The constant amplitude component is the middle is "everything else"; the sum of many radio signals and noise.}
+\label{fig:D_dipole_10ms}
+\begin{center}
+\includegraphics[width=8cm]{D_dipole_10ms.jpg}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Impulse noise D received on dipole at 2$\mu$s/div.  The bursts resolve into a sequence of exponentially decaying "ringing" pulses.  Each of these pulses is about 200 $\mu$s apart.}
+\label{fig:D_dipole_2us}
+\begin{center}
+\includegraphics[width=8cm]{D_dipole_2us.jpg}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Impulse noise D received on dipole at 50ns/div.  The ringing has a period of 139ns, or a frequency of 7.19 MHz, roughly the resonant frequency of the 40M dipole}
+\label{fig:D_dipole_50ns}
+\begin{center}
+\includegraphics[width=8cm]{D_dipole_50ns.jpg}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{Impulse noise D on Wellbrook, 150mVpp at 5ms/div.}
+\label{fig:D_wellbrook_5ms}
+\begin{center}
+\includegraphics[width=8cm]{D_wellbrook_5ms.jpg}
+\end{center}
+\end{figure}
 
 \subsection{Discussion}
 
 Noise, comes in layers.
+Complex impulse trains.  Noise blanker.  Wideband antenna
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

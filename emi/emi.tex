@@ -189,15 +189,18 @@ Given $d$ is small, and there is still significant power at high harmonic number
 \subsection{Attacks}
 
 \begin{enumerate}
-\item Estimation and subtraction of the signals. Key take away is mirror of $d(t)$ about harmonic centre. Estimation of signal from one sideband to cancel other, or from AM demodulation (envelope). This will be problematic when it's spread so far that we get energy from $n+1$, $n-1$ near harmonic $n$.  However in that case it may not be as annoying/strong.
+\item Estimation and subtraction of the signals. Key take away is mirror of $d(t)$ about harmonic centre.  We could use estimation of the signal from one sideband to cancel other sideband. This will be problematic when it's spread so far that we get energy from $n+1$, $n-1$ near harmonic $n$.  However in that case it may not be as annoying/strong.
 
-\item Estimation of signal from adjacent harmonics.  Can we find $x_n(t)$ from $x_{n-1}(t)$?  $\omega$ and $n$ can be estimated from the spectrum.  A direct form solution is unlikely however the equations are differentiable so an iterative solution could be found.
+\item Estimation of signal from adjacent harmonics.  Can we find $x_n(t)$ from $x_{n-1}(t)$?  $\omega$ and $n$ can be estimated from the spectrum (note $\omega$ and $d$ are likely to be time varying). A direct form solution is unlikely however the equations are differentiable so an iterative solution could be found.  It would be easier to estimate the parameters at lower frequencies as the modulation index $h$ will be smaller.  It could then be synthesised for any other band of frequencies. 
 
 \item Dual channel coherent removal (diversity receiver).
 
 \item Noise blanking in the time domain.  This may be challenging with $R>100$ kHz, as the period becomes $< 10\mu$s, implying the need for a wide bandwidth and sample rate $>>100$ kHz in order to resolve individual noise pulses in the time domain.
 
 \item Training of time domain pulses, correlation and removal.
+
+\item Wide bandwidth noise blanker, such that a pulse of a few $\mu$ in a 30 kHz period can be removed.
+
 \end{enumerate}
 
 \section{Noise Blanker}
@@ -615,6 +618,8 @@ The relatively close spacing of the noise D impulses (200$\mu$s apart over sever
 A wideband noise blanker that can blank a few $\mu$s every 200 $\mu$s would be more effective, but would require a wider DSP bandwidth.  It also risks intermodulation interference from strong signals.  This is an interesting area for further work.  Diversity might help with Noise D as it is present in both antennas, indeed it's strength and 50Hz period suggests a suburban source propagated by electricity lines.
 
 The period of noise D is approximately the same as one PSK symbol at HF.  For the demodulation of constant envelope digital signals like (Q)PSK and FSK, these impulses could be removed by limiting.  However in the common scenario of a SSB receiver followed by DSP operating at audio bandwidths, low duty cycle noise pulses would be smeared in time, reduced in amplitude and difficult to remove.  This suggests a PSK demodulator operating at a high sample rate, coupled with limiting, would be worth exploring.
+
+Another possible approach is to train a system to recognise the impulse response of the antenna system to identify and remove noise impulses.
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

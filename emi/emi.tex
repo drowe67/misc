@@ -201,6 +201,7 @@ Given $d$ is small, and there is still significant power at high harmonic number
 \end{enumerate}
 
 \section{Noise Blanker}
+\label{blanker}
 
 Consider a signal $x(t)$ consisting of a wanted sinusoidal signal and an unwanted impulse train that repeats every $1/R$ seconds.
 \begin{equation}
@@ -282,11 +283,12 @@ Y(w) &= a_1 (1-d) \delta(\omega - \omega_1) - a_1 d H(\omega-\omega_1) \\
 \end{figure}
 
 \subsection{Discussion}
+\label{blanker_discussion}
 
 \begin{enumerate}
 \item The wanted signal has been reduced to $(1-d)$, and harmonics $H(\omega)$ have been introduced either side.  These are spectral copies of the input signal, spaced every $\alpha$ radians/s.
-\item An attenuation of $(1-d)$ is quite modest, for example if half of the signal is blanked ($d=0.5$), we lose just 3dB of the wanted signal.  So quite heavy blanking is feasible, if it improves the output SNR by removing the noise pulse.
-\item The harmonic levels are proportional to the duty cycle $d$.
+\item An attenuation of $(1-d)$ is quite modest, for example if half of the signal is blanked ($d=0.5$), we lose just 3dB of the wanted signal power.  So quite heavy blanking is feasible, if it improves the output SNR by removing the noise pulse.
+\item The harmonic levels are proportional to the duty cycle $d$.  As our blanking pulse becomes longer relative to the noise period, we will experience more blanking noise.
 \item If the harmonic levels approach $a_1$ they may cause interference.  However for digital waveforms a margin of only a few dB beneath the wanted signal would be acceptable.  This suggests digital waveforms can benefit more from noise blanking than analog. 
 \item A second, strong signal in the passband could introduce interference if one of it's harmonic sidebands approaches $a_1$ at $\omega_1$.  This is the intermodulation effect of noise blankers.
 \item The PWM analysis in Section \ref{pwm} showed that a small duty cycle/small jitter signal can cause broadband noise.  This suggests a narrow time domain blanking pulse $T<<1/R$ can remove that noise with acceptable impact on the wanted signal. 
@@ -490,7 +492,7 @@ An experiment was conducted where the signal from one antenna was split, and fed
 
 \subsection{Loop Antenna}
 
-Am I suffering from near field noise? I have Wellbrook ALA1530LN Loop Antenna, so I placing it on a tripod at various sites around my block, and measured the received power in a 3kHz bandwidth. The gain of the Wellbook is different to the dipole, so the powers cannot be directly compared.  Figure \ref{fig:home_map_loop} shows the noise power.  It peaks in the area closest to buildings, and drops off when equidistant from buildings and electricity lines.  The Wellbrook manual suggests placement 6m from buildings and other noise sources - good advice!
+Am I suffering from near field noise? I have Wellbrook ALA1530LN Loop Antenna, so I placing it on a tripod at various sites around my block, and measured the received power in a 3kHz bandwidth. The gain of the Wellbook is different to the dipole, so the powers cannot be directly compared.  Figure \ref{fig:home_map_loop} shows the noise power.  It peaks in the area closest to several homes, and drops off when equidistant from my home and electricity lines.  The Wellbrook manual suggests placement 6m from buildings and other noise sources - good advice!
 
 I'm not nerdy enough to leave it set up in the middle of the front yard, so settled for the "X" position where its obscured by a tree.
 
@@ -506,9 +508,9 @@ When receiving off air signals, the Wellbrook performs roughly the same as the d
 
 \subsection{Observations}
 
-I used a more elaborate setup for my next set of observations (Figure \ref{fig:meas_config_2}).  With the addition of the 7 MHz HPF I found the scope much more useful, especially in identifying impulse noise.  Impulse noise viewed on the scope is much more obvious using the Wellbrook, presumably due to it's wide bandwidth. Note impulse noise may sound the same on the SSB receiver with either antenna (same raspy, buzzing sound), it's just harder to observe when the dipole is connected to the scope. Switching between the loop and dipole allows me to see if the noise signal is present in both antennas, for example to determine if it's near field noise in just one of them.
+I used a more elaborate setup for my next set of observations (Figure \ref{fig:meas_config_2}).  With the addition of the 7 MHz HPF I found the scope much more useful, especially for identifying impulse noise.  Impulse noise viewed on the scope is much more obvious using the Wellbrook, presumably due to it's wide bandwidth. Note impulse noise may sound the same on the SSB receiver with either antenna (same raspy, buzzing sound), it's just harder to observe when the dipole is connected to the scope. Switching between the loop and dipole allows me to see if the noise signal is present in both antennas, for example to determine if it's near field noise in just one of them.
 
-So I can observe noise signals with the spec-an, oscilloscope, the IC7300 (or Linrad) receiver waterfall, and by listening to the receiver audio.  I can select how I collect the noise by selecting between my two antennas.
+So I can observe noise signals with the spec-an, oscilloscope, IC7300 (or Linrad) receiver waterfall, and by listening to the receiver audio.  I can select how I collect the noise by switching between two antennas.
 
 \begin{figure}[h]
 \caption{Experimental set up for second set of measurements.  A loop antenna, switch, and oscilloscope has been added. The 7 MHz Band Pass Filter (BPF) removes the strong broadcast signals, making the oscilloscope more useful.}
@@ -566,11 +568,11 @@ So I can observe noise signals with the spec-an, oscilloscope, the IC7300 (or Li
 
 \subsection{Noise D}
 
-Shortly after setting up the new measurement system, an additional impulse noise source D was discovered.  I can hear it equally well on the radio using either antenna (as a buzzy noise), although it is somewhat more obvious as on the scope using the Wellbrook.  It's power (measured into the dipole) varies between B \& C, but has no obvious harmonic structure.  It tends to occur in the morning for a few hours, disappearing by about 10am.
+Shortly after setting up the new measurement system, an additional impulse noise source D was discovered.  I can hear it equally well on the radio using either antenna (as a buzzy noise), although it is somewhat more obvious on the scope using the Wellbrook.  The IC7300 noise blanker is not effective unless "delay" is set to 100\%, however this setting results in weak SSB signals being distorted. It's power (measured into the dipole) varies -110 and -100 dBm/Hz (between clusters B \& C), but has no obvious harmonic structure. On several days I have observed it in the morning for a few hours, disappearing by about 10am.
 
-Zooming in at various time bases is instructive (Figures \ref{fig:D_dipole_10ms}, \ref{fig:D_dipole_2us} and \ref{fig:D_dipole_50ns}).  This shows complex pattern of impulses.  Each impulse is causing the antenna system to ring for a few $\mu$s.
+Observing the oscilloscope at various time bases is instructive (Figures \ref{fig:D_dipole_10ms}, \ref{fig:D_dipole_2us} and \ref{fig:D_dipole_50ns}).  This shows complex pattern of impulses, with each impulse causing the antenna system to ring for a few $\mu$s.
 
-Figure \ref{fig:D_wellbrook_5ms} is noise D received on the Wellbrook. Note the peak of the impulse is 150mVpp.  Taking into account 7dB of splitter loss, that's around 400mVpp from the antenna.  These are very high peak power signals, and I am amazed that modern receivers can deal with 400mVpp input signals at all.
+Figure \ref{fig:D_wellbrook_5ms} is noise D received on the Wellbrook. Note the peak of the impulse is 150mVpp.  Taking into account 7dB of splitter loss, that's around 400mVpp from the antenna.  These are very high peak power signals, I am amazed that modern receivers can deal with 400mVpp input signals at all.
 
 \begin{figure}[h]
 \caption{Impulse noise D received on dipole at 10ms/division.  A complex sequence of impulses and bursts of impulses.  The constant amplitude component is the middle is "everything else"; the sum of many radio signals and noise.}
@@ -589,7 +591,7 @@ Figure \ref{fig:D_wellbrook_5ms} is noise D received on the Wellbrook. Note the 
 \end{figure}
 
 \begin{figure}[h]
-\caption{Impulse noise D received on dipole at 50ns/div.  The ringing has a period of 139ns, or a frequency of 7.19 MHz, roughly the resonant frequency of the 40M dipole}
+\caption{Impulse noise D received on dipole at 50ns/div.  The ringing has a period of 139ns, or a frequency of 7.19 MHz, the resonant frequency of the 40M dipole.}
 \label{fig:D_dipole_50ns}
 \begin{center}
 \includegraphics[width=8cm]{D_dipole_50ns.jpg}
@@ -606,15 +608,13 @@ Figure \ref{fig:D_wellbrook_5ms} is noise D received on the Wellbrook. Note the 
 
 \subsection{Discussion}
 
-Noise, comes in layers.
+Urban noise problems are complex, I have identified 4 noise sources around my home so far.
 
-Complex impulse trains.
+The relatively close spacing of the noise D impulses (200$\mu$s apart over several ms) might explain why the noise blanker is struggling.  The blanker signal processing is likely operating at a bandwidth such that consecutive pulses are smeared together, so the blanker would be forced to blank about 5ms out of every 20ms. From our noise blanker analysis in Section \ref{blanker_discussion} the blanker noise products are duty cycle $d$ lower than the wanted signal, or $10log10(5/20)=-6$ dB lower in power than the wanted signal.  We would expect this to be quite obvious on SSB signals.  However a signal/interferer ratio of 6dB wouldn't bother many digital modes.
 
-Noise blanker might not be able to handle it.  Diversity might, or systems that learn and remove impulse response.
+A wideband noise blanker that can blank a few $\mu$s every 200 $\mu$s would be more effective, but would require a wider DSP bandwidth.  It also risks intermodulation interference from strong signals.  This is an interesting area for further work.  Diversity might help with Noise D as it is present in both antennas, indeed it's strength and 50Hz period suggests a suburban source propagated by electricity lines.
 
-This noise will be smeared by a receiver.  Consider PSK symbols 20ms long - would would happen to them?
-
-Wideband antenna, wide processing bandwidth might help, but intermod.
+The period of noise D is approximately the same as one PSK symbol at HF.  For the demodulation of constant envelope digital signals like (Q)PSK and FSK, these impulses could be removed by limiting.  However in the common scenario of a SSB receiver followed by DSP operating at audio bandwidths, low duty cycle noise pulses would be smeared in time, reduced in amplitude and difficult to remove.  This suggests a PSK demodulator operating at a high sample rate, coupled with limiting, would be worth exploring.
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

@@ -25,6 +25,7 @@ This report was written to further my understanding of the topic, and hopefully 
 
 \subsection{Summary}
 
+What I've learnt about characterising and removing noise:
 \begin{enumerate}
 \item S-meters can't be trusted \cite{vu2nsb_s_meter}, you'll need a calibrated way to measure noise power at your site.
 \item Measure your ambient noise figure $F_a$ and compare to P.372 \cite{itu372-16}.
@@ -35,6 +36,7 @@ This report was written to further my understanding of the topic, and hopefully 
 \item If possible, find and remove the local noise sources.
 \end{enumerate}
 
+Table \ref{table:noise_classes} is how I classify noise.  Like many taxonomies, the boundaries are not clear cut.  For example if you have enough PWM or impulse sources added together you get AWGN.  A single impulse can be considered a PWM signal with a very low frequency.  I found it useful to classify periodic noise sources based on if the noise pulse rate $R$ is inside or outside the receiver bandwidth $B$.
 \begin{table}[h]
 \centering
 \begin{tabular}{ | m{1.2cm} | m{4cm} | m{3cm} | m{2cm} |}
@@ -47,9 +49,22 @@ This report was written to further my understanding of the topic, and hopefully 
 \hline PWM & Short pulses close together in time $R>B$, harmonics in frequency & Switch mode power supplies & tones or hash \\
  \hline
 \end{tabular}
-\caption{How I classify noise. AWGN is Additive White Gaussian Noise, PWM is Pulse Width Modulation, $R$ is the frequency of the noise pulses, $B$ is your receiver bandwidth.}
+\caption{How I classify noise signals. AWGN is Additive White Gaussian Noise, PWM is Pulse Width Modulation, $R$ is the frequency of the noise pulses, $B$ is your receiver bandwidth.}
 \label{table:noise_classes}
 \end{table}
+
+The maths and analysis of experimental data has these take aways:
+\begin{enumerate}
+\item Both the noise and noise blankers can be expressed as Fourier series.
+\item PWM harmonics are baseband PSK, AM modulated onto carriers at the centre of each harmonic.  By thinking of the noise as signals we can get insight into possible attacks.
+\item PWM noise is localised to harmonic centres at lower frequencies, then gets wider with increasing frequency.
+\item The signal processing bandwidth where the blanker runs matters.  As the bandwidth is reduced the noise pulses are smeared together.
+\item Blankers don't attenuate the wanted signal much, but do introduce intermodulation.  Blankers are likely to be more effective with digital than analog modes.
+\item Diversity only works when the noise is effectively a point source.
+\item Impulse noise can be really complex, confusing narrow band noise blankers.
+\item Impulses make the antenna system ring. It may be possible to indentify and remove this ringing.
+\item A limiter might be useful for digital modes.
+\end{enumerate}
 
 \subsection{Selected References}
 
@@ -373,14 +388,14 @@ It seems likely that antenna topology alone cannot distinguish far field EMI (su
 
 \section{Experimental Measurements 1}
 
-In May 2023 I perfomed some measurements at my suburban home.  The goal was to gain experience in measuring EMI and attempt to fit experimental results to the theoretical framework above.
+In May 2023 I performed some measurements at my suburban home.  The goal was to gain experience in measuring EMI and attempt to fit experimental results to the theoretical framework above.
 
 The home is located in Adelaide (population 1.3 million), South Australia and is on a suburban square corner block of 550 \si{\metre\squared}.  Overhead power lines are on two sides, and the suburb is served by VDSL Internet using overhead 70 year old phone lines.  There are two adjacent houses, and the home and it's Southern neighbour have roof mounted solar PV systems.
 
-The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house (and solar panels), the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun at the feedpoint. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
+Figure \ref{fig:home_map} is a map of my home. The station antenna is an inverted V fan dipole with 40m and 20m elements, suspended over the house (and solar panels), the mast and feed point is 9m above ground. It is coupled to 50 ohm coax using a balun at the feedpoint. Subjectively, SSB stations on the 40m band are hard to hear and unpleasant to listen to, and 20m varies between reasonable noise levels and completely unusable (time varying).
 
 \begin{figure}[h]
-\caption{Map of my home.  EMI sources are power and xDSL lines, wiring in the home and adjacent homes, and a roof mounted solar PV system.}
+\caption{Map of my home.  EMI sources are overhead power and xDSL lines, wiring in the home and adjacent homes, and roof mounted solar PV systems on my home and the home to the South.}
 \label{fig:home_map}
 \begin{center}
 \includegraphics[width=12cm]{house_map.png}
@@ -412,7 +427,7 @@ The station antenna is an inverted V fan dipole with 40m and 20m elements, suspe
 \end{center}
 \end{figure}
 
-The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  The spec-an settings were: 3kHz resolution bandwidth, span 200 kHz, pre-amp on, attenuator 0dB, RMS detector, power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to an IC7300 HF radio to monitor the signal.
+Figure \ref{fig:meas_config_1} shows the experimental configuration. The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectrum analyser, and the noise power measured at 7.1 and 14.2 MHz.  The spec-an settings were: 3kHz resolution bandwidth, span 200 kHz, pre-amp on, attenuator 0dB, RMS detector, power averaged over 100 counts.  The noise floor of the spec-an is about -160 dBm/Hz. The other port of the splitter was connected to an IC7300 HF radio to monitor the signal.
 
 \begin{figure}[h]
 \caption{Scatter plot of noise power measurements over a period of 1 week, made in a 3 kHz resolution bandwidth (top), and converted to a 1 Hz bandwidth at bottom.  Red circles indicate clusters.}
@@ -422,7 +437,7 @@ The inverted V dipole was connected via a 3dB splitter to a Rigol DSA 815 spectr
 \end{center}
 \end{figure}
 
-Figure \ref{fig:noise_measurements} shows noise power measurements were made over a period of one week (1-3 measurements each day) in May 2023 on the 40M and 20M bands.  There were three clusters (Table \ref{table:measurement_clusters}), that were used as a first step in characterising the noise. Each cluster was allocated a label (noise A, B \& C). The external noise figure is given by $F_a = N_0 - 174$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-16 \cite{itu372-16}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent my previous efforts using a small tuned loop \cite{rowetel_noise_city}.
+Figure \ref{fig:noise_measurements} plots noise power measurements made over a period of one week (1-3 measurements each day) in May 2023 on the 40M and 20M bands.  There were three clusters (Table \ref{table:measurement_clusters}), that were used as a first step in characterising the noise. Each cluster was allocated a label (noise A, B \& C). The ambient noise figure is given by $F_a = N_0 - 174$. Table \ref{table:external_noise_figure} compares the measurements to the median $F_a$ for residential locations from ITU-R P.372-16 \cite{itu372-16}. The measurements have been adjusted for the splitter (-3.5dB) and feedline (-1dB) losses.  The noise field is assumed to be isotropic so the antenna gain is modelled as 0dB. The measured noise power is consistent my previous efforts using a small tuned loop \cite{rowetel_noise_city}.
 
 Fitting a straight line to the S-unit standard calibration of S9 = -73dBm, and 6dB per S-unit we can find S units from received power $R$ in dBm:
 \begin{equation}
@@ -619,7 +634,7 @@ A wideband noise blanker that can blank a few $\mu$s every 200 $\mu$s would be m
 
 The period of noise D is approximately the same as one PSK symbol at HF.  For the demodulation of constant envelope digital signals like (Q)PSK and FSK, these impulses could be removed by limiting.  However in the common scenario of a SSB receiver followed by DSP operating at audio bandwidths, low duty cycle noise pulses would be smeared in time, reduced in amplitude and difficult to remove.  This suggests a PSK demodulator operating at a high sample rate, coupled with limiting, would be worth exploring.
 
-Another possible approach is to train a system to recognise the impulse response of the antenna system to identify and remove noise impulses.
+The ringing of the antenna system in response to an impulse suggests several attacks. We could train a system to recognise the impulse response of the antenna system to identify and remove noise impulses.  If the impulse response is known, we could inverse filter to produce very short (non smeared) noise impulses that are easy to blank.
 
 \bibliographystyle{plain}
 \bibliography{emi_refs}

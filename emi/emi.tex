@@ -6,7 +6,7 @@
 \usepackage{array}
 \begin{document}
 
-\title{EMI on Lower HF}
+\title{Urban EMI on Lower HF}
 \author{David Rowe VK5DGR}
 
 \maketitle
@@ -27,7 +27,7 @@ This report was written to further my understanding of the topic, and hopefully 
 
 What I've learnt about characterising and removing noise:
 \begin{enumerate}
-\item S-meters can't be trusted \cite{vu2nsb_s_meter}, you'll need a calibrated way to measure noise power at your site.
+\item S-meters can't be trusted \cite{vu2nsb_s_meter}\cite{dj0ip_s_meter}, you'll need a calibrated way to measure noise power at your site.
 \item Measure your ambient noise figure $F_a$ and compare to P.372 \cite{itu372-16}.
 \item If your noise is AWGN and your $F_a$ is similar to P.372 it's probably city wide noise, rather than something local. Congratulations you are doing as well as can be reasonably expected. Your options are a directional (receive) antenna, or moving your antenna to the country.
 \item If you see harmonics on your waterfall (and hear tones as your tune across the band) it's PWM and likely very local.
@@ -56,7 +56,7 @@ Table \ref{table:noise_classes} is how I classify noise.  Like many taxonomies, 
 The maths and analysis of experimental data has these take aways:
 \begin{enumerate}
 \item Both the noise and noise blankers can be expressed as a Fourier series.
-\item PWM harmonics are PSk signals, AM modulated onto carriers at the centre of each harmonic.  By thinking of the noise as signals with structure we can get insight into possible attacks.
+\item PWM harmonics are PSK signals, AM modulated onto carriers at the centre of each harmonic.  By thinking of the noise as signals with structure we can get insight into possible attacks.
 \item PWM noise is localised to harmonic centres at lower frequencies, then gets wider with increasing frequency.
 \item The signal processing bandwidth where the blanker runs matters \cite{sm5bsz_blanker}.  As the bandwidth is reduced the noise pulses are smeared together.
 \item Blankers don't attenuate the wanted signal much, but do introduce intermodulation.  Blankers are likely to be more effective with digital than analog modes.
@@ -343,14 +343,14 @@ Physical distancing of the antenna elements from noise sources will help reduce 
 \end{center}
 \end{figure}
 
-Consider an EMI signal $e(t)$ received on two nearby antennas:
+Consider Figure \ref{fig:diveristy_model} where an EMI signal $e(t)$ received on two antennas:
 \begin{equation}
 \begin{split}
 r_1(t) &= a_1 e(t) \\
 r_2(t) &= a_2 e(t) \\
 \end{split}
 \end{equation}
-where $a_1$ and $a_2$ are complex constants that model path loss and phase shift due to propogation delay. It can be shown that:
+where $a_1$ and $a_2$ are complex constants that model path loss and phase shift due to propagation delay. It can be shown that:
 \begin{equation} \label{eq_diversity1}
 r_1(t) = cr_2(t)
 \end{equation}
@@ -358,9 +358,28 @@ where $c=a_1/a_2$, the ratio of two complex gains.  Thus if we can estimate $c$,
 \begin{equation} 
 E = r_1(t) - cr_2(t)
 \end{equation}
-This model requires the EMI signal to be present (i.e. above the receiver internal noise) in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the effectiveness of diversity will be very sensitive to antenna placement.
 
-When suppressing far field EMI signals amplitude will be less sensitive to antenna placement. However this model also requires that the noise $e(n)$ be a point source.  Consider the case where the there are several independent noise sources $e_n(t)$ located at different locations, e.g. an urban location in the middle of a city.  It is unlikely the phase and amplitude relationships will be the same for each sources so the solution of (\ref{eq_diversity1}) will be different for each source.  If we rely on a single coefficient $c$ cancellation will be ineffective.  So the effectiveness of diversity with rely on how well the noise resolves to a single point source.
+Consider a poorly filtered switch mode power supply $e(t)$ inside a house that is coupled by the house wiring into a nearby antenna.  The house wiring is routed near the antenna at several points, resulting in multiple coupling paths with different path loss and delay. This can be modelled as the same noise source with multiple different paths:
+\begin{equation}
+\begin{split}
+r_{local}(t) &= \sum_n a_n e(t) \\
+     &= \left( \sum_n a_n \right) e(t) \\
+     &= a e(t)
+\end{split}
+\end{equation}
+Note the vector sum of many paths resolves to single complex constant.  This will be true of each antenna placed near the house, so (\ref{eq_diversity1}) can be satisfied, and the noise removed. Noise from overhead electricity lines could be modelled the same way - a single noise signal radiated by many different antennas.
+
+Consider the case where the there are several independent noise sources located at different locations, e.g. an urban location in the middle of a city:
+\begin{equation}
+r_{urban}(t) = \sum_n a_n e_n(t)
+\end{equation}
+It is unlikely the phase and amplitude relationships described by $a_n$ will be the same for each source so the solution of (\ref{eq_diversity1}) will be different for each source.  If we rely on a single coefficient, cancellation will be ineffective.  So the effectiveness of diversity will rely on how well the noise resolves to a single point source.
+
+Diversity is unlikely to be effective in cancelling urban noise, but will be effective for single local noise sources, even if coupled from multiple paths (like noisy electricity lines surrounding an antenna).
+
+In terms of antenna pattern, the two antennas form a phased array.  Diversity can be viewed as $e(n)$ resolving to the equivalent of a point source, where we place a null in the antenna pattern.  In the case of multiple coupling paths (like house wiring coupling to an overhead antenna), the "bearing" of the null may not have a meaningful physical interpretation.
+
+This model requires the EMI signal to be present (i.e. above the receiver internal noise) in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the effectiveness of diversity will be sensitive to antenna placement.
 
 \subsection{Directional Antennas}
 
@@ -389,6 +408,8 @@ There are many subjective reports that small loop antennas (either tuned or untu
 There are subjective reports from the on-line community that a loop antenna placed in or even under the ground \cite{k5jy_log}\cite{duffy_lig} performs favourably in suburban locations compared to traditional antennas such as dipoles. It is a balanced design, and the use of common mode chokes on either end of the feedline is recommended. The low gain (e.g. -30 dB) is usable for Rx operation as noise external to the receiver generally dominates system noise figure at HF. So both signal and noise is reduced, and S/N remains the same.
 
 How this antenna reduces the effects of EMI (as implied by the improved SNR) is unclear, but worthy of further investigation. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranean) placement of the antenna.  It's directivity may help, by attenuating isotropic far field noise and hence increasing SNR is certain directions (e.g. 90 degrees elevation, for NVIS applications).  It's low placement and novel use of urban grassed areas may also increase physical distance to near field signals such as overhead power lines and nearby houses.
+
+The cobweb antenna is a dipole that has been folded into a square such that the two ends nearly touch.  This creates a compact shape (3 metre sides on the 20M band) that allows it to be more easily physically distanced from near field sources (e.g. vertically on a mast) than a traditional linear dipole.  In particular this arrangement keeps the high impedance "ends" of the dipole that are most sensitive to electric field noise further away from the ground and near field sources than an traditional inverted V. The folding results in a few dB less gain than a dipole, however given the omnidirectional pattern and dominance of ambience noise at HF that is of no consequence.
 
 It seems likely that in the absence of significant directivity, antenna topology alone cannot distinguish far field EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
 

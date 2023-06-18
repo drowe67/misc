@@ -29,7 +29,7 @@ What I've learnt about characterising and removing noise:
 \begin{enumerate}
 \item S-meters can't be trusted \cite{vu2nsb_s_meter}\cite{dj0ip_s_meter}, you'll need a calibrated way to measure noise power at your site.
 \item Measure your ambient noise figure $F_a$ and compare to P.372 \cite{itu372-16}.
-\item If your noise is AWGN and your $F_a$ is similar to P.372 it's probably city wide noise, rather than something local. Congratulations you are doing as well as can be reasonably expected. Your options are a directional (receive) antenna, or moving your antenna to the country.
+\item If your noise is AWGN and your $F_a$ is similar to P.372 it's probably city wide noise, rather than something local. Congratulations you are doing as well as can be reasonably expected. Your options are a (receive) antenna with directivity, or moving your antenna to the country.
 \item If you see harmonics on your waterfall (and hear tones as your tune across the band) it's PWM and likely very local.
 \item If it's rapid clicks or buzzing it's impulse noise which is also local, but can travel down power lines around suburbs. 
 \item To address PWM and impulse local noise, position your antenna at least 6m from any buildings, power and phone lines.  Look for and address any common modem feedline issues, use a balun on your dipole, or use antennas with good balance (like loops).  Try Diversity.  Your noise blanker might work for impulse noise.  A small loop antenna might help as it is easier to place away from noise sources than a wire antenna.
@@ -62,7 +62,7 @@ The maths and analysis of experimental data has these take aways:
 \item Blankers don't attenuate the wanted signal much, but do introduce intermodulation.  Blankers are likely to be more effective with digital than analog modes.
 \item A blanker running in a wide bandwidth may be useful for reducing the impact of PWM noise.
 \item Diversity only works when the noise is effectively a point source.
-\item In an urban location, your ability to establish a link with a station at a quiet location will be limited by the ambient noise your receiver detects more than than your transmitter EIRP.  Consider combining a very low gain (e.g. -30dB) receive antenna with directivity (small loop with a rotator, loop on ground, array of small antennas) combined with a simple transmit antenna such as a dipole.
+\item In an urban location, your ability to establish a link may be limited by the ambient noise your receiver detects more than than your transmitter EIRP.  Consider combining a low gain receive antenna with directivity (e.g. an array of small antennas) combined with a simple transmit antenna such as a dipole.
 \item Impulse noise can be really complex, confusing narrow band noise blankers.
 \item Impulses make the antenna system ring. It may be possible to identify and remove this ringing.
 \item A limiter and detector running in a wide processing bandwidth might be useful for digital modes.
@@ -70,7 +70,7 @@ The maths and analysis of experimental data has these take aways:
 
 \subsection{Selected References}
 
-This field is highly subjective, I have found it difficult to find hard data, repeatable experiments and good quality references.
+This field is highly subjective, with many claims not backed by sound signal processing or antenna theory. I have found it difficult to find hard data, repeatable experiments and good quality references.
 
 References I recommend are ITUT-R P372 \cite{itu372-16}, the W8JI web site \cite{w8ji_radio_noise} for a concise overview of HF noise and small loop antenna myths; and the web site of LZ1AQ \cite{lz1aq} for his studies on small loop antenna arrays. After some experimentation \cite{rowetel_noise_city} I've settled on the approach suggested by Owen Duffy \cite{duffy_lig} and Basu \cite{vu2nsb_s_meter} - comparing my ambient noise floor to P.372 to check my baseline, then seeing what I can do about local noise sources. John Fallows VE6EY \cite{ve6ey} has some fine material on noise reduction using diversity receivers on his blog and YouTube channel.
 
@@ -359,7 +359,7 @@ where $c=a_1/a_2$, the ratio of two complex gains.  Thus if we can estimate $c$,
 E = r_1(t) - cr_2(t)
 \end{equation}
 
-Consider a poorly filtered switch mode power supply $e(t)$ inside a house that is coupled by the house wiring into a nearby antenna.  The house wiring is routed near the antenna at several points, resulting in multiple coupling paths with different path loss and delay. This can be modelled as the same noise source with multiple different paths:
+Consider a poorly filtered switch mode power supply $e(t)$ inside a house that is coupled by the house wiring into a nearby antenna.  The house wiring is routed near the antenna at several points, resulting in multiple coupling paths, each with different path loss and delay. The signal collected by the antenna can be modelled as the sum of the signals from multiple different paths:
 \begin{equation}
 \begin{split}
 r_{local}(t) &= \sum_n a_n e(t) \\
@@ -373,11 +373,11 @@ Consider the case where the there are several independent noise sources located 
 \begin{equation}
 r_{urban}(t) = \sum_n a_n e_n(t)
 \end{equation}
-It is unlikely the phase and amplitude relationships described by $a_n$ will be the same for each source so the solution of (\ref{eq_diversity1}) will be different for each source.  If we rely on a single coefficient, cancellation will be ineffective.  So the effectiveness of diversity will rely on how well the noise resolves to a single point source.
+It is unlikely the phase and amplitude relationships described by $a_n$ will be the same for each source so the solution of (\ref{eq_diversity1}) will be different for each source.  If we rely on a single coefficient, cancellation will be ineffective.  So the effectiveness of diversity will rely on how well the noise resolves to a single source.
 
-Diversity is unlikely to be effective in cancelling urban noise, but will be effective for single local noise sources, even if coupled from multiple paths (like noisy electricity lines surrounding an antenna).
+Diversity is unlikely to be effective in cancelling urban noise, but will be effective for single local noise sources, even if coupled from multiple paths (like noisy overhead electricity lines surrounding an antenna).
 
-In terms of antenna pattern, the two antennas form a phased array.  Diversity can be viewed as $e(n)$ resolving to the equivalent of a point source, where we place a null in the antenna pattern.  In the case of multiple coupling paths (like house wiring coupling to an overhead antenna), the "bearing" of the null may not have a meaningful physical interpretation.
+In terms of antenna pattern, the two antennas form a phased array.  Diversity can be viewed as $e(n)$ resolving to the equivalent of a point source, where we place a null in the antenna pattern.  In the case of multiple coupling paths (like house wiring coupling to an antenna), the "bearing" of the null may not have a meaningful physical interpretation.
 
 This model requires the EMI signal to be present (i.e. above the receiver internal noise) in both received signals. In diversity systems the two antennas are placed some fraction of a wavelength apart. Near field intensity is a strong function of distances of less than one wavelength, so the two antennas are likely to have very different responses to near field EMI. For example at a spacing of $\lambda/4$ a near field signal coupled to one antenna may be undetectable in the other antenna. This implies the effectiveness of diversity will be sensitive to antenna placement.
 
@@ -395,7 +395,7 @@ If the EMI is the sum of many sources it is likely to have equal power flux dens
 \end{equation}
 Thus the noise power received by a directional antenna is the same as an isotropic antenna and the same in any direction. In contrast our far field wanted signal is a point source. If that signal develops a power of $S$ watts into an isotropic antenna, it will develop a power of $GS$ watts at the terminals of our directional antenna. The S/N improvement using a directional antenna in a uniform EMI field is therefore improved by the antenna gain $G$.  
 
-For lower HF where external (ambient) noise dominates, antenna pattern and directivity \cite{w8ji_directivity} is a better way model SNR improvements than gain.  Directivity is the ratio of power received from our wanted direction compared to power from all other directions. Merely improving gain (without changing directivity) will not improve SNR in the presence of isotropic noise.  It also implies low gain (but directional) antennas such as arrays of small dipoles or loops, can improve received SNR in presence of noise.
+For lower HF where external (ambient) noise dominates, directivity \cite{w8ji_directivity} is more important than gain.  Directivity is the ratio of power received from our wanted direction compared to power from all other directions. Merely improving gain (without changing directivity) will not improve SNR in the presence of isotropic noise, as both signal and noise will increase.  It also implies low gain (but directional) antennas such as arrays of small dipoles or loops, can improve received SNR.
 
 If the EMI is a point source, we may be able to place it in a pattern null using a directional antenna or diversity/beamforming techniques, further improving the effectiveness of the attack.
 
@@ -403,15 +403,15 @@ If the EMI is a point source, we may be able to place it in a pattern null using
 
 Antenna topologies may help reduce near field coupling.  For example the conductors of physically small loops and dipoles can be placed further away from near field sources compared to a full length dipole that must extend across the entire width of an urban block \cite{lz1aq}.
 
-There are many subjective reports that small loop antennas (either tuned or untuned) provide significant reductions in EMI, by virtue of lower sensitivity to near electric fields.  However loop antennas are not magic \cite{w8ji_radio_noise}, and perform worse than dipoles in the presence of strong magnetic fields and even at certain distances from electric fields.  Their principle benefit appears to be small overall dimensions, making them easier to position away from near fields radiating from homes and power lines. The ability to null point noise sources is also useful, in installations with a rotator.
+There are many subjective reports that small loop antennas (either tuned or untuned) provide significant reductions in EMI, by virtue of lower sensitivity to near electric fields.  However loop antennas are not magic \cite{w8ji_radio_noise}, and perform worse than dipoles in the presence of strong magnetic fields and even at certain distances from electric fields.  The principle benefit appears to be small overall dimensions, making them easier to position away from near fields radiating from homes and power lines. In installations with a rotator, the ability to null point noise sources is also useful.
 
 There are subjective reports from the on-line community that a loop antenna placed in or even under the ground \cite{k5jy_log}\cite{duffy_lig} performs favourably in suburban locations compared to traditional antennas such as dipoles. It is a balanced design, and the use of common mode chokes on either end of the feedline is recommended. The low gain (e.g. -30 dB) is usable for Rx operation as noise external to the receiver generally dominates system noise figure at HF. So both signal and noise is reduced, and S/N remains the same.
 
-How this antenna reduces the effects of EMI (as implied by the improved SNR) is unclear, but worthy of further investigation. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranean) placement of the antenna.  It's directivity may help, by attenuating isotropic far field noise and hence increasing SNR is certain directions (e.g. 90 degrees elevation, for NVIS applications).  It's low placement and novel use of urban grassed areas may also increase physical distance to near field signals such as overhead power lines and nearby houses.
+The physics around how this antenna can reduce the effects of EMI is unclear. It is possible that compared to a reference dipole, near field noise is reduced as it is attenuated more than desired far field signals by the low (or subterranean) placement of the antenna.  It's low placement and novel use of urban grassed areas may also increase physical distance to near field signals such as overhead power lines and nearby houses.
 
-The cobweb antenna is a dipole that has been folded into a square such that the two ends nearly touch.  This creates a compact shape (3 metre sides on the 20M band) that allows it to be more easily physically distanced from near field sources (e.g. vertically on a mast) than a traditional linear dipole.  In particular this arrangement keeps the high impedance "ends" of the dipole that are most sensitive to electric field noise further away from the ground and near field sources than an traditional inverted V. The folding results in a few dB less gain than a dipole, however given the omnidirectional pattern and dominance of ambience noise at HF that is of no consequence.
+The cobweb antenna is a dipole that has been arranged into a square such that the two ends nearly touch.  This creates a compact shape (3 metre sides on the 20M band) that allows it to be more easily physically distanced from near field sources (e.g. vertically on a mast) than a traditional linear dipole.  In particular this arrangement keeps the high impedance "ends" of the dipole that are most sensitive to electric field noise further away from the ground and near field sources than an traditional inverted V. The folding results in a few dB less gain than a dipole, however given the omnidirectional pattern and dominance of ambient noise at HF that may have limited effect on SNR.
 
-It seems likely that in the absence of significant directivity, antenna topology alone cannot distinguish far field EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
+It seems likely that in the absence of significant directivity, antenna topology alone cannot distinguish urban EMI (such as AWGN noise that is the sum of many noise sources in a city) from wanted signals.
 
 \section{Experimental Measurements 1}
 

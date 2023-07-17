@@ -1,0 +1,59 @@
+\documentclass{article}
+\usepackage{amsmath}
+\begin{document}
+
+\title{Low SNR FreeDV Mode}
+\author{David Rowe VK5DGR}
+\maketitle
+
+\section{Introduction}
+
+After 10 years development and on air experience with various FreeDV waveforms, we would like to develop a new waveform that outperforms and replaces a variety of existing modes such as 700C/D/E and 1600.  Requirements include \cite{freedv-020}:
+\begin{enumerate}
+\item Better performance than SSB at 0dB SNR on MPP and MPD channels.
+\item A single mode that can handle MPP and MPD, and replace several existing FreeDV modes, simplifying the end user experience.
+\item For compliance with Export Control regulations, the minimum speech codec bit rate is 700 bit/s.
+\end{enumerate}
+
+\section{Theory}
+
+In this section we will set up a theoretical model for what is possible.  For PTT voice systems we have frames sizes of a few 100ms, which limits the FEC frame size and hence the performance of any code.  For PSK channels a threshold $E_b/N_0=2dB$ and a code rate $R=0.5$ is typical for these codes, where $E_b/N_0$ is the energy per payload data bit (coded $E_b/N_0$) in dB.  The SNR is given by:
+\begin{equation}
+SNR = \frac{E_b}{N_0} + 10log_{10}\left(\frac{R_b}{B}\right)
+\end{equation}
+where $R_b$ is the bit rate, and $B$ is the bandwidth in which we measure SNR.  Given $Rb=700$ and $B=3000$ we have:
+\begin{equation}
+\begin{split}
+SNR &= 2 + 10log10(700/3000) \\
+    &= -4.3 dB
+\end{split}
+\end{equation}
+This is ideal performance for an AWGN channel.  In practice we must allocate some power for synchronisation, such as pilot carriers and symbols use for frequency and phase estimation.  The estimators have losses, which reduce performance.
+
+Performance on a multipath channel is significantly worse (typically 5 dB) worse.  To cope with the multipath channels, we use an OFDM modem, with $N_c$ carriers at $Rs=Rb*R$. need a high pilot symbol insertion rate to track frequency and phase shifts on each carrier due to Doppler.
+
+TODO Glossary
+
+TODO could have expression for Fading channels, block error rate
+
+ and we may need an increased pilot symbol rate, and a 
+
+TODO check performance of a few codes
+
+Table explaining MPP MPD
+
+
+
+Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
+
+Challenges, fast fading, ISI
+
+Initial goal, single waveform that handles MPP and MPD at low SNR, better than 700D performance
+
+Joint low latency/high latency on two carriers ()diveristy
+
+Wades techniques (ref)
+
+\bibliographystyle{plain}
+\bibliography{freedv_low_refs}
+\end{document}

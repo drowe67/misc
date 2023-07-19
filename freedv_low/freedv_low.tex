@@ -1,5 +1,6 @@
 \documentclass{article}
 \usepackage{amsmath}
+\usepackage{array}
 \begin{document}
 
 \title{Low SNR FreeDV Mode}
@@ -17,22 +18,74 @@ After 10 years development and on air experience with various FreeDV waveforms, 
 
 \section{Theory}
 
-In this section we will set up a theoretical model for what is possible.  For PTT voice systems we have frames sizes of a few 100ms, which limits the FEC frame size and hence the performance of any code.  For PSK channels a threshold $E_b/N_0=2dB$ and a code rate $R=0.5$ is typical for these codes, where $E_b/N_0$ is the energy per payload data bit (coded $E_b/N_0$) in dB.  The SNR is given by:
+In this section we will develop a theoretical model to help us explore performance limits.  For practical PTT voice systems algorithmic delay is limited to a few 100ms, which limits the FEC codeword size and hence the performance of the code.  For PSK channels a threshold $E_b/N_0=2dB$ and a code rate $R=0.5$ is typical, where $E_b/N_0$ is the energy per payload data bit (coded $E_b/N_0$) in dB.  The lowest (threshold) SNR possible is given by:
 \begin{equation}
 SNR = \frac{E_b}{N_0} + 10log_{10}\left(\frac{R_b}{B}\right)
 \end{equation}
-where $R_b$ is the bit rate, and $B$ is the bandwidth in which we measure SNR.  Given $Rb=700$ and $B=3000$ we have:
+where $R_b$ is the payload data bit rate, and $B$ is the bandwidth in which we measure SNR.  Given $Rb=700$ and $B=3000$ we have:
 \begin{equation}
 \begin{split}
-SNR &= 2 + 10log10(700/3000) \\
+SNR &= 2 + 10log_{10}(700/3000) \\
     &= -4.3 dB
 \end{split}
 \end{equation}
-This is ideal performance for an AWGN channel.  In practice we must allocate some power for synchronisation, such as pilot carriers and symbols use for frequency and phase estimation.  The estimators have losses, which reduce performance.
+This is ideal performance for an AWGN channel.  In practice we must allocate some power for synchronisation, such as pilot symbols used for frequency and phase estimation.  The phase, frequency, and timing estimators estimators are not perfect, which reduces performance.
 
-Performance on a multipath channel is significantly worse (typically 5 dB) worse.  To cope with the multipath channels, we use an OFDM modem, with $N_c$ carriers at $Rs=Rb*R$. need a high pilot symbol insertion rate to track frequency and phase shifts on each carrier due to Doppler.
+Performance on a multipath channels is significantly worse, typically 5 dB.  In addition, we may allocate some carrier power to deal with intersymbol interference (for example a cyclic prefix in OFDM modems).
 
-TODO Glossary
+A more complete model is
+\begin{equation}
+SNR = \frac{E_b}{N_0} + 10log_{10}\left(\frac{R_b}{B}\right) + L_s + L_{il} + L_{cp}
+\end{equation}
+where $L_s$ is the loss from power allocated to synchronisation symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
+
+Consider a repeating sequence of PSK symbols, consisting of $N_p-1$ data symbols followed by one pilot symbol, giving $N_p$ symbols in total.  Each symbol has an energy of $E_s$ Joules.  Power is energy per unit time.  For a repeatng sequence of symbols symbols the total power is:
+\begin{equation}
+S = \frac{E_sN_p}{T_sN_p}
+\end{equation}
+where $T_s$ is the symbol period. The power allocated to the pilot symbols is:
+\begin{equation}
+S_p = \frac{E_s}{T_sN_p}
+\end{equation}The loss in signal power due to pilot insertion is:
+\begin{equation}
+\begin{split}
+L_p &= \frac{S - S_p}{S} \\
+    &= \frac{E_sN_p}{T_sN_p} - \frac{Es}{T_sN_p}
+\end{split}
+\end{equation}
+
+\section{Glossary}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{l m{8cm} }
+ \hline
+ Acronym & Explanation \\
+ \hline
+ AWGN & Additive White Gaussian Noise - a communications channel with flat frequency response and additive noise \\
+ FEC & Forward Error Correction \\
+ PTT & Push To Talk - voice communications where only one person is transmitting at any one time.  Common in two way radio but not mobile telephones  \\
+ MPP & Multipath Poor channel, 1 Hz Doppler, 2ms delay spread, typical for US and Australian interstate propogation \\
+ MPD & Multipath Disturbed channel, 2 Hz Doppler, 4ms delay spread, typical for UK Winter NVIS propogation \\
+ \hline
+\end{tabular}
+\caption{Glossary of Acronyms}
+\end{table}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{l l l}
+ \hline
+ Symbol & Explanation & Units \\
+ \hline
+ $B$ & Noise bandwidth & Hz \\
+ $E_b/N_0$ &  Energy per bit on spectral noise density & dB \\
+ $R_b$ & Bit rate & Bits/s \\
+ $SNR$ & Signal to Noise Ratio & dB \\
+ \hline
+\end{tabular}
+\caption{Glossary of Symbols}
+\end{table}
 
 TODO could have expression for Fading channels, block error rate
 
@@ -42,7 +95,7 @@ TODO check performance of a few codes
 
 Table explaining MPP MPD
 
-
+TODO: set up model, then discuss various algorithms and how they affect model
 
 Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
 

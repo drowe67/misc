@@ -62,7 +62,7 @@ The maths and analysis of experimental data has these take aways:
 \item Blankers don't attenuate the wanted signal much, but do introduce intermodulation.  Blankers are likely to be more effective with digital than analog modes.
 \item A blanker running in a wide bandwidth may be useful for reducing the impact of PWM noise.
 \item Diversity only works when the noise is effectively a point source.
-\item In an urban location, your ability to establish a link may be limited by the ambient noise your receiver detects more than than your transmitter EIRP.  Consider combining a low gain receive antenna with directivity (e.g. an array of small antennas) combined with a simple transmit antenna such as a dipole.
+\item In an urban location, your ability to establish a link may be limited by the ambient noise your receiver detects more than than your transmitter EIRP.  Consider combining a low gain receive antenna with directivity (e.g. an array of small antennas) with a simple transmit antenna such as a dipole.
 \item Impulse noise can be really complex, confusing narrow band noise blankers.
 \item Impulses make the antenna system ring. It may be possible to identify and remove this ringing.
 \item A limiter and detector running in a wide processing bandwidth might be useful for digital modes.
@@ -86,7 +86,7 @@ Bandwidth relates the rate $R$ of the noise pulses to the bandwidth $B$ of a typ
 
 Our narrow band receiver smooths the time domain envelope of noise impulses. As $R$ relative to $B$ increase, our receiver smears the short time domain pulses (such as a PWM waveform) into a longer pulses with a smoother time domain envelope (such as damped sinusoids and in the limiting case AWGN noise), making the EMI signal harder to identify and remove.
 
-For EMI signals to be detected by our receiver, we need a source of RF currents and a way of coupling those current into our antenna system (which includes the antenna and feed line).  On lower HF our antenna systems are typically located less than one wavelength from the source of RF currents so both near and far field coupling is possible, and indeed a combination of both seems likely.
+For EMI signals to be detected by our receiver, we need a source of RF currents and a way of coupling those current into our antenna system (which includes the antenna and feed line).  On lower HF our antenna systems are typically located less than one wavelength from the source of RF currents so both near and far field coupling is possible.
 
 If we position our receiver some distance from many noise signals, we get the sum of many signals added together, which converges to far field AWGN noise.  The level reduces with distance, so an effective attack is travelling to a country location, and operating a portable station for the day.
 

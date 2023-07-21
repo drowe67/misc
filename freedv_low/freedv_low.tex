@@ -1,66 +1,18 @@
 \documentclass{article}
 \usepackage{amsmath}
 \usepackage{array}
+\usepackage{siunitx}  
 \begin{document}
 
 \title{Low SNR FreeDV Mode}
 \author{David Rowe VK5DGR}
 \maketitle
 
-\section{Introduction}
-
-After 10 years development and on air experience with various FreeDV waveforms, we would like to develop a new waveform that outperforms and replaces a variety of existing modes such as 700C/D/E and 1600.  Requirements include \cite{freedv-020}:
-\begin{enumerate}
-\item Better performance than SSB at 0dB SNR on MPP and MPD channels.
-\item A single mode that can handle MPP and MPD, and replace several existing FreeDV modes, simplifying the end user experience.
-\item For compliance with Export Control regulations, the minimum speech codec bit rate is 700 bit/s.
-\end{enumerate}
-
-\section{Theory}
-
-In this section we will develop a theoretical model to help us explore performance limits.  For practical PTT voice systems algorithmic delay is limited to a few 100ms, which limits the FEC codeword size and hence the performance of the code.  For PSK channels a threshold $E_b/N_0=2dB$ and a code rate $R=0.5$ is typical, where $E_b/N_0$ is the energy per payload data bit (coded $E_b/N_0$) in dB.  The lowest (threshold) SNR possible is given by:
-\begin{equation}
-SNR = \frac{E_b}{N_0} + 10log_{10}\left(\frac{R_b}{B}\right)
-\end{equation}
-where $R_b$ is the payload data bit rate, and $B$ is the bandwidth in which we measure SNR.  Given $Rb=700$ and $B=3000$ we have:
-\begin{equation}
-\begin{split}
-SNR &= 2 + 10log_{10}(700/3000) \\
-    &= -4.3 dB
-\end{split}
-\end{equation}
-This is ideal performance for an AWGN channel.  In practice we must allocate some power to symbols used for synchronisation, such as pilot symbols used for frequency and phase estimation, or unique word bits used for frame synchronisation.  Synchronisation algorithms often struggle at low SNRs, introducing additional "implementation" losses.
-
-Performance on multipath channels is significantly worse, in our use cases typically 5 dB.  On these channels, we may allocate some carrier power to deal with intersymbol interference (for example a cyclic prefix in OFDM modems).
-
-A more complete model is:
-\begin{equation} \label{eq:snr_all}
-SNR = \frac{E_b}{N_0} + 10log_{10}\left(\frac{R_b}{B}\right) + L_s + L_{il} + L_{cp}
-\end{equation}
-where $L_s$ is the loss from power allocated to synchronisation symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
-
-\subsection{Loss components}
-
-Consider a repeating sequence of PSK symbols, consisting of $N_p-1$ data symbols followed by one pilot symbol, giving $N_p$ symbols in total.  Each symbol (data or pilot) has an energy of $E_s$ Joules.  Power is energy per unit time.  For a repeating sequence of $N_p$ symbols the total power is:
-\begin{equation}
-S = \frac{E_sN_p}{T_sN_p}
-\end{equation}
-where $T_s$ is the symbol period. The power allocated to the pilot symbols is:
-\begin{equation}
-S_p = \frac{E_s}{T_sN_p}
-\end{equation}The loss in signal power as a proportion of total power due to pilot insertion is:
-\begin{equation}
-\begin{split}
-L_p &= \frac{S - S_p}{S} \\
-    &= \frac{N_p-1}{N_p}
-\end{split}
-\end{equation}
-Expressed in dB, $L_p$ is a component of the synchronisation loss $L_s$ in (\ref{eq:snr_all}). For example a pilot insertion rate of $N_p=8$ results in $L_p=-0.58dB$.
 \section{Glossary}
 
 \begin{table}[h]
 \centering
-\begin{tabular}{l m{8cm} }
+\begin{tabular}{l p{8cm} }
  \hline
  Acronym & Explanation \\
  \hline
@@ -81,13 +33,88 @@ Expressed in dB, $L_p$ is a component of the synchronisation loss $L_s$ in (\ref
  Symbol & Explanation & Units \\
  \hline
  $B$ & Noise bandwidth & Hz \\
- $E_b/N_0$ &  Energy per bit on spectral noise density & dB \\
- $R_b$ & Bit rate & Bits/s \\
+ $E_b/N_0$ & Energy per bit on spectral noise density & dimensionless, dB\footnote{1} \\
+ $N_p$ & Pilot symbol insertion rate & - \\
+ $R_b$ & Bit rate & Bits/second \\
+ $R_s$ & Symbol rate & symbols/second \\
+ $T_s$ & Symbol period & seconds \\
  $SNR$ & Signal to Noise Ratio & dB \\
+ $S$ & Signal Power & Watts \\
+ $N$ & Noise Power & Watts \\
  \hline
 \end{tabular}
 \caption{Glossary of Symbols}
 \end{table}
+
+\footnotetext[1]{Can be expressed as a linear ratio $E_b/N_0$ or $10log_{10}(E_b/N_0)$ dB}
+
+\section{Introduction}
+
+After 10 years development and on air experience with various FreeDV waveforms, we would like to develop a new waveform that outperforms and replaces a variety of existing modes such as 700C/D/E and 1600.  Requirements include \cite{freedv-020}:
+\begin{enumerate}
+\item Better performance than SSB at 0dB SNR on MPP and MPD channels.
+\item A single mode that can handle MPP and MPD, and replace several existing FreeDV modes, simplifying the end user experience.
+\item For compliance with Export Control regulations, the minimum speech codec bit rate is 700 bit/s.
+\end{enumerate}
+
+\section{Theory}
+
+In this section we will develop a theoretical model to help us explore performance limits.  For practical PTT voice systems algorithmic delay is limited to a few 100ms, which limits the FEC codeword size and hence the performance of the code.  For PSK channels a threshold $E_b/N_0=2 \, \si{dB}$ and a code rate $R=0.5$ is typical, where $E_b/N_0$ is the energy per payload data bit (coded $E_b/N_0$).  The lowest (threshold) SNR for a viable voice link is given by:
+\begin{equation}
+\label{eq:snr}
+\begin{split}
+\frac{S}{N} &= \frac{E_bR_b}{N_0B} \\
+SNR &= 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\right) \quad [\si{dB}]
+\end{split}
+\end{equation}
+where $R_b$ is the payload data bit rate, and $B$ is the bandwidth in which we measure SNR.  Given $Rb=700$ and $B=3000$ we have:
+\begin{equation}
+\begin{split}
+SNR &= 2 + 10log_{10}(700/3000) \\
+    &= -4.3 \, \si{dB}
+\end{split}
+\end{equation}
+This is ideal performance for an AWGN channel.  In practice we must allocate some power to symbols used for synchronisation, such as pilot symbols used for frequency and phase estimation, or unique word bits used for frame synchronisation.  Synchronisation algorithms often struggle at low SNRs, introducing additional "implementation" losses.
+
+Performance on multipath channels is significantly worse, in our use cases typically 5 dB.  On these channels, we may allocate some carrier power to deal with intersymbol interference (for example a cyclic prefix in OFDM modems).
+
+A more complete model is:
+\begin{equation}
+\label{eq:snr_all}
+SNR = 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\right) + L_s + L_{il} + L_{cp}
+\end{equation}
+where $L_s$ is the loss from power allocated to synchronisation symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
+
+\subsection{Pilot symbol overhead}
+
+In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_p-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a \emph{frame}. The frame of $N_p-1$ has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_p$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
+\begin{equation}
+\begin{split}
+T_f &= T^\prime_f \\
+(N_p-1)T_s &= N_pT_s \\
+R^\prime_s &= R_s\frac{N_p}{N_p-1}
+\end{split}
+\end{equation}
+where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ in terms of $E_s$ and $R_s$:
+\begin{equation}
+\begin{split}
+\frac{S}{N} &= \frac{E_sR_s}{N_0B} \\
+\frac{S}{N}^\prime &= \frac{E_sR^\prime_s}{N_0B} \\
+                   &= \frac{E_bR_sN_p}{N_0B(N_p-1)} \\
+\frac{S^\prime/N}{S/N} &= \frac{N_p}{N_p-1}
+\end{split}
+\end{equation}
+Thus when we insert pilots, the threshold $S/N$ increases by a factor of $N_p/(N_p-1)$. Expressed in $\si{dB}$:
+\begin{equation}
+\begin{split}
+10log_{10}\left(\frac{S^\prime}{N}\right) &= 10log_{10}\left(\frac{S}{N}\right) + 10log_{10}\left(\frac{N_p}{N_p-1}\right) \\
+SNR^\prime &= SNR + 10log_{10}\left(\frac{N_p}{N_p-1}\right) \\
+SNR^\prime &= SNR + L_p  \quad [\si{dB}]
+\end{split}
+\end{equation}
+where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example a pilot insertion rate of $N_p=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to acheive the threshold SNR for the voice link.  If there is no other synchronisation overhead, then $L_s=L_p$ in Equation \ref{eq:snr_all}.
+
+\section{Unorganised Notes}
 
 TODO could have expression for Fading channels, block error rate
 

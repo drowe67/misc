@@ -9,6 +9,7 @@ Some small projects on miscellaneous topics.
 | April 2023 | gt_sun | Derivation of the expression for estimating receiver G/T from power measurements obtained by pointing an antenna at the sun and quiet sky |
 | May 2023 | rect_ft | Fourier Transforms of rectangular functions |
 | May 2023 | emi | HF EMI study: Qualitative discussion of EMI on lower HF bands, expressions for PWM noise and noise blanking, experimental EMI measurements |
+| July 2023 | freedv_low | Low SNR FreeDV waveform study |
 
 I build the Latex documents using Texmaker:
 

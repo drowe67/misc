@@ -87,7 +87,7 @@ where $L_s$ is the loss from power allocated to synchronisation symbols, $L_{il}
 
 \subsection{Pilot symbol overhead}
 
-In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_p-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a \emph{frame}. The frame of $N_p-1$ has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_p$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
+In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_p-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a \emph{frame}. The frame of $N_p-1$ symbols has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_p$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
 \begin{equation}
 \begin{split}
 T_f &= T^\prime_f \\
@@ -95,8 +95,9 @@ T_f &= T^\prime_f \\
 R^\prime_s &= R_s\frac{N_p}{N_p-1}
 \end{split}
 \end{equation}
-where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ in terms of $E_s$ and $R_s$:
+where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ (\ref{eq:snr}) in terms of $E_s$ and $R_s$:
 \begin{equation}
+\label{eq_snr_s}
 \begin{split}
 \frac{S}{N} &= \frac{E_sR_s}{N_0B} \\
 \frac{S}{N}^\prime &= \frac{E_sR^\prime_s}{N_0B} \\
@@ -114,27 +115,46 @@ SNR^\prime &= SNR + L_p  \quad [\si{dB}]
 \end{equation}
 where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example a pilot insertion rate of $N_p=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to acheive the threshold SNR for the voice link.  If there is no other synchronisation overhead, then $L_s=L_p$ in Equation \ref{eq:snr_all}.
 
+\subsection{Cyclic Prefix Overhead}
+
+Now we consider the SNR overhead for the Cycle Prefix (CP) used in OFDM modems to cope with delay spread on multipath channels.  To achieve our payload data rate (e.g. 700 bits/s), we send symbols $D$ across the channel at a constant symbol rate $R_s$, or one symbol every $T=T_s$ seconds.  To cope with delay spread, we construct a composite symbol by pre-pending a Cyclic Prefix (CP) $T_{cp}$ seconds in duration to a new symbol $D^\prime$ of $T^\prime_s$ seconds in duration.  $D$ and $D^\prime$ contain the same PSK symbol, and convey the same information over the channel. The new composite symbol is now $T^\prime = T_{cp}+T^\prime_s$ seconds long.  The CP contains no additional information, it is just an extension of the single symbol $D^\prime$. Thus we still send one symbol of data over the channel every $T^\prime$ seconds.  To maintain the payload data rate over the channel, we must send the new composite symbol at the same rate as the original symbol:
+\begin{equation}
+\begin{split}
+T &= T^\prime \\
+T_s &= T_{cp} + T^\prime_s \\
+R^\prime_s &= \frac{R_s}{1 - T_{cp}/T_s}
+\end{split}
+\end{equation}
+It can be observed that $R^\prime_s > R_s$, to account for the portion of the composite symbol allocated to the CP.  For example with $R_s=700$, $T_s=0.02$, $T_{cp}=0.002$, $R^\prime_s=700/(1-0.002/0.02)=777.78$ symbols/second.
+
+For the composite signal, the transmitter power $S$ is spread between the CP and $D^\prime$: 
+\begin{equation}
+S = \frac{T_{cp}}{T_s}S + \left(1 - \frac{T_{cp}}{T_s} \right)S
+\end{equation}
+Only the RH term contributes to the demodulation of $D^\prime$:
+\begin{equation}
+\begin{split}
+\frac{S(1-T_{cp}/T_s)}{N} &= \frac{E_sR^\prime_s}{N_0B} \\
+\frac{S}{N} &= \frac{E_sR^\prime_s}{N_0B}\frac{1}{(1-T_{cp}/T_s)}\\
+            &= \frac{E_sR_s}{N_0B}\frac{1}{(1-T_{cp}/T_s)^2} \\
+\end{split}
+\end{equation}
+Thus to close the link with the composite symbol the $S/N$ must be increased by a factor of $1/(1 - {T_s}/T_{cp})^2$ compared to our ideal modem.  This accounts for the energy allocated to the CP, and the shorter period $T^\prime_s$ of the symbol $D^\prime$.
+
 \section{Unorganised Notes}
 
-TODO could have expression for Fading channels, block error rate
+TODO:
 
- and we may need an increased pilot symbol rate, and a 
-
-TODO check performance of a few codes
-
-Table explaining MPP MPD
-
-TODO: set up model, then discuss various algorithms and how they affect model
-
-Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
-
-Challenges, fast fading, ISI
-
-Initial goal, single waveform that handles MPP and MPD at low SNR, better than 700D performance
-
-Joint low latency/high latency on two carriers ()diveristy
-
-Wades techniques (ref)
+\begin{itemize}
+\item Challenges, fast fading, ISI, PAPR
+\item Expression for Fading channels, block error rate.
+\item Table of FreeDV waveforms and values, plugged into formula, effect of increasing pilot symbol rate.
+\item Check performance of a few codes again 2dB figure above.
+\item Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
+\item single tone/equaliser
+\item Joint low latency/high latency on two carriers diversity
+\item Wades techniques (ref)
+\end{itemize} 
 
 \bibliographystyle{plain}
 \bibliography{freedv_low_refs}

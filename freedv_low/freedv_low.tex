@@ -17,6 +17,7 @@
  Acronym & Explanation \\
  \hline
  AWGN & Additive White Gaussian Noise - a communications channel with flat frequency response and additive noise \\
+ CP & Cyclic Prefix \\
  FEC & Forward Error Correction \\
  PTT & Push To Talk - voice communications where only one person is transmitting at any one time.  Common in two way radio but not mobile telephones  \\
  MPP & Multipath Poor channel, 1 Hz Doppler, 2ms delay spread, typical for US and Australian interstate propogation \\
@@ -34,7 +35,7 @@
  \hline
  $B$ & Noise bandwidth & Hz \\
  $E_b/N_0$ & Energy per bit on spectral noise density & dimensionless, dB\footnote{1} \\
- $N_p$ & Pilot symbol insertion rate & - \\
+ $N_s$ & Spacing between pilots (pilot insertion rate) & - \\
  $R_b$ & Bit rate & Bits/second \\
  $R_s$ & Symbol rate & symbols/second \\
  $T_s$ & Symbol period & seconds \\
@@ -81,18 +82,18 @@ Performance on multipath channels is significantly worse, in our use cases typic
 A more complete model is:
 \begin{equation}
 \label{eq:snr_all}
-SNR = 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\right) + L_s + L_{il} + L_{cp}
+SNR = 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\right) + L_p + L_{il} + L_{cp}
 \end{equation}
-where $L_s$ is the loss from power allocated to synchronisation symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
+where $L_p$ is the loss from power allocated to pilot symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
 
 \subsection{Pilot symbol overhead}
 
-In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_p-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a \emph{frame}. The frame of $N_p-1$ symbols has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_p$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
+In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_s-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a \emph{frame}. The frame of $N_s-1$ symbols has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_s$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
 \begin{equation}
 \begin{split}
 T_f &= T^\prime_f \\
-(N_p-1)T_s &= N_pT_s \\
-R^\prime_s &= R_s\frac{N_p}{N_p-1}
+(N_s-1)T_s &= N_sT_s \\
+R^\prime_s &= R_s\frac{N_s}{N_s-1}
 \end{split}
 \end{equation}
 where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ (\ref{eq:snr}) in terms of $E_s$ and $R_s$:
@@ -101,19 +102,19 @@ where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ (\ref{eq:snr}) in terms of 
 \begin{split}
 \frac{S}{N} &= \frac{E_sR_s}{N_0B} \\
 \frac{S}{N}^\prime &= \frac{E_sR^\prime_s}{N_0B} \\
-                   &= \frac{E_bR_sN_p}{N_0B(N_p-1)} \\
-\frac{S^\prime/N}{S/N} &= \frac{N_p}{N_p-1}
+                   &= \frac{E_bR_sN_s}{N_0B(N_s-1)} \\
+\frac{S^\prime/N}{S/N} &= \frac{N_s}{N_s-1}
 \end{split}
 \end{equation}
-Thus when we insert pilots, the threshold $S/N$ increases by a factor of $N_p/(N_p-1)$. Expressed in $\si{dB}$:
+Thus when we insert pilots, the threshold $S/N$ increases by a factor of $N_s/(N_s-1)$. Expressed in $\si{dB}$:
 \begin{equation}
 \begin{split}
-10log_{10}\left(\frac{S^\prime}{N}\right) &= 10log_{10}\left(\frac{S}{N}\right) + 10log_{10}\left(\frac{N_p}{N_p-1}\right) \\
-SNR^\prime &= SNR + 10log_{10}\left(\frac{N_p}{N_p-1}\right) \\
+10log_{10}\left(\frac{S^\prime}{N}\right) &= 10log_{10}\left(\frac{S}{N}\right) + 10log_{10}\left(\frac{N_s}{N_s-1}\right) \\
+SNR^\prime &= SNR + 10log_{10}\left(\frac{N_s}{N_s-1}\right) \\
 SNR^\prime &= SNR + L_p  \quad [\si{dB}]
 \end{split}
 \end{equation}
-where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example a pilot insertion rate of $N_p=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to acheive the threshold SNR for the voice link.  If there is no other synchronisation overhead, then $L_s=L_p$ in Equation \ref{eq:snr_all}.
+where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example FreeDV 700D uses a pilot insertion rate of $N_s=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to acheive the threshold SNR for the voice link.
 
 \subsection{Cyclic Prefix Overhead}
 
@@ -137,9 +138,11 @@ Only the RH term contributes to the demodulation of $D^\prime$:
 \frac{S(1-T_{cp}/T_s)}{N} &= \frac{E_sR^\prime_s}{N_0B} \\
 \frac{S}{N} &= \frac{E_sR^\prime_s}{N_0B}\frac{1}{(1-T_{cp}/T_s)}\\
             &= \frac{E_sR_s}{N_0B}\frac{1}{(1-T_{cp}/T_s)^2} \\
+SNR         &= 10log10 \left( \frac{E_sR_s}{N_0B} \right) - 20log10(1-T_{cp}/T_s) \\
+            &= 10log10 \left( \frac{E_sR_s}{N_0B} \right) + L_{cp} \quad [\si{dB}]
 \end{split}
 \end{equation}
-Thus to close the link with the composite symbol the $S/N$ must be increased by a factor of $1/(1 - {T_s}/T_{cp})^2$ compared to our ideal modem.  This accounts for the energy allocated to the CP, and the shorter period $T^\prime_s$ of the symbol $D^\prime$.
+Thus to close the link with the composite symbol the $S/N$ must be increased by a factor of $1/(1 - {T_s}/T_{cp})^2$ compared to our ideal modem.  This accounts for the energy allocated to the CP, and the shorter period $T^\prime_s$ of the symbol $D^\prime$.  The squared term suggest SNR is quite sensitive to increasing $T_{cp}$, which is necessary to handle fast fading, high delay spread channels such as MPD. For example FreeDV 700E has $Ts=0.02$, $T_{cp}=0.006$, giving $L_{cp}=-20log10(1-0.006/0.02)=3.1 \si{dB}$.
 
 \section{Unorganised Notes}
 
@@ -147,13 +150,17 @@ TODO:
 
 \begin{itemize}
 \item Challenges, fast fading, ISI, PAPR
-\item Expression for Fading channels, block error rate.
+\item simulation model to check results
+\item Can we include PAPR into model?
+\item Expression for Fading channels, block error rate, why 2020 is a lemon.
 \item Table of FreeDV waveforms and values, plugged into formula, effect of increasing pilot symbol rate.
-\item Check performance of a few codes again 2dB figure above.
+\item Check performance of a few codes against 2dB figure above.
 \item Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
-\item single tone/equaliser
+\item single tone/equaliser/hybrid OFDM-EQ
 \item Joint low latency/high latency on two carriers diversity
+\item Tx \& Rx diversity
 \item Wades techniques (ref)
+\item undersampled pilots
 \end{itemize} 
 
 \bibliographystyle{plain}

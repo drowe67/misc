@@ -19,6 +19,8 @@
  AWGN & Additive White Gaussian Noise - a communications channel with flat frequency response and additive noise \\
  CP & Cyclic Prefix \\
  FEC & Forward Error Correction \\
+ LEO & Low earth orbit satellite channel, AWGN with large freq offset and Doppler shift (high rate of change of freq offset) \\
+ GEO & Geosynchronous satellite channel, AWGN but high phase noise and large freq offset \\
  PTT & Push To Talk - voice communications where only one person is transmitting at any one time.  Common in two way radio but not mobile telephones  \\
  MPP & Multipath Poor channel, 1 Hz Doppler, 2ms delay spread, typical for US and Australian interstate propogation \\
  MPD & Multipath Disturbed channel, 2 Hz Doppler, 4ms delay spread, typical for UK Winter NVIS propogation \\
@@ -54,11 +56,14 @@
 After 10 years development and on air experience with various FreeDV waveforms, we would like to develop a new waveform that outperforms and replaces a variety of existing modes such as 700C/D/E and 1600.  Requirements include \cite{freedv-020}:
 \begin{enumerate}
 \item Better performance than SSB at 0dB SNR on MPP and MPD channels.
-\item A single mode that can handle MPP and MPD, and replace several existing FreeDV modes, simplifying the end user experience.
+\item A single mode that can handle MPP, MPD, GEO (e.g. QO-100), and replace several existing FreeDV modes, simplifying the end user experience.
 \item For compliance with Export Control regulations, the minimum speech codec bit rate is 700 bit/s.
 \end{enumerate}
+It is acceptable for performance to gradually decrease as the multipath channel quality declines, but we would like the decline to be gradual, e.g. a few dB more power for operation on MPD versus MPP.
 
-\section{Theory}
+This document explores ways we can improve the existing OFDM modem waveforms in order to meet these requirements.
+
+\section{Modem Performance Model}
 
 In this section we will develop a theoretical model to help us explore performance limits.  For practical PTT voice systems algorithmic delay is limited to a few 100ms, which limits the FEC codeword size and hence the performance of the code.  For PSK channels a threshold $E_b/N_0=2 \, \si{dB}$ and a code rate $R=0.5$ is typical, where $E_b/N_0$ is the energy per payload data bit (coded $E_b/N_0$).  The lowest (threshold) SNR for a viable voice link is given by:
 \begin{equation}
@@ -85,6 +90,8 @@ A more complete model is:
 SNR = 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\right) + L_p + L_{il} + L_{cp}
 \end{equation}
 where $L_p$ is the loss from power allocated to pilot symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
+
+TODO: Discuss Available bandwidth. 2000 Hz, using QPSK we can get 4000 bits/s.  Less overheads (which can be expressed as SNR or bandwidth reduction?).  We have 700 bits/s source code or 1400 bits/s with rate 0.5 FEC.
 
 \subsection{Pilot symbol overhead}
 
@@ -118,6 +125,8 @@ where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation
 
 \subsection{Cyclic Prefix Overhead}
 
+TODO- fix, sould just be one factor of $1 - T_{cp}/T_s$ I think.
+
 Now we consider the SNR overhead for the Cycle Prefix (CP) used in OFDM modems to cope with delay spread on multipath channels.  To achieve our payload data rate (e.g. 700 bits/s), we send symbols $D$ across the channel at a constant symbol rate $R_s$, or one symbol every $T=T_s$ seconds.  To cope with delay spread, we construct a composite symbol by pre-pending a Cyclic Prefix (CP) $T_{cp}$ seconds in duration to a new symbol $D^\prime$ of $T^\prime_s$ seconds in duration.  $D$ and $D^\prime$ contain the same PSK symbol, and convey the same information over the channel. The new composite symbol is now $T^\prime = T_{cp}+T^\prime_s$ seconds long.  The CP contains no additional information, it is just an extension of the single symbol $D^\prime$. Thus we still send one symbol of data over the channel every $T^\prime$ seconds.  To maintain the payload data rate over the channel, we must send the new composite symbol at the same rate as the original symbol:
 \begin{equation}
 \begin{split}
@@ -144,23 +153,51 @@ SNR         &= 10log10 \left( \frac{E_sR_s}{N_0B} \right) - 20log10(1-T_{cp}/T_s
 \end{equation}
 Thus to close the link with the composite symbol the $S/N$ must be increased by a factor of $1/(1 - {T_s}/T_{cp})^2$ compared to our ideal modem.  This accounts for the energy allocated to the CP, and the shorter period $T^\prime_s$ of the symbol $D^\prime$.  The squared term suggest SNR is quite sensitive to increasing $T_{cp}$, which is necessary to handle fast fading, high delay spread channels such as MPD. For example FreeDV 700E has $Ts=0.02$, $T_{cp}=0.006$, giving $L_{cp}=-20log10(1-0.006/0.02)=3.1 \si{dB}$.
 
+\subsection{Waveform Improvements}
+
+Try low risk approaches to start with, then iterate.  To simulate performance with voice codec, use PER=0.1, BER=0.01 voice codec threshold for modem tests alone.
+
+\subsection{Equalisation}
+
+\begin{enumerate}
+\item Pilot symbols are used to estimate channel.
+\item Phase and amplitude shifts due to the channel impulse response.  For example consider two path model, has time varying complex coeffs and delay.
+\item Consider Two path  model, comprised of two time varying complex coefficients, with bandwidth (-20dB) of $B=1$ Hz (MPP).  The model is considered stationary over one symbol.
+\item We should be able to reconstruct a 1Hz bandwidth signal at 1 Hz sample rate, which suggests a low pilot insertion rate.  The other factor is how channel estimate noise.
+\item Each coefficient $h_n$ is a complex random variable with bandwidth $B$. Consider the channel model applied to steady state symbol (or a time varying PSK signal after ISI has settled). Two terms of bandwidth B add linearly, so by linearity the result also has bandwidth B.  The sum is a random modulation of bandwidth B about on the symbol centre frequency.  The Doppler bandwidth $B$ therefore defines the bandwidth required for equalisation, independent of delay spread. One caveat - if B an appreciable fraction of Rs the DFT orthogonality may break down to some extent as energy falls into adjacent DFT bins.
+\item 700D samples pilots at $1/(N_p*Ts)=6.25 \si{Hz}$, which should be adequate for our target channels.  This is an acceptably low $L_{ps}$ SNR overhead.
+\item Move from block average to 2D interpolator with bandwidth of (say 6Hz).  Simulation, show it can do a better job than block estimator.
+\item Benefit - wide Doppler bandwidth, small pilot overhead, low noise channel estimator
+\end{enumerate}
+
+\subsection{Multipath}
+
+n=2 diversity to handle multipath.  Say 3dB gain on MPP/MPD.  Research combining techniques. Risks are copies will have half power so estimators make not work as well.
+
+\subsection{FEC}
+
+If we use diversity, I am not sure how much FEC we can also use, as we may run out of bandwidth.  Alternative is MAP techniques or some combination of MAP and FEC.
+
+\subsection{Delay Spread (ISI)}
+
+\begin{enumerate}
+\item We need a CP long enough to handle MPD (4ms plus guard)
+\item Try longer $T_s$ which will mean less overhead. However this implies lower $R_s$ which may be impacted by frequency spreading effect of Doppler.
+\item Measure implementation loss or EVM against ISI, we might be able to get away with some ISI, it is acceptable to have performance drop off for MPD, but it needs to be gradual rather than breaking.
+\item 700C had just 13ms symbols but dealt with ISI pretty well - this might be worth exploring.
+\end{enumerate}
+
 \section{Unorganised Notes}
 
 TODO:
 
 \begin{itemize}
-\item Challenges, fast fading, ISI, PAPR
-\item simulation model to check results
-\item Can we include PAPR into model?
+\item Can we include PAPR into model? Cn we have different trajectories for QPSK symbols around unit circle that reduce PAPR?  No I don't think that helps when multiple carriers are added together.  ECSSB techniques may be useful.
 \item Expression for Fading channels, block error rate, why 2020 is a lemon.
 \item Table of FreeDV waveforms and values, plugged into formula, effect of increasing pilot symbol rate.
 \item Check performance of a few codes against 2dB figure above.
 \item Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
-\item single tone/equaliser/hybrid OFDM-EQ
-\item Joint low latency/high latency on two carriers diversity
-\item Tx \& Rx diversity
-\item Wades techniques (ref)
-\item undersampled pilots
+\item Wades MAP techniques (ref).  This has a lot of promise, need an effective way to simulate and establish benefit with a modest amount of work.  Without a rate 0.5 code this would free up a lot of bandwidth to deal with ISI better, e.g. we could have large gaps between symbols.  Or use parallel tone modem to reduce effects of ISI.  A high rate code on top of this may be useful option (if it can converge).   Can we combine MAP with extra bits?  Index optimisation also a simple approach.
 \end{itemize} 
 
 \bibliographystyle{plain}

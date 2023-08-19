@@ -1,51 +1,58 @@
-% doppler_spread_ut.m
-% David Rowe Jan 2016
+% phase_resampler.m
+% David Rowe Aug 2023
 %
-% Unit test script for doppler_spread
+% Phase resampler test script
 
-f = 1;
-Fs = 8000;
-N  = Fs*10;
+function phase_resampler
+    randn('seed',1);
 
-[spread states] = doppler_spread(f, Fs, N);
+    pkg load signal
+    % Doppler bandwidth (Hz).  Doppler signal is complex so
+    % this is a total bandwidth oif Fd, sperad Fd/2 either side of 0 Hz
+    Fd = 1;          
+    Fs = 8000;
+    N  = Fs*10;
 
-% use spreading samples to modulate 1000Hz sine wave
-% You can listen to this with: sine1k_1Hz.raw
+    [d1 states] = doppler_spread(Fd, Fs, N);
 
-%   $ play -t raw -r 8000 -s -2 
-s = cos(2*pi*(1:N)*1000/Fs);
-s = s .* spread;
-s = real(s)*5000;
-fs = fopen("sine1k_1Hz.raw","wb"); fwrite(fs,s,"short"); fclose(fs);
+    % Decimate down to a sample rate of 2Fd
+    Fs2 = 2*Fd;
+    M = Fs/Fs2
+    assert (M == floor(M));
+    n2 = 1:M:length(d1);
+    d2 = d1(n2);
+    [d3 h3]  = resample(d2,M,1);
+    length(h3)
 
-% Some plots
+    % Some plots
 
-x = states.x; y = states.y; b = states.b;
+    d4 = states.spread_lowFs;
+    M = states.M;
+    figure(1); clf;
+    subplot(211); 
+    plot(real(d1)); hold on; 
+    stem((1:M:length(d4)*M),real(d4));
+    hold off;
+    ylabel('real');
+    title('Doppler Function lowFs');
+    subplot(212); 
+    plot(imag(d1)); hold on; 
+    stem((1:M:length(d4)*M),imag(d4));
+    hold off;
+    ylabel('imag');
+    xlabel('Time (samples)')
 
-H = freqz(b,1,x);
+    figure(2); clf;
+    subplot(211); 
+    plot(real(d1)); ylabel('real');
+    hold on; 
+    stem(n2,real(d2)); 
+    plot(real(d3)); 
+    hold off;
+    subplot(212); 
+    plot(imag(d1)); xlabel('imag');
+    hold on; stem(n2,imag(d2)); hold off;
+    title('Doppler Function');
+    xlabel('Time (samples)')
 
-figure(1)
-clf
-subplot(211)
-plot(x,y,';target;')
-title('Gaussian Filter Freq Resp Lin');
-legend('boxoff');
-subplot(212)
-plot(x,20*log10(y),';target;')
-hold on;
-plot(x,20*log10(y),'g+;actual;')
-hold off;
-axis([0 f*10/2 -60 0])
-title('Gaussian Filter Freq Resp dB');
-xlabel('Freq (Hz)');
-legend('boxoff');
-
-figure(2);
-subplot(211)
-plot(abs(spread))
-title('Spreading Function Magnitude');
-subplot(212)
-plot(s)
-title('1000Hz Sine Wave');
-xlabel('Time (samples)')
-
+endfunction

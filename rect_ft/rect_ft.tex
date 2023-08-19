@@ -202,7 +202,7 @@ Note $h_{\alpha}(k)$ is complex, and can be pre-computed from $h(n)$ at initiali
 
 Each operation in the summation of \ref{eq:bandpass_time2} is complex so requires $4N_{tap}$ Multiply Accumulates (MACs) to compute each $y(n)$, or for a block of $N$ samples, $4N_{tap}N$ MACs.
 
-In contrast, Equation \ref{eq:bandpass_time} has real coefficients, so for complex $x(n)$ requires $2N_{tap}$ MACs to compute each $y(n)$, plus 4 MACs each for the up and down frequency shifts. We assume $e^{-j \alpha n}$ is stored as a look up table and requires no FOPs. Alternatively it can be computed using a recursion with an additional 4 MACs/sample. The up and down conversions are conjugates so only one needs to be computed, the other can then be obtained by a sign change. For a block of $N$ samples, this is a total of $(2N_{tap}+8)N$ MACs.
+In contrast, Equation \ref{eq:bandpass_time} has real coefficients, so for complex $x(n)$ requires $2N_{tap}$ MACs to compute each $y(n)$, plus 4 MACs each for the up and down frequency shifts. We assume $e^{-j \alpha n}$ is stored as a look up table and requires no MACs. Alternatively it can be computed using a recursion with an additional 4 MACs/sample. The up and down conversions are conjugates so only one needs to be computed, the other can then be obtained by a sign change. For a block of $N$ samples, this is a total of $(2N_{tap}+8)N$ MACs.
 
 Table \ref{eq:bandpass_time} presents the MACs required to process a 100ms ($N=800$ samples at $Fs=8000 Hz$) block of samples.  In this example the real coefficient algorithm in Equation \ref{eq:bandpass_time} is the most efficient.
 
@@ -237,11 +237,15 @@ Steps 2-4 are repeated for each block of $N$ samples.
 
 \section {Further Work}
 
-Octave script to compare and plot fir1() to \ref{eq:dtcf_1}. Show effect of windowing on frequency response.
+\begin{enumerate}
 
-Maths for sample rate conversion, zero insertion, decimation.
+\item Octave script to compare and plot fir1() to \ref{eq:dtcf_1}. Show effect of windowing on frequency response.
 
-Rather than selecting $B/2$ by trial and error, we could find an expression for the windowed FT $X_w(\omega)$, and solve for $B/2$ given $|X_w(\omega)|=10^{-1/20}$, where $\omega$ is the frequency of the desired -1dB point (e.g. just outside of the outermost OFDM carrier).  This could be evaluated for any $N_t$, trading off filter performance (and hence the OFDM signal spurious mask) for CPU load.  
+\item Maths for sample rate conversion, zero insertion, decimation.
+
+\item Rather than selecting $B/2$ by trial and error, we could find an expression for the windowed FT $X_w(\omega)$, and solve for $B/2$ given $|X_w(\omega)|=10^{-1/20}$, where $\omega$ is the frequency of the desired -1dB point (e.g. just outside of the outermost OFDM carrier).  This could be evaluated for any $N_t$, trading off filter performance (and hence the OFDM signal spurious mask) for CPU load.  
+
+\end{enumerate}
 
 \bibliographystyle{plain}
 \bibliography{rect_ft_refs}

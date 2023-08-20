@@ -1,14 +1,14 @@
 % phase_resampler.m
 % David Rowe Aug 2023
 %
-% Phase resampler test script
+% Phase resampler tests
 
 function phase_resampler
     randn('seed',1);
 
     pkg load signal
     % Doppler bandwidth (Hz).  Doppler signal is complex so
-    % this is a total bandwidth oif Fd, sperad Fd/2 either side of 0 Hz
+    % this is a total bandwidth of Fd, sperad Fd/2 either side of 0 Hz
     Fd = 1;          
     Fs = 8000;
     N  = Fs*10;
@@ -16,13 +16,21 @@ function phase_resampler
     [d1 states] = doppler_spread(Fd, Fs, N);
 
     % Decimate down to a sample rate of 2Fd
-    Fs2 = 2*Fd;
+    Fs2 = 6.25*Fd;
     M = Fs/Fs2
     assert (M == floor(M));
     n2 = 1:M:length(d1);
     d2 = d1(n2);
-    [d3 h3]  = resample(d2,M,1);
-    length(h3)
+
+    % Try resampling
+    B=pi/2; n=(-2:2); h=(B/(2*pi))*sinc(n*B/(2*pi));
+    h
+    zero_padded = zeros(1,2*length(d2));
+    zero_padded(1:2:end) = d2;
+    d3 = 2*filter(h,1,[zero_padded 0 0]);
+    d3 = d3(3:end);
+    length(d3)
+    n3 = ((1:length(d3))-1)*M/2;
 
     % Some plots
 
@@ -47,7 +55,7 @@ function phase_resampler
     plot(real(d1)); ylabel('real');
     hold on; 
     stem(n2,real(d2)); 
-    plot(real(d3)); 
+    stem(n3,real(d3)); 
     hold off;
     subplot(212); 
     plot(imag(d1)); xlabel('imag');

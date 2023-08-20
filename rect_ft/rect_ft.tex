@@ -5,8 +5,12 @@
 \usepackage{tkz-euclide}
 \begin{document}
 
-\title{Fourier Transforms of Rectangular Functions}
+\title{Fourier Transforms of Rectangular Functions and FreeDV Filtering}
 \maketitle
+
+\section{Introduction}
+
+Using Fourier Transforms of Rectangular Functions, this document derives expressions for generating FreeDV band pass filter coefficients at run time, and efficient implementations of the filters.
 
 \section{Continuous Time Continuous Frequency}
 
@@ -39,9 +43,10 @@ X(w) &= \int_{-\infty}^{\infty} rect(t)e^{-j \omega t} dt\\
      &= \left[ \frac{1}{-j \omega} e^{-j \omega t} \right]_{-T/2}^{T/2} \\
      &= \frac{1}{-j \omega} \left[  e^{-j \omega \frac{T}{2}} - e^{j \omega \frac{T}{2}} \right] \\
      &= \frac{2 sin(\omega T/2)}{\omega} \\
-     &= T sinc \left( \frac{\omega T}{2} \right)
+     &= T sinc \left( \frac{\omega T}{2} \right) \\
 \end{split}
 \end{equation}
+where $sinc(x) = sin(x)/x$.    
 
 \section{Discrete Time Continuous Frequency}
 
@@ -102,12 +107,15 @@ $H(\omega)$ can be considered an ideal low pass filter for real input signals, w
 \begin{split}
 h(n) &= \frac{1}{2 \pi} \int_{-\pi}^{+\pi} H(\omega )e^{j \omega n} d\omega \\
      &= \frac{1}{2 \pi} \int_{-B/2}^{+B/2} e^{j \omega n} d\omega \\
-     &= \frac{1}{2 \pi jn} \left[ e^{j \omega B/2} - e^{-j \omega B/2} \right] \\
+     &= \frac{1}{2 \pi jn} \left[ e^{j \omega n} \right]_{-B/2}^{+B/2} \\
+     &= \frac{1}{2 \pi jn} \left[ e^{j n B/2} - e^{-j n B/2} \right] \\
      &= \frac{sin \left( \frac{nB}{2} \right) }{\pi n} \\
      &= \left( \frac{\frac{B}{2 \pi}}{\frac{B}{2 \pi}} \right ) \frac{sin \left( \frac{nB}{2} \right) }{\pi n} \\
      &= \frac{B}{2 \pi} sinc \left( \frac{nB}{2} \right) \\
 \end{split}
 \end{equation}
+Where $sinc(x) = sin(x)/x$.  Note the normalised sinc function $sinc(x) = sin(\pi x)/(\pi x)$ is common in DSP software such as GNU Octave.
+
 The infinite length even sequence $h(n)$ can be considered the time domain impulse response of an ideal low pass filter with cut off frequency $B/2$ radians. In practice filters are limited to $N_{tap}$ taps by applying a tapered window.  This results in non-ideal frequency response, rather than an ideal rectangular (brick wall) filter. A suitable length $N_{tap}$ set of Hanning windowed filter coefficients can be found by:
 \begin{equation}
 \begin{split}

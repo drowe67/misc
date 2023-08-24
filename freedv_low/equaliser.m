@@ -1,9 +1,44 @@
-% phase_resampler.m
+% equaliser.m
 % David Rowe Aug 2023
 %
-% Phase resampler tests
+% Prototyping equaliser improvements.  The equaliser uses pilot symbols to estimate the channel
+% and apply corrections to (equalise) received data symbols.  
 
-function phase_resampler
+1;
+pkg load signal;
+
+% simple time domain example of resampling
+function test_resampler
+  Fs = 2;
+ 
+end
+
+% plot frequency response of different resamplers
+function plot_resampler_freq_response
+    figure(1); clf; hold on;
+    h = [1 1 1 1]/4; [H w] = freqz(h); plot(w,20*log10(H),'b;[1 1 1 1];');
+    B=pi/2; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'g;sinc pi/2;');
+    B=pi; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'r;sinc pi;');
+    B=pi; n=(-3.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'c;6 tap pi;');
+    axis([0 pi -20 3]); grid; title('4 sample resamplers freq resp')
+end
+
+% try each resampler to equalise a MPP channel, plot BER curves
+function test_resampler_ber
+% 1 sample/symbol
+% random QPSK symbols with inserted pilots at Np
+% additive noise
+% sample Doppler function at symbol rate
+% estimate channel from pilots using chosen filter function
+% equalise using channel estimate
+% demodulate and count BER
+% plot curves from different resamplers
+% next step: effect of samples from carriers either side, need to simulate that
+end
+
+% Resampling Doppler signal
+
+function doppler_resampler
     randn('seed',1);
 
     pkg load signal
@@ -64,3 +99,4 @@ function phase_resampler
     xlabel('Time (samples)')
 
 endfunction
+

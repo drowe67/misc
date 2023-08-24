@@ -168,7 +168,7 @@ The general strategy is to propose an innovation, and explore with analysis/math
 \subsection{Equalisation}
 
 \begin{enumerate}
-\item Pilot symbols are used to estimate channel.  We require a 2 Hz bandwidth (fastest fading on MPP) and low noise (in AWGN channels) channel estimates.
+\item Pilot symbols are used to the estimate channel.  We require a 2 Hz bandwidth and low implementation loss $L_{il}$ in a noisy channel.
 \item Each OFDM carrier experiences phase and amplitude shifts due to the channel impulse response.  For example consider two path simulation model (TODO ref, subsection), which has two time varying complex coefficients and delay.
 \item Consider the two path HF channel model, comprised of two time varying complex coefficients, with bandwidth (-20dB) of $B=1 \si{Hz}$ (MPP).  The model is considered stationary over one symbol.
 \item We should be able to reconstruct a 1 Hz bandwidth signal at 1 Hz sample rate, which suggests a low pilot insertion rate.  Other factors are adequate (in a modem performance sense) estimation in the presence of AWGN channel noise, and the short window of samples (at least fwd in time) that we can use, e.g. 4 samples total.
@@ -181,7 +181,7 @@ The general strategy is to propose an innovation, and explore with analysis/math
 
 \subsection{Multipath}
 
-n=2 diversity to handle multipath.  Say 3dB gain on MPP/MPD.  Research combining techniques. Risks are copies will have half power so estimators make not work as well.
+n=2 diversity to handle multipath.  Say 3dB gain on MPP/MPD.  Research combining techniques. Risks are copies will have half power so estimates will have more noise.
 
 \subsection{FEC}
 

@@ -67,6 +67,7 @@ end
     [ ] plot curves from different resamplers
     [ ] plot curves from different Doppler rates
     [ ] extend to use pilots from carriers either side, so pilots with slightly different channel
+    [ ] extend to high bandwidth, high SNR fading
     [ ] output curves and write up
 #}
 
@@ -82,7 +83,12 @@ function sim_out = ber_test(sim_in)
     EbNovec = sim_in.EbNovec;
     hf_en   = sim_in.hf_en;
     nbitsvec = sim_in.nbits;
-    
+    nsymb = max(nbitsvec)/bps;
+    ch_phase = 0;
+    if isfield(sim_in,"ch_phase")
+      ch_phase = sim_in.ch_phase;
+    end
+
     % init HF model
 
     if hf_en
@@ -90,7 +96,6 @@ function sim_out = ber_test(sim_in)
 
       dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
 
-      nsymb = max(nbitsvec)/bps;
       [spread1 st] = doppler_spread(dopplerSpreadHz, Rs, nsymb);
       spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
 
@@ -111,34 +116,37 @@ function sim_out = ber_test(sim_in)
 
         % modulator ------------------------
 
-        tx_bits = rand(1,nbits) > 0.5;        
+        tx_bits = rand(1,nbits) > 0.5;    
         tx_symb = [];
         prev_tx_symb = 1;
         for s=1:nsymb
+            % insert pilot every Np symbols
+            if mod(s-1,8) == 0
+              tx_bits(2*s-1:2*s) = [0 0];
+            end
             atx_symb = qpsk_mod(tx_bits(2*s-1:2*s));
             tx_symb = [tx_symb atx_symb];
         end
-        % every Np symbols is a pilot
-        tx_symb(1:Np:end) = 1;
 
         % channel ---------------------------
 
         rx_symb = tx_symb;
+        ch_model = ones(1,nsymb).*exp(j*ch_phase);
 
         if hf_en
 
-          % simplified rate Rs simulation model that doesn't include
-          % ISI, just freq filtering.  We assume perfect phase estimation
-          % so it's just amplitude distortion.
+          % Simplified rate Rs simulation model that doesn't include
+          % ISI, just per carrier freq-domain filtering by a single
+          % complex coefficient.
 
           hf_model = zeros(1, nsymb);
           for s=1:nsymb 
             hf_model(s) = hf_gain*(spread1(s) + exp(-j*path_delay)*spread2(s));
-            %TODO: this is amplitude only, include phase
-            %hf_model     = abs(hf_model1(s));
             rx_symb(s) = rx_symb(s).*hf_model(s);
           end
+          ch_model = ch_model .* hf_model;
         end
+        rx_symb = rx_symb.*ch_model;
 
         % variance is noise power, which is divided equally between real and
         % imag components of noise
@@ -150,16 +158,36 @@ function sim_out = ber_test(sim_in)
         % equalise using pilots
         rx_pilots = rx_symb(1:Np:nsymb);
 
+        % TODO: params for each resampler, make resampler a sim_in choice
+        if strcmp(sim_in.resampler,"sinc")
+          filter_delay = -1.5;
+          B=pi; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h);
+          rx_pilots_filtered = filter(h,1,rx_pilots);
+        end
+        if strcmp(sim_in.resampler,"nearest")
+          filter_delay = 0;
+          rx_pilots_filtered = rx_pilots;
+        end
+
+        for s=1:nsymb
+          ind = floor(s/Np)+1;
+          ind = min(length(rx_pilots_filtered),ind); ind = max(1,ind);
+          printf("s: %d ind: %d\n",s,ind)
+          rx_symb(s) *= exp(-j*angle(rx_pilots_filtered(ind)));
+          %rx_symb(s) *= exp(-j*angle(hf_model(s)));
+       end
+
         if verbose == 2
             figure(1); clf;
             subplot(211); hold on;
-            plot(real(hf_model));
-            stem((1:Np:nsymb),real(rx_symb(1:Np:nsymb)));
-            hold off; axis([0 nsymb -4 4]); xlabel('time (s)'); ylabel('real');
+            plot(real(ch_model));
+            stem((1:Np:nsymb),real(rx_pilots));
+            stem((1:Np:nsymb) + filter_delay*Np,real(rx_pilots_filtered));
+            hold off; axis([0 nsymb -2 2]); xlabel('time (symbol)'); ylabel('real');
             subplot(212); hold on;
-            plot(imag(hf_model));
-            stem((1:Np:nsymb),imag(rx_symb(1:Np:nsymb)));
-            hold off; axis([0 nsymb -4 4]); xlabel('time (s)'); ylabel('imag');
+            plot(imag(ch_model));
+            stem((1:Np:nsymb),imag(rx_pilots));
+            hold off; axis([0 nsymb -2 2]); xlabel('time (symbol)'); ylabel('imag');
         end
 
         % demodulate rx symbols to bits
@@ -183,11 +211,7 @@ function sim_out = ber_test(sim_in)
             plot(rx_symb*exp(j*pi/4),'+','markersize', 10);
             mx = max(abs(rx_symb));
             axis([-mx mx -mx mx]);
-            if sim_in.diversity && sim_in.hf_en 
-              figure(3);
-              plot(1:nsymb, abs(hf_model1), 1:nsymb, abs(hf_model2), 'linewidth', 2);
-            end
-          end
+           end
         end
     end
 
@@ -198,9 +222,10 @@ function run_single(nbits = 1000,EbNodB=100)
     sim_in.verbose   = 2;
     sim_in.nbits     = nbits;
     sim_in.EbNovec   = EbNodB;
-    sim_in.hf_en     = 1;
-    sim_in.diversity = 0;
-
+    sim_in.hf_en     = 0;
+    sim_in.resampler = "nearest";
+    sim_in.ch_phase = pi/4;
+ 
     sim_qpsk = ber_test(sim_in);
 endfunction
 

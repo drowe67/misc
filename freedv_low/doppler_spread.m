@@ -12,7 +12,11 @@ function [spread_FsHz states] = doppler_spread(dopplerSpreadHz, FsHz, Nsam)
   lowFs = ceil(10*dopplerSpreadHz);
   Ntaps = 100;
   M = FsHz/lowFs;
-  assert(M == floor(M));
+  if M != floor(M)
+    % lowFs is not critical but we need M to be an integer
+    M = floor(M);
+    lowFs = FsHz/M;
+  end
   Nsam_low = ceil(Nsam/M);
   
   % generate gaussian freq response and design filter

@@ -83,7 +83,7 @@ function sim_out = ber_test(sim_in)
     EbNovec = sim_in.EbNovec;
     hf_en   = sim_in.hf_en;
     nbitsvec = sim_in.nbits;
-    nsymb = max(nbitsvec)/bps;
+    nsymb_max = max(nbitsvec)/bps;
     ch_phase = 0;
     if isfield(sim_in,"ch_phase")
       ch_phase = sim_in.ch_phase;
@@ -96,8 +96,8 @@ function sim_out = ber_test(sim_in)
 
       dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
 
-      [spread1 st] = doppler_spread(dopplerSpreadHz, Rs, nsymb);
-      spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
+      spread1 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
+      spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
 
       % normalise power through HF channel
       hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
@@ -106,13 +106,15 @@ function sim_out = ber_test(sim_in)
     for ne = 1:length(EbNovec)
 
         % work out noise power -------------
-
         EbNodB = EbNovec(ne);
         EsNodB = EbNodB + 10*log10(bps);
         EsNo = 10^(EsNodB/10);
         variance = 1/EsNo;
+
+        % integer number of modem frames
         nbits = nbitsvec(ne);
-        Nsymb = nbits/bps;
+        nbits = floor(nbits/(Np*bps))*Np*bps;
+        nsymb = nbits/bps;
 
         % modulator ------------------------
 
@@ -142,9 +144,12 @@ function sim_out = ber_test(sim_in)
           hf_model = zeros(1, nsymb);
           for s=1:nsymb 
             hf_model(s) = hf_gain*(spread1(s) + exp(-j*path_delay)*spread2(s));
-            rx_symb(s) = rx_symb(s).*hf_model(s);
+           end
+          if hf_en == 1
+            ch_model = ch_model .* abs(hf_model);
+          else
+            ch_model = ch_model .* hf_model;
           end
-          ch_model = ch_model .* hf_model;
         end
         rx_symb = rx_symb.*ch_model;
 
@@ -157,6 +162,7 @@ function sim_out = ber_test(sim_in)
 
         % equalise using pilots
         rx_pilots = rx_symb(1:Np:nsymb);
+        rx_equal = zeros(1,nsymb);
 
         % TODO: params for each resampler, make resampler a sim_in choice
         if strcmp(sim_in.resampler,"sinc")
@@ -167,22 +173,21 @@ function sim_out = ber_test(sim_in)
         if strcmp(sim_in.resampler,"nearest")
           filter_delay = 0;
           rx_pilots_filtered = rx_pilots;
+          for s=1:nsymb
+            ind = round((s-1)/Np)+1;
+            ind = min(length(rx_pilots_filtered),ind); ind = max(1,ind);
+            %printf("s: %d ind: %d\n",s,ind)
+            rx_equal(s) = rx_pilots_filtered(ind);
+            rx_symb(s) *= exp(-j*angle(rx_equal(s)));
+          end
         end
-
-        for s=1:nsymb
-          ind = floor(s/Np)+1;
-          ind = min(length(rx_pilots_filtered),ind); ind = max(1,ind);
-          printf("s: %d ind: %d\n",s,ind)
-          rx_symb(s) *= exp(-j*angle(rx_pilots_filtered(ind)));
-          %rx_symb(s) *= exp(-j*angle(hf_model(s)));
-       end
 
         if verbose == 2
             figure(1); clf;
             subplot(211); hold on;
             plot(real(ch_model));
-            stem((1:Np:nsymb),real(rx_pilots));
-            stem((1:Np:nsymb) + filter_delay*Np,real(rx_pilots_filtered));
+            stem((1:Np:nsymb), real(rx_pilots));
+            plot(real(rx_equal));
             hold off; axis([0 nsymb -2 2]); xlabel('time (symbol)'); ylabel('real');
             subplot(212); hold on;
             plot(imag(ch_model));
@@ -203,9 +208,9 @@ function sim_out = ber_test(sim_in)
 
         error_pattern = xor(tx_bits, rx_bits);
         nerrors = sum(error_pattern);
-        bervec(ne) = nerrors/nbits;
+        bervec(ne) = nerrors/nbits + 1E-12;
         if verbose
-          printf("EbNodB: % 4.1f nbits: %5d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
+          printf("EbNodB: % 4.1f nbits: %7d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
           if verbose == 2
             figure(2); clf;
             plot(rx_symb*exp(j*pi/4),'+','markersize', 10);
@@ -222,9 +227,9 @@ function run_single(nbits = 1000,EbNodB=100)
     sim_in.verbose   = 2;
     sim_in.nbits     = nbits;
     sim_in.EbNovec   = EbNodB;
-    sim_in.hf_en     = 0;
+    sim_in.hf_en     = 2;
     sim_in.resampler = "nearest";
-    sim_in.ch_phase = pi/4;
+    sim_in.ch_phase  = 0;
  
     sim_qpsk = ber_test(sim_in);
 endfunction
@@ -234,7 +239,8 @@ function run_curves
     sim_in.verbose = 1;
     sim_in.EbNovec = 0:10;
     sim_in.hf_en   = 0;
- 
+    sim_in.resampler = "";
+
     % AWGN -----------------------------
 
     ber_awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
@@ -252,15 +258,18 @@ function run_curves
 
     hf_sim_in.nbits = min(max_nbits, floor(500 ./ ber_hf_theory));
     sim_qpsk_hf = ber_test(hf_sim_in);
+    hf_sim_in.hf_en = 2;  hf_sim_in.resampler = "nearest";
+    sim_qpsk_hf_nearest = ber_test(hf_sim_in);
 
     % Plot results --------------------
 
     figure (3, 'position', [400, 10, 600, 400]); clf;
     semilogy(sim_in.EbNovec, ber_awgn_theory,'r+-;QPSK AWGN theory;','markersize', 10, 'linewidth', 2)
     hold on;
-    semilogy(sim_in.EbNovec, sim_qpsk.bervec,'g+-;QPSK AWGN simulated;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, sim_qpsk.bervec,'g+-;QPSK AWGN sim;','markersize', 10, 'linewidth', 2)
     semilogy(hf_sim_in.EbNovec, ber_hf_theory,'r+-;QPSK HF theory;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf.bervec,'g+-;QPSK HF simulated;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf.bervec,'g+-;QPSK HF sim;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf_nearest.bervec,'b+-;QPSK HF nearest;','markersize', 10, 'linewidth', 2)
     hold off;
     xlabel('Eb/No (dB)')
     ylabel('BER')

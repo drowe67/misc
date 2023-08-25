@@ -30,7 +30,7 @@ function [spread_FsHz states] = doppler_spread(dopplerSpreadHz, FsHz, Nsam)
   % resample to FsHz. As Fs_low >> bandwidth of signal (dopplerSpreadHz), we can 
   % use a linear resampler
 
-  spread_FsHz = interp1((1:M:Nsam_low*M),spread_lowFs,1:Nsam);
+  spread_FsHz = interp1((1:M:Nsam_low*M),spread_lowFs,1:Nsam,"extrap");
   assert(length(spread_FsHz) >= Nsam);
   
   % return some states for optional unit testing

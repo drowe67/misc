@@ -6,6 +6,7 @@
 
 1;
 pkg load signal;
+qpsk;
 
 % simple time domain example of resampling
 function test_resampler
@@ -35,12 +36,12 @@ function test_resampler
     plot(T*(0:N-1),real(d1));
     stem(Tp*(0:length(d2)-1),real(d2));
     stem(Tp*(0:length(d2)-1) - 3.5*Tp,real(d3));
-    hold off; axis([0 Trun -1 1])
+    hold off; axis([0 Trun -1 1]); xlabel('time (s)'); ylabel('real');
     subplot(212); hold on;
     plot(T*(0:N-1),imag(d1));
     stem(Tp*(0:length(d2)-1),imag(d2));
     stem(Tp*(0:length(d2)-1) - 3.5*Tp,imag(d3));
-    hold off; axis([0 Trun -1 1])
+    hold off; axis([0 Trun -1 1]); xlabel('time (s)'); ylabel('imag');
 end
 
 % plot frequency response of different resamplers
@@ -53,81 +54,143 @@ function plot_resampler_freq_response
     axis([0 pi -20 3]); grid; title('4 sample resamplers freq resp')
 end
 
-% try each resampler to equalise a MPP channel, plot BER curves
-function test_resampler_ber
-% 1 sample/symbol
-% random QPSK symbols with inserted pilots at Np
-% additive noise
-% sample Doppler function at symbol rate
-% estimate channel from pilots using chosen filter function
-% equalise using channel estimate
-% demodulate and count BER
-% plot curves from different resamplers
-% next step: effect of samples from carriers either side, so pilots with slightly different channel
-% next step, extend to sum of two Doppler sequences, after ISI has settled.  Sum of two might improve (central limit)
-end
+% Rate Rs modem simulation model -------------------------------------------------------
 
-% Resampling Doppler signal
+#{
+    TODO
+    [X] BER counting with random QPSK symbols
+    [ ] with inserted pilots at Np
+    [X] additive noise
+    [ ] sample Doppler function at symbol rate
+    [ ] estimate channel from pilots using chosen filter function
+    [ ] equalise using channel estimate
+    [ ] plot curves from different resamplers
+    [ ] plot curves from different Doppler rates
+    [ ] extend to use pilots from carriers either side, so pilots with slightly different channel
+    [ ] output curves and write up
+#}
 
-function doppler_resampler
-    randn('seed',1);
+function sim_out = ber_test(sim_in)
+    bps     = 2;     % two bits/symbol for QPSK
+    Rs      = 50;    % symbol rate (needed for HF model)
+    
+    verbose = sim_in.verbose;
+    EbNovec = sim_in.EbNovec;
+    hf_en   = sim_in.hf_en;
 
-    pkg load signal
-    % Doppler bandwidth (Hz).  Doppler signal is complex so
-    % this is a total bandwidth of Fd, sperad Fd/2 either side of 0 Hz
-    Fd = 1;          
-    Fs = 8000;
-    N  = Fs*10;
+    % user can supply number of bits per point to get good results
+    % at high Eb/No
 
-    [d1 states] = doppler_spread(Fd, Fs, N);
+    if length(sim_in.nbits) > 1
+      nbitsvec = sim_in.nbits;
+      nbitsvec += 100 - mod(nbitsvec,100);  % round up to nearest 100
+    else
+      nbitsvec(1:length(EbNovec)) = sim_in.nbits;
+    end
 
-    % Decimate down to a sample rate of 2Fd
-    Fs2 = 6.25*Fd;
-    M = Fs/Fs2
-    assert (M == floor(M));
-    n2 = 1:M:length(d1);
-    d2 = d1(n2);
+    % init HF model
 
-    % Try resampling
-    B=pi/2; n=(-2:2); h=(B/(2*pi))*sinc(n*B/(2*pi));
-    h
-    zero_padded = zeros(1,2*length(d2));
-    zero_padded(1:2:end) = d2;
-    d3 = 2*filter(h,1,[zero_padded 0 0]);
-    d3 = d3(3:end);
-    length(d3)
-    n3 = ((1:length(d3))-1)*M/2;
+    if hf_en
+      % some typical values
 
-    % Some plots
+      dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
 
-    d4 = states.spread_lowFs;
-    M = states.M;
-    figure(1); clf;
-    subplot(211); 
-    plot(real(d1)); hold on; 
-    stem((1:M:length(d4)*M),real(d4));
-    hold off;
-    ylabel('real');
-    title('Doppler Function lowFs');
-    subplot(212); 
-    plot(imag(d1)); hold on; 
-    stem((1:M:length(d4)*M),imag(d4));
-    hold off;
-    ylabel('imag');
-    xlabel('Time (samples)')
+      nsymb = max(nbitsvec)/bps;
+      [spread1 st] = doppler_spread(dopplerSpreadHz, Rs, nsymb);
+      spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
 
-    figure(2); clf;
-    subplot(211); 
-    plot(real(d1)); ylabel('real');
-    hold on; 
-    stem(n2,real(d2)); 
-    stem(n3,real(d3)); 
-    hold off;
-    subplot(212); 
-    plot(imag(d1)); xlabel('imag');
-    hold on; stem(n2,imag(d2)); hold off;
-    title('Doppler Function');
-    xlabel('Time (samples)')
+      % normalise power through HF channel
+      hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
+    end
 
+    for ne = 1:length(EbNovec)
+
+        % work out noise power -------------
+
+        EbNodB = EbNovec(ne);
+        EsNodB = EbNodB + 10*log10(bps);
+        EsNo = 10^(EsNodB/10);
+        variance = 1/EsNo;
+        nbits = nbitsvec(ne);
+        nsymb = nbits/bps;
+
+        % modulator ------------------------
+
+        tx_bits = rand(1,nbits) > 0.5;        
+        tx_symb = [];
+        prev_tx_symb = 1;
+        for s=1:nsymb
+            atx_symb = qpsk_mod(tx_bits(2*s-1:2*s));
+            tx_symb = [tx_symb atx_symb];
+        end
+
+        % channel ---------------------------
+
+        rx_symb = tx_symb;
+
+        if hf_en
+
+          % simplified rate Rs simulation model that doesn't include
+          % ISI, just freq filtering.  We assume perfect phase estimation
+          % so it's just amplitude distortion.
+
+          hf_model1 = hf_model2 = zeros(1, nsymb);
+          for s=1:nsymb 
+            hf_model1(s) = hf_gain*(spread1(s) + exp(-j*path_delay)*spread2(s));
+            %TODO: this is amplitude only, include phase
+            hf_model     = abs(hf_model1(s));
+            rx_symb(s) = rx_symb(s).*hf_model;
+          end
+        end
+
+        % variance is noise power, which is divided equally between real and
+        % imag components of noise
+
+        noise = sqrt(variance*0.5)*(randn(1,nsymb) + j*randn(1,nsymb));
+        rx_symb += noise;
+
+        % demodulator ------------------------------------------
+
+        % demodulate rx symbols to bits
+ 
+        rx_bits = [];
+        prev_rx_symb = 1;
+        for s=1:nsymb
+          arx_symb = rx_symb(s);
+          two_bits = qpsk_demod(arx_symb);
+          rx_bits = [rx_bits two_bits];
+        end
+        
+        % count errors -----------------------------------------
+
+        error_pattern = xor(tx_bits, rx_bits);
+        nerrors = sum(error_pattern);
+        bervec(ne) = nerrors/nbits;
+        if verbose
+          printf("EbNodB: % 3.1f nbits: %5d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
+          if verbose == 2
+            figure(2); clf;
+            plot(rx_symb*exp(j*pi/4),'+','markersize', 10);
+            mx = max(abs(rx_symb));
+            axis([-mx mx -mx mx]);
+            if sim_in.diversity && sim_in.hf_en 
+              figure(3);
+              plot(1:nsymb, abs(hf_model1), 1:nsymb, abs(hf_model2), 'linewidth', 2);
+            end
+          end
+        end
+    end
+
+    sim_out.bervec = bervec;
+endfunction
+
+function run_single
+    sim_in.verbose   = 2;
+    sim_in.nbits     = 1000;
+    sim_in.EbNovec   = 100;
+    sim_in.hf_en     = 1;
+    sim_in.diversity = 0;
+
+    sim_qpsk = ber_test(sim_in);
 endfunction
 

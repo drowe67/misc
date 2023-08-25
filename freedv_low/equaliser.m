@@ -194,3 +194,43 @@ function run_single
     sim_qpsk = ber_test(sim_in);
 endfunction
 
+function run_curves
+    max_nbits = 1E5;
+    sim_in.verbose = 1;
+    sim_in.EbNovec = 0:10;
+    sim_in.hf_en   = 0;
+ 
+    % AWGN -----------------------------
+
+    ber_awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
+    sim_in.nbits    = min(max_nbits, floor(500 ./ ber_awgn_theory));
+
+    sim_qpsk = ber_test(sim_in);
+      
+    % HF -----------------------------
+
+    hf_sim_in = sim_in; hf_sim_in.dqpsk = 0; hf_sim_in.hf_en = 1;
+    hf_sim_in.EbNovec = 0:16;
+
+    EbNoLin = 10.^(hf_sim_in.EbNovec/10);
+    ber_hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
+
+    hf_sim_in.nbits = min(max_nbits, floor(500 ./ ber_hf_theory));
+    sim_qpsk_hf = ber_test(hf_sim_in);
+
+    % Plot results --------------------
+
+    figure (3, 'position', [400, 10, 600, 400]); clf;
+    semilogy(sim_in.EbNovec, ber_awgn_theory,'r+-;QPSK AWGN theory;','markersize', 10, 'linewidth', 2)
+    hold on;
+    semilogy(sim_in.EbNovec, sim_qpsk.bervec,'g+-;QPSK AWGN simulated;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, ber_hf_theory,'r+-;QPSK HF theory;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf.bervec,'g+-;QPSK HF simulated;','markersize', 10, 'linewidth', 2)
+    hold off;
+    xlabel('Eb/No (dB)')
+    ylabel('BER')
+    grid("minor")
+    axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-3 1])
+
+endfunction
+

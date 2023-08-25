@@ -71,23 +71,18 @@ end
 #}
 
 function sim_out = ber_test(sim_in)
+    rand('seed',1);
+    randn('seed',1);
+
     bps     = 2;     % two bits/symbol for QPSK
     Rs      = 50;    % symbol rate (needed for HF model)
-    
+    Np      = 8;     % one pilot every Np symbols
+
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
     hf_en   = sim_in.hf_en;
-
-    % user can supply number of bits per point to get good results
-    % at high Eb/No
-
-    if length(sim_in.nbits) > 1
-      nbitsvec = sim_in.nbits;
-      nbitsvec += 100 - mod(nbitsvec,100);  % round up to nearest 100
-    else
-      nbitsvec(1:length(EbNovec)) = sim_in.nbits;
-    end
-
+    nbitsvec = sim_in.nbits;
+    
     % init HF model
 
     if hf_en
@@ -112,7 +107,7 @@ function sim_out = ber_test(sim_in)
         EsNo = 10^(EsNodB/10);
         variance = 1/EsNo;
         nbits = nbitsvec(ne);
-        nsymb = nbits/bps;
+        Nsymb = nbits/bps;
 
         % modulator ------------------------
 
@@ -123,6 +118,8 @@ function sim_out = ber_test(sim_in)
             atx_symb = qpsk_mod(tx_bits(2*s-1:2*s));
             tx_symb = [tx_symb atx_symb];
         end
+        % every Np symbols is a pilot
+        tx_symb(1:Np:end) = 1;
 
         % channel ---------------------------
 
@@ -134,25 +131,38 @@ function sim_out = ber_test(sim_in)
           % ISI, just freq filtering.  We assume perfect phase estimation
           % so it's just amplitude distortion.
 
-          hf_model1 = hf_model2 = zeros(1, nsymb);
+          hf_model = zeros(1, nsymb);
           for s=1:nsymb 
-            hf_model1(s) = hf_gain*(spread1(s) + exp(-j*path_delay)*spread2(s));
+            hf_model(s) = hf_gain*(spread1(s) + exp(-j*path_delay)*spread2(s));
             %TODO: this is amplitude only, include phase
-            hf_model     = abs(hf_model1(s));
-            rx_symb(s) = rx_symb(s).*hf_model;
+            %hf_model     = abs(hf_model1(s));
+            rx_symb(s) = rx_symb(s).*hf_model(s);
           end
         end
 
         % variance is noise power, which is divided equally between real and
         % imag components of noise
-
         noise = sqrt(variance*0.5)*(randn(1,nsymb) + j*randn(1,nsymb));
         rx_symb += noise;
 
         % demodulator ------------------------------------------
 
+        % equalise using pilots
+        rx_pilots = rx_symb(1:Np:nsymb);
+
+        if verbose == 2
+            figure(1); clf;
+            subplot(211); hold on;
+            plot(real(hf_model));
+            stem((1:Np:nsymb),real(rx_symb(1:Np:nsymb)));
+            hold off; axis([0 nsymb -4 4]); xlabel('time (s)'); ylabel('real');
+            subplot(212); hold on;
+            plot(imag(hf_model));
+            stem((1:Np:nsymb),imag(rx_symb(1:Np:nsymb)));
+            hold off; axis([0 nsymb -4 4]); xlabel('time (s)'); ylabel('imag');
+        end
+
         % demodulate rx symbols to bits
- 
         rx_bits = [];
         prev_rx_symb = 1;
         for s=1:nsymb
@@ -167,7 +177,7 @@ function sim_out = ber_test(sim_in)
         nerrors = sum(error_pattern);
         bervec(ne) = nerrors/nbits;
         if verbose
-          printf("EbNodB: % 3.1f nbits: %5d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
+          printf("EbNodB: % 4.1f nbits: %5d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
           if verbose == 2
             figure(2); clf;
             plot(rx_symb*exp(j*pi/4),'+','markersize', 10);
@@ -184,10 +194,10 @@ function sim_out = ber_test(sim_in)
     sim_out.bervec = bervec;
 endfunction
 
-function run_single
+function run_single(nbits = 1000,EbNodB=100)
     sim_in.verbose   = 2;
-    sim_in.nbits     = 1000;
-    sim_in.EbNovec   = 100;
+    sim_in.nbits     = nbits;
+    sim_in.EbNovec   = EbNodB;
     sim_in.hf_en     = 1;
     sim_in.diversity = 0;
 

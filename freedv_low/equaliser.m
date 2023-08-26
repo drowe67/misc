@@ -166,11 +166,6 @@ function sim_out = ber_test(sim_in)
         rx_pilots_t = Ts*(0:Np:nsymb-1);     % pilot times
         rx_ch = zeros(1,nsymb);              % channel estimate
 
-        if strcmp(sim_in.resampler,"sinc")
-          filter_delay = -1.5;
-          B=pi; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h);
-          rx_pilots_filtered = filter(h,1,rx_pilots);
-        end
         if strcmp(sim_in.resampler,"nearest")
           % use nearest pilot
           for s=0:nsymb-1
@@ -181,14 +176,16 @@ function sim_out = ber_test(sim_in)
           end
         end
         if strcmp(sim_in.resampler,"lin2")
-          % linear interpolation between two nearest pilots
+          % Linear interpolation between two nearest pilots, used on 700E and datac1 modes
+          % 2dB Similar performance to mean4 on HF, trade off I guess
         rx_ch = interp1(rx_pilots_t,rx_pilots,rx_symb_t);
           for s=1:nsymb
             rx_symb(s) *= exp(-j*angle(rx_ch(s)));
           end
         end
         if strcmp(sim_in.resampler,"mean4")
-          % mean of 4 adjacent pilots
+          % Mean of 4 adjacent pilots, similar time duration to 700D.  Lack of HF response in resampler
+          % is quite obvious, abput 0.5dB IL AWGN
           filter_delay = 1.5*Np*Ts;
           h = [1 1 1 1]/4;
           rx_pilots_filtered = filter(h,1,rx_pilots);
@@ -196,6 +193,11 @@ function sim_out = ber_test(sim_in)
           for s=1:nsymb
             rx_symb(s) *= exp(-j*angle(rx_ch(s)));
           end
+        end
+        if strcmp(sim_in.resampler,"sinc")
+          filter_delay = -1.5;
+          B=pi; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h);
+          rx_pilots_filtered = filter(h,1,rx_pilots);
         end
 
         if verbose == 2
@@ -256,14 +258,15 @@ function run_curves
     sim_in.verbose = 1;
     sim_in.EbNovec = 0:10;
     sim_in.hf_en   = 0;
-    sim_in.resampler = "mean4";
+    sim_in.resampler = "";
 
     % AWGN -----------------------------
 
     awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
     sim_in.nbits  = min(max_nbits, floor(500 ./ awgn_theory));
 
-    awgn_sim_mean4 = ber_test(sim_in);
+    sim_in.resampler = "lin2"; awgn_sim_lin2 = ber_test(sim_in);
+    sim_in.resampler = "mean4"; awgn_sim_mean4 = ber_test(sim_in);
       
     % HF -----------------------------
 
@@ -286,7 +289,8 @@ function run_curves
     figure (3); clf;
     semilogy(sim_in.EbNovec, awgn_theory,'r+-;AWGN theory;','markersize', 10, 'linewidth', 2)
     hold on;
-    semilogy(sim_in.EbNovec, awgn_sim_mean4.bervec,'g+-;AWGN sim mean4;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_sim_lin2.bervec,'bo-;AWGN sim lin2;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_sim_mean4.bervec,'bx-;AWGN sim mean4;','markersize', 10, 'linewidth', 2)
     semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;','markersize', 10, 'linewidth', 2)
     semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'g+-;HF sim ideal;','markersize', 10, 'linewidth', 2)
     semilogy(hf_sim_in.EbNovec, hf_sim_nearest.bervec,'b+-;HF sim nearest;','markersize', 10, 'linewidth', 2)

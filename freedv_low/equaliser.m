@@ -46,11 +46,11 @@ end
 
 % plot frequency response of different resamplers
 function plot_resampler_freq_response
-    figure(2); clf; hold on;
+    figure(4); clf; hold on;
     h = [1 1 1 1]/4; [H w] = freqz(h); plot(w,20*log10(H),'b;[1 1 1 1];');
     B=pi/2; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'g;sinc pi/2;');
     B=pi; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'r;sinc pi;');
-    B=pi; n=(-3.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'c;6 tap pi;');
+    B=2*pi; n=(-3.5:0.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'c;6 tap pi;');
     axis([0 pi -20 3]); grid; title('4 sample resamplers freq resp')
 end
 
@@ -59,15 +59,17 @@ end
 #{
     TODO
     [X] BER counting with random QPSK symbols
-    [ ] with inserted pilots at Np
+    [X] with inserted pilots at Np
     [X] additive noise
-    [ ] sample Doppler function at symbol rate
-    [ ] estimate channel from pilots using chosen filter function
-    [ ] equalise using channel estimate
+    [X] sample Doppler function at symbol rate
+    [X] estimate channel from pilots using chosen filter function
+    [X] equalise using channel estimate
     [ ] plot curves from different resamplers
     [ ] plot curves from different Doppler rates
     [ ] extend to use pilots from carriers either side, so pilots with slightly different channel
     [ ] extend to high bandwidth, high SNR fading
+    [ ] diversity
+    [ ] LPDC (combined with diversity)
     [ ] output curves and write up
 #}
 
@@ -79,12 +81,13 @@ function sim_out = ber_test(sim_in)
     Rs      = 50;    % symbol rate (needed for HF model)
     Ts      = 1/Rs;
     Np      = 8;     % one pilot every Np symbols
+    Npad    = Np*3;  % extra symbols at end to deal with interpolator edges
 
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
     hf_en   = sim_in.hf_en;
     nbitsvec = sim_in.nbits;
-    nsymb_max = max(nbitsvec)/bps;
+    nsymb_max = max(nbitsvec)/bps+Npad;
     ch_phase = 0;
     if isfield(sim_in,"ch_phase")
       ch_phase = sim_in.ch_phase;
@@ -95,7 +98,7 @@ function sim_out = ber_test(sim_in)
     if hf_en
       % some typical values
 
-      dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
+      dopplerSpreadHz = sim_in.dopplerHz; path_delay = 1E-3*Rs;
 
       spread1 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
       spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
@@ -112,10 +115,11 @@ function sim_out = ber_test(sim_in)
         EsNo = 10^(EsNodB/10);
         variance = 1/EsNo;
 
-        % integer number of modem frames
+        % integer number of "modem" frames
         nbits = nbitsvec(ne);
-        nbits = floor(nbits/(Np*bps))*Np*bps;
         nsymb = nbits/bps;
+        nsymb = floor(nsymb/Np)*Np + Npad;
+        nbits = nsymb*bps;
 
         % modulator ------------------------
 
@@ -166,38 +170,46 @@ function sim_out = ber_test(sim_in)
         rx_pilots_t = Ts*(0:Np:nsymb-1);     % pilot times
         rx_ch = zeros(1,nsymb);              % channel estimate
 
+        % bunch of options for resampler, takes pilots and estimates channel
+
         if strcmp(sim_in.resampler,"nearest")
           % use nearest pilot
           for s=0:nsymb-1
             ind = round(s/Np)+1;
             ind = min(length(rx_pilots),ind); ind = max(1,ind);
             rx_ch(s+1) = rx_pilots(ind);
-            rx_symb(s+1) *= exp(-j*angle(rx_ch(s+1)));
           end
         end
         if strcmp(sim_in.resampler,"lin2")
           % Linear interpolation between two nearest pilots, used on 700E and datac1 modes
-          % 2dB Similar performance to mean4 on HF, trade off I guess
-        rx_ch = interp1(rx_pilots_t,rx_pilots,rx_symb_t);
-          for s=1:nsymb
-            rx_symb(s) *= exp(-j*angle(rx_ch(s)));
-          end
+          % 1.5dB Il AWGN, similar performance to mean4 on HF (1.5dB), trade off I guess
+          rx_ch = interp1(rx_pilots_t,rx_pilots,rx_symb_t);
         end
         if strcmp(sim_in.resampler,"mean4")
           % Mean of 4 adjacent pilots, similar time duration to 700D.  Lack of HF response in resampler
-          % is quite obvious, abput 0.5dB IL AWGN
+          % is quite obvious, about 0.5dB IL AWGN
           filter_delay = 1.5*Np*Ts;
           h = [1 1 1 1]/4;
           rx_pilots_filtered = filter(h,1,rx_pilots);
           rx_ch = interp1(rx_pilots_t-filter_delay,rx_pilots_filtered,rx_symb_t,"extrap");
-          for s=1:nsymb
-            rx_symb(s) *= exp(-j*angle(rx_ch(s)));
-          end
         end
         if strcmp(sim_in.resampler,"sinc")
-          filter_delay = -1.5;
-          B=pi; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h);
-          rx_pilots_filtered = filter(h,1,rx_pilots);
+          % use sinc filter to double the sample rate of the pilots, then linear interpolation
+          % note delay and B needed hand tweaking using plot_freq_response above, and run_single to adjust delay
+          filter_delay = 3.5*Np*Ts;
+          B=2*pi; n=(-3.5:0.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h);
+          rx_pilots2 = zeros(1,2*length(rx_pilots));
+          rx_pilots2(1:2:end) = rx_pilots;
+          rx_pilots2_filtered = 2*filter(h,1,rx_pilots2);
+          rx_pilots2_t = Ts*(0:Np/2:nsymb-1);
+          rx_ch = interp1(rx_pilots2_t-filter_delay,rx_pilots2_filtered,rx_symb_t,"extrap");
+       end
+
+        % actual equalisation (just of phase)
+        if hf_en != 1
+           for s=1:nsymb
+              rx_symb(s) *= exp(-j*angle(rx_ch(s)));
+           end
         end
 
         if verbose == 2
@@ -214,6 +226,10 @@ function sim_out = ber_test(sim_in)
             hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (symbol)'); ylabel('imag');
         end
 
+        % remove padding at end as equaliser invalid
+        rx_symb = rx_symb(1:end-Npad);
+        nsymb -= Npad;
+ 
         % demodulate rx symbols to bits
         rx_bits = [];
         prev_rx_symb = 1;
@@ -225,7 +241,7 @@ function sim_out = ber_test(sim_in)
         
         % count errors -----------------------------------------
 
-        error_pattern = xor(tx_bits, rx_bits);
+        error_pattern = xor(tx_bits(1:end-Npad*bps), rx_bits);
         nerrors = sum(error_pattern);
         bervec(ne) = nerrors/nbits + 1E-12;
         if verbose
@@ -242,14 +258,20 @@ function sim_out = ber_test(sim_in)
     sim_out.bervec = bervec;
 endfunction
 
-function run_single(nbits = 1000,EbNodB=100)
+function run_single(nbits = 1000,EbNodB=100,resampler="sinc", dopplerHz=1.0)
     sim_in.verbose   = 2;
     sim_in.nbits     = nbits;
     sim_in.EbNovec   = EbNodB;
-    sim_in.hf_en     = 2;
-    sim_in.resampler = "mean4";
+    if dopplerHz == 0
+       sim_in.hf_en  = 0;
+    else
+       sim_in.hf_en  = 2;
+       sim_in.dopplerHz = dopplerHz;
+     end
+    sim_in.resampler = resampler;
     sim_in.ch_phase  = 0;
- 
+    sim_in.dopplerHz = dopplerHz;
+
     sim_qpsk = ber_test(sim_in);
 endfunction
 
@@ -267,22 +289,24 @@ function run_curves
 
     sim_in.resampler = "lin2"; awgn_sim_lin2 = ber_test(sim_in);
     sim_in.resampler = "mean4"; awgn_sim_mean4 = ber_test(sim_in);
+    sim_in.resampler = "sinc"; awgn_sim_sinc = ber_test(sim_in);
       
     % HF -----------------------------
 
     hf_sim_in = sim_in; 
     hf_sim_in.hf_en = 1;
     hf_sim_in.EbNovec = 0:16;
+    hf_sim_in.dopplerHz = 1.0;
 
     EbNoLin = 10.^(hf_sim_in.EbNovec/10);
     hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
 
     hf_sim_in.nbits = min(max_nbits, floor(500 ./ hf_theory));
     hf_sim = ber_test(hf_sim_in);
-    hf_sim_in.hf_en = 2;  hf_sim_in.resampler = "nearest";
-    hf_sim_nearest = ber_test(hf_sim_in);
+    hf_sim_in.hf_en = 2;
     hf_sim_in.resampler = "lin2"; hf_sim_lin2 = ber_test(hf_sim_in);
     hf_sim_in.resampler = "mean4"; hf_sim_mean4 = ber_test(hf_sim_in);
+    hf_sim_in.resampler = "sinc"; hf_sim_sinc = ber_test(hf_sim_in);
 
     % Plot results --------------------
 
@@ -291,11 +315,12 @@ function run_curves
     hold on;
     semilogy(sim_in.EbNovec, awgn_sim_lin2.bervec,'bo-;AWGN sim lin2;','markersize', 10, 'linewidth', 2)
     semilogy(sim_in.EbNovec, awgn_sim_mean4.bervec,'bx-;AWGN sim mean4;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_sim_sinc.bervec,'b*-;AWGN sim sinc;','markersize', 10, 'linewidth', 2)
     semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;','markersize', 10, 'linewidth', 2)
     semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'g+-;HF sim ideal;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_nearest.bervec,'b+-;HF sim nearest;','markersize', 10, 'linewidth', 2)
     semilogy(hf_sim_in.EbNovec, hf_sim_lin2.bervec,'bo-;HF sim lin2;','markersize', 10, 'linewidth', 2)
     semilogy(hf_sim_in.EbNovec, hf_sim_mean4.bervec,'bx-;HF sim mean4;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_sinc.bervec,'b*-;HF sim sinc;','markersize', 10, 'linewidth', 2)
     hold off;
     xlabel('Eb/No (dB)')
     ylabel('BER')

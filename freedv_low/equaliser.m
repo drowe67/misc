@@ -77,6 +77,7 @@ function sim_out = ber_test(sim_in)
 
     bps     = 2;     % two bits/symbol for QPSK
     Rs      = 50;    % symbol rate (needed for HF model)
+    Ts      = 1/Rs;
     Np      = 8;     % one pilot every Np symbols
 
     verbose = sim_in.verbose;
@@ -158,41 +159,57 @@ function sim_out = ber_test(sim_in)
         noise = sqrt(variance*0.5)*(randn(1,nsymb) + j*randn(1,nsymb));
         rx_symb += noise;
 
-        % demodulator ------------------------------------------
+        % equaliser ------------------------------------------
 
-        % equalise using pilots
-        rx_pilots = rx_symb(1:Np:nsymb);
-        rx_equal = zeros(1,nsymb);
+        rx_symb_t = Ts*(0:nsymb-1);          % symbol times
+        rx_pilots = rx_symb(1:Np:nsymb);     % extract pilots
+        rx_pilots_t = Ts*(0:Np:nsymb-1);     % pilot times
+        rx_ch = zeros(1,nsymb);              % channel estimate
 
-        % TODO: params for each resampler, make resampler a sim_in choice
         if strcmp(sim_in.resampler,"sinc")
           filter_delay = -1.5;
           B=pi; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h);
           rx_pilots_filtered = filter(h,1,rx_pilots);
         end
         if strcmp(sim_in.resampler,"nearest")
-          filter_delay = 0;
-          rx_pilots_filtered = rx_pilots;
+          % use nearest pilot
+          for s=0:nsymb-1
+            ind = round(s/Np)+1;
+            ind = min(length(rx_pilots),ind); ind = max(1,ind);
+            rx_ch(s+1) = rx_pilots(ind);
+            rx_symb(s+1) *= exp(-j*angle(rx_ch(s+1)));
+          end
+        end
+        if strcmp(sim_in.resampler,"lin2")
+          % linear interpolation between two nearest pilots
+        rx_ch = interp1(rx_pilots_t,rx_pilots,rx_symb_t);
           for s=1:nsymb
-            ind = round((s-1)/Np)+1;
-            ind = min(length(rx_pilots_filtered),ind); ind = max(1,ind);
-            %printf("s: %d ind: %d\n",s,ind)
-            rx_equal(s) = rx_pilots_filtered(ind);
-            rx_symb(s) *= exp(-j*angle(rx_equal(s)));
+            rx_symb(s) *= exp(-j*angle(rx_ch(s)));
+          end
+        end
+        if strcmp(sim_in.resampler,"mean4")
+          % mean of 4 adjacent pilots
+          filter_delay = 1.5*Np*Ts;
+          h = [1 1 1 1]/4;
+          rx_pilots_filtered = filter(h,1,rx_pilots);
+          rx_ch = interp1(rx_pilots_t-filter_delay,rx_pilots_filtered,rx_symb_t,"extrap");
+          for s=1:nsymb
+            rx_symb(s) *= exp(-j*angle(rx_ch(s)));
           end
         end
 
         if verbose == 2
             figure(1); clf;
             subplot(211); hold on;
-            plot(real(ch_model));
-            stem((1:Np:nsymb), real(rx_pilots));
-            plot(real(rx_equal));
-            hold off; axis([0 nsymb -2 2]); xlabel('time (symbol)'); ylabel('real');
+            plot(rx_symb_t,real(ch_model));
+            plot(rx_pilots_t, real(rx_pilots),'ro');
+            plot(rx_symb_t,real(rx_ch));
+            hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('real');
             subplot(212); hold on;
-            plot(imag(ch_model));
-            stem((1:Np:nsymb),imag(rx_pilots));
-            hold off; axis([0 nsymb -2 2]); xlabel('time (symbol)'); ylabel('imag');
+            plot(rx_symb_t,imag(ch_model));
+            plot(rx_pilots_t, imag(rx_pilots),'ro');
+            plot(rx_symb_t,imag(rx_ch));
+            hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (symbol)'); ylabel('imag');
         end
 
         % demodulate rx symbols to bits
@@ -210,7 +227,7 @@ function sim_out = ber_test(sim_in)
         nerrors = sum(error_pattern);
         bervec(ne) = nerrors/nbits + 1E-12;
         if verbose
-          printf("EbNodB: % 4.1f nbits: %7d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
+          printf("EbNodB: % 5.1f nbits: %7d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
           if verbose == 2
             figure(2); clf;
             plot(rx_symb*exp(j*pi/4),'+','markersize', 10);
@@ -228,7 +245,7 @@ function run_single(nbits = 1000,EbNodB=100)
     sim_in.nbits     = nbits;
     sim_in.EbNovec   = EbNodB;
     sim_in.hf_en     = 2;
-    sim_in.resampler = "nearest";
+    sim_in.resampler = "mean4";
     sim_in.ch_phase  = 0;
  
     sim_qpsk = ber_test(sim_in);
@@ -239,37 +256,42 @@ function run_curves
     sim_in.verbose = 1;
     sim_in.EbNovec = 0:10;
     sim_in.hf_en   = 0;
-    sim_in.resampler = "";
+    sim_in.resampler = "mean4";
 
     % AWGN -----------------------------
 
-    ber_awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
-    sim_in.nbits    = min(max_nbits, floor(500 ./ ber_awgn_theory));
+    awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
+    sim_in.nbits  = min(max_nbits, floor(500 ./ awgn_theory));
 
-    sim_qpsk = ber_test(sim_in);
+    awgn_sim_mean4 = ber_test(sim_in);
       
     % HF -----------------------------
 
-    hf_sim_in = sim_in; hf_sim_in.dqpsk = 0; hf_sim_in.hf_en = 1;
+    hf_sim_in = sim_in; 
+    hf_sim_in.hf_en = 1;
     hf_sim_in.EbNovec = 0:16;
 
     EbNoLin = 10.^(hf_sim_in.EbNovec/10);
-    ber_hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
+    hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
 
-    hf_sim_in.nbits = min(max_nbits, floor(500 ./ ber_hf_theory));
-    sim_qpsk_hf = ber_test(hf_sim_in);
+    hf_sim_in.nbits = min(max_nbits, floor(500 ./ hf_theory));
+    hf_sim = ber_test(hf_sim_in);
     hf_sim_in.hf_en = 2;  hf_sim_in.resampler = "nearest";
-    sim_qpsk_hf_nearest = ber_test(hf_sim_in);
+    hf_sim_nearest = ber_test(hf_sim_in);
+    hf_sim_in.resampler = "lin2"; hf_sim_lin2 = ber_test(hf_sim_in);
+    hf_sim_in.resampler = "mean4"; hf_sim_mean4 = ber_test(hf_sim_in);
 
     % Plot results --------------------
 
-    figure (3, 'position', [400, 10, 600, 400]); clf;
-    semilogy(sim_in.EbNovec, ber_awgn_theory,'r+-;QPSK AWGN theory;','markersize', 10, 'linewidth', 2)
+    figure (3); clf;
+    semilogy(sim_in.EbNovec, awgn_theory,'r+-;AWGN theory;','markersize', 10, 'linewidth', 2)
     hold on;
-    semilogy(sim_in.EbNovec, sim_qpsk.bervec,'g+-;QPSK AWGN sim;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, ber_hf_theory,'r+-;QPSK HF theory;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf.bervec,'g+-;QPSK HF sim;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf_nearest.bervec,'b+-;QPSK HF nearest;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_sim_mean4.bervec,'g+-;AWGN sim mean4;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'g+-;HF sim ideal;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_nearest.bervec,'b+-;HF sim nearest;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2.bervec,'bo-;HF sim lin2;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_mean4.bervec,'bx-;HF sim mean4;','markersize', 10, 'linewidth', 2)
     hold off;
     xlabel('Eb/No (dB)')
     ylabel('BER')

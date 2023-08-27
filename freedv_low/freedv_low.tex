@@ -157,9 +157,26 @@ Thus to close the link with the composite symbol the $S/N$ must be increased by 
 
 \subsection{HF Channel Model}
 
-TODO: ref and expression, brief discussion.
+The two path HF channel model is given by:
+\begin{equation}
+y(n) = x(n)e^{j\phi_1}+x(n-dF_s)e^{j\phi_2}
+\end{equation}
+where $\phi_1$ and $\phi_2$ are two time varying, complex, Gaussian filtered random variables with bandwidth $F_d$ Hz, $d$ is the path delay in seconds and $F_s$ is the sample rate in $\si{Hz}$. As $F_d << R_s$ we assume $\phi_1$ and $\phi_2$ are stationary for the duration of a single symbol. Taking the z-transform:
+\begin{equation}
+\begin{split}
+Y(z) &= X(z)e^{j\phi_1}+X(z)z^{-dF_s}e^{j\phi_2} \\
+\frac{Y(z)}{X(z)} &= e^{j\phi_1}+z^{-dF_s}e^{j\phi_2} \\
+H(z) &= e^{j\phi_1}+z^{-dF_s}e^{j\phi_2} \\
+H(e^{j \omega}) &= e^{j\phi_1}+e^{j(\phi_2 - \omega d F_s)}
+\end{split}
+\end{equation}
+For OFDM, the angular frequency of carrier $n$ is given by $\omega=2 \pi n R_s/F_s$, which can be used to derive a single complex coefficient that describes the channel for carrier $n$:
+\begin{equation}
+H_n = e^{j\phi_1}+e^{j (\phi_2 - 2 \pi R_s d)}
+\end{equation} 
+We note there is some symmetry in the RH term in the phase between carrier $n-1$ and carrier $n+1$ which supports averaging over adjacent carriers to estimate $H_n$.
 
-\section{Waveform Improvments}
+\section{Waveform Improvements}
 
 In this section notes on (proposed) waveform improvements are presented.
 
@@ -191,7 +208,8 @@ Take away notes from analysis and simulation (TODO edit and write up properly):
 \item Have sinc interpolator working, with some adjustments to delay and bandwidth.  As bandwidth is wider, it tracks time domain pilot noise better, rather than averaging it, so poor AWGN performance.  lin2 very hard to beat on fading channels (outperforms sinc at current bandwidths), and so simple, due to oversampling.  Thickness of arms is a good indication of fading perf.   lin2 works above 2 Hz.
 \item "bandwidth" interpretation of mean4 also shows how it is impacted by fast fading.
 \item We are showing reasonable HF perf with Np=8, Ts=0.02, 1dB off hf theory for 1Hz, 2dB for 2Hz Doppler - in a single mode.  So this is progress towards our single mode goal, with 0.4dB saving in $L_p$ and bandwidth savings using $N_p=8$. It would be nice to improve slow fading/AWGN perf, and get closer to ideal HF.
-\item idea: try lin2 with adajacent carriers, to see if HF gets closer to ideal and we improve AWGN.  Accidental plotting of time domain adjacent carrier is instructive.  Phase shift of 2nd phase term of adjacent carriers is symmetrical which might help.  It is proportonal to delay spread so we may see more degredation.  lin2 AWGN now 0.5dB, but not sure if fading perf better, still around 1dB 
+\item idea: try lin2 with adajacent carriers, to see if HF gets closer to ideal and we improve AWGN.  Accidental plotting of time domain adjacent carrier is instructive.  Phase shift of 2nd phase term of adjacent carriers is symmetrical which might help.  It is proportonal to delay spread so we may see more degredation.  lin2 AWGN Improved by 1dB (now 0.5dB), fading improved about 0.5dB (now 1dB).
+\item Same Np, Lp as 700D, but works on 2 Hz (and beyond) fading.  If channel improves, users get benefit of improved perf (unlike 700E where you're stuck with needing a high SNR)).  Less use of bandwidth I think as less pilot overhead (so room for tx diversity). Potential down side is 0.5dB off AWGN for 700D, and (maybe) some loss from bigger CP.  Put perhaps longer symbol will help that.
 \end{enumerate}
 
 \subsection{Multipath}

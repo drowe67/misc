@@ -82,6 +82,8 @@ function sim_out = ber_test(sim_in)
     Ts      = 1/Rs;
     Np      = 8;     % one pilot every Np symbols
     Npad    = Np*3;  % extra symbols at end to deal with interpolator edges
+    Nc      = 3;     % number of carriers
+    Fs      = 8000;  % only used for HF channel model calculations
 
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
@@ -92,13 +94,17 @@ function sim_out = ber_test(sim_in)
     if isfield(sim_in,"ch_phase")
       ch_phase = sim_in.ch_phase;
     end
+    pilot_freq_weights = [0 1 0];
+    if isfield(sim_in,"pilot_freq_weights")
+      pilot_freq_weights = sim_in.pilot_freq_weights;
+    end
 
     % init HF model
 
     if hf_en
       % some typical values
 
-      dopplerSpreadHz = sim_in.dopplerHz; path_delay = 1E-3*Rs;
+      dopplerSpreadHz = sim_in.dopplerHz; path_delay_s = 2E-3;
 
       spread1 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
       spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
@@ -124,7 +130,7 @@ function sim_out = ber_test(sim_in)
         % modulator ------------------------
 
         tx_bits = rand(1,nbits) > 0.5;    
-        tx_symb = [];
+        tx_symb = zeros(Nc,nsymb);
         prev_tx_symb = 1;
         for s=1:nsymb
             % insert pilot every Np symbols
@@ -132,13 +138,17 @@ function sim_out = ber_test(sim_in)
               tx_bits(2*s-1:2*s) = [0 0];
             end
             atx_symb = qpsk_mod(tx_bits(2*s-1:2*s));
-            tx_symb = [tx_symb atx_symb];
+            tx_symb(1,s) = atx_symb;
+        end
+        % set up parallel carriers, only middle one carries data
+        for c=2:Nc
+          tx_symb(c,:) = tx_symb(1,:);
         end
 
         % channel ---------------------------
 
         rx_symb = tx_symb;
-        ch_model = ones(1,nsymb).*exp(j*ch_phase);
+        ch_model = ones(Nc,nsymb).*exp(j*ch_phase);
 
         if hf_en
 
@@ -146,9 +156,14 @@ function sim_out = ber_test(sim_in)
           % ISI, just per carrier freq-domain filtering by a single
           % complex coefficient.
 
-          hf_model = zeros(1, nsymb);
+          hf_model = zeros(Nc, nsymb);
           for s=1:nsymb 
-            hf_model(s) = hf_gain*(spread1(s) + exp(-j*path_delay)*spread2(s));
+            for c=1:Nc
+              % middle carrier at 0 Hz, note Fs cancels
+              w = 2*pi*(c-2)*Rs/Fs;
+              d = path_delay_s*Fs;
+              hf_model(c,s) = hf_gain*(spread1(s) + exp(-j*d*w)*spread2(s));
+            end
            end
           if hf_en == 1
             ch_model = ch_model .* abs(hf_model);
@@ -160,15 +175,20 @@ function sim_out = ber_test(sim_in)
 
         % variance is noise power, which is divided equally between real and
         % imag components of noise
-        noise = sqrt(variance*0.5)*(randn(1,nsymb) + j*randn(1,nsymb));
+        noise = sqrt(variance*0.5)*(randn(Nc,nsymb) + j*randn(Nc,nsymb));
         rx_symb += noise;
 
         % equaliser ------------------------------------------
 
         rx_symb_t = Ts*(0:nsymb-1);          % symbol times
-        rx_pilots = rx_symb(1:Np:nsymb);     % extract pilots
+        % extract pilots, filtering across freq
+        rx_pilots = zeros(1,nsymb/Np);
+        for c=1:Nc
+          rx_pilots += pilot_freq_weights(c)*rx_symb(c,1:Np:nsymb);   
+        end
+        rx_pilots ./= sum(pilot_freq_weights);
         rx_pilots_t = Ts*(0:Np:nsymb-1);     % pilot times
-        rx_ch = zeros(1,nsymb);              % channel estimate
+        rx_ch = zeros(1,nsymb);              % channel estimate of centre carrier
 
         % bunch of options for resampler, takes pilots and estimates channel
 
@@ -208,7 +228,7 @@ function sim_out = ber_test(sim_in)
         % actual equalisation (just of phase)
         if hf_en != 1
            for s=1:nsymb
-              rx_symb(s) *= exp(-j*angle(rx_ch(s)));
+              rx_symb(2,s) *= exp(-j*angle(rx_ch(s)));
            end
         end
 
@@ -226,8 +246,8 @@ function sim_out = ber_test(sim_in)
             hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (symbol)'); ylabel('imag');
         end
 
-        % remove padding at end as equaliser invalid
-        rx_symb = rx_symb(1:end-Npad);
+        % extract centre carrier, remove padding at end as equaliser invalid
+        rx_symb = rx_symb(2,1:end-Npad);
         nsymb -= Npad;
  
         % demodulate rx symbols to bits
@@ -259,6 +279,7 @@ function sim_out = ber_test(sim_in)
 endfunction
 
 function run_single(nbits = 1000,EbNodB=100,resampler="sinc", dopplerHz=1.0)
+    sim_in.pilot_freq_weights = [1 1 1];
     sim_in.verbose   = 2;
     sim_in.nbits     = nbits;
     sim_in.EbNovec   = EbNodB;
@@ -281,6 +302,7 @@ function run_curves
     sim_in.EbNovec = 0:10;
     sim_in.hf_en   = 0;
     sim_in.resampler = "";
+    sim_in.pilot_freq_weights = [0.5 1 0.5];
 
     % AWGN -----------------------------
 
@@ -290,13 +312,14 @@ function run_curves
     sim_in.resampler = "lin2"; awgn_sim_lin2 = ber_test(sim_in);
     sim_in.resampler = "mean4"; awgn_sim_mean4 = ber_test(sim_in);
     sim_in.resampler = "sinc"; awgn_sim_sinc = ber_test(sim_in);
-      
+     
     % HF -----------------------------
 
     hf_sim_in = sim_in; 
     hf_sim_in.hf_en = 1;
     hf_sim_in.EbNovec = 0:16;
     hf_sim_in.dopplerHz = 1.0;
+    hf_sim_in.pilot_freq_weights = [0.5 1 0.5];
 
     EbNoLin = 10.^(hf_sim_in.EbNovec/10);
     hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));

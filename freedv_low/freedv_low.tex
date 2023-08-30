@@ -36,8 +36,9 @@
  Symbol & Explanation & Units \\
  \hline
  $B$ & Noise bandwidth & Hz \\
+ $B_d$ & Doppler spreading bandwidth for HF channel model & Hz \\
  $E_b/N_0$ & Energy per bit on spectral noise density & dimensionless, dB\footnote{1} \\
- $N_s$ & Spacing between pilots (pilot insertion rate) & - \\
+ $N_p$ & Pilot insertion rate & dimensionless \\
  $R_b$ & Bit rate & Bits/second \\
  $R_s$ & Symbol rate & symbols/second \\
  $T_s$ & Symbol period & seconds \\
@@ -97,12 +98,12 @@ TODO: Discuss Available bandwidth. 2000 Hz, using QPSK we can get 4000 bits/s.  
 
 \subsection{Pilot symbol overhead}
 
-In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_s-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a \emph{frame}. The frame of $N_s-1$ symbols has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_s$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
+In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_p-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a modem \emph{modem frame}. The frame of $N_p-1$ symbols has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_p$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
 \begin{equation}
 \begin{split}
 T_f &= T^\prime_f \\
-(N_s-1)T_s &= N_sT_s \\
-R^\prime_s &= R_s\frac{N_s}{N_s-1}
+(N_p-1)T_s &= N_pT_s \\
+R^\prime_s &= R_s\frac{N_p}{N_p-1}
 \end{split}
 \end{equation}
 where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ (\ref{eq:snr}) in terms of $E_s$ and $R_s$:
@@ -111,11 +112,11 @@ where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ (\ref{eq:snr}) in terms of 
 \begin{split}
 \frac{S}{N} &= \frac{E_sR_s}{N_0B} \\
 \frac{S}{N}^\prime &= \frac{E_sR^\prime_s}{N_0B} \\
-                   &= \frac{E_bR_sN_s}{N_0B(N_s-1)} \\
-\frac{S^\prime/N}{S/N} &= \frac{N_s}{N_s-1}
+                   &= \frac{E_bR_sN_s}{N_0B(N_p-1)} \\
+\frac{S^\prime/N}{S/N} &= \frac{N_p}{N_p-1}
 \end{split}
 \end{equation}
-Thus when we insert pilots, the threshold $S/N$ increases by a factor of $N_s/(N_s-1)$. Expressed in $\si{dB}$:
+Thus when we insert pilots, the threshold $S/N$ increases by a factor of $N_p/(N_p-1)$. Expressed in $\si{dB}$:
 \begin{equation}
 \begin{split}
 10log_{10}\left(\frac{S^\prime}{N}\right) &= 10log_{10}\left(\frac{S}{N}\right) + 10log_{10}\left(\frac{N_s}{N_s-1}\right) \\
@@ -157,24 +158,28 @@ Thus to close the link with the composite symbol the $S/N$ must be increased by 
 
 \subsection{HF Channel Model}
 
-The two path HF channel model is given by:
+The two path HF channel model \cite{itu1487} is given by:
 \begin{equation}
-y(n) = x(n)e^{j\phi_1}+x(n-dF_s)e^{j\phi_2}
+y(t) = x(t)G_1(t) + x(t-d)G_2(t)
 \end{equation}
-where $\phi_1$ and $\phi_2$ are two time varying, complex, Gaussian filtered random variables with bandwidth $F_d$ Hz, $d$ is the path delay in seconds and $F_s$ is the sample rate in $\si{Hz}$. As $F_d << R_s$ we assume $\phi_1$ and $\phi_2$ are stationary for the duration of a single symbol. Taking the z-transform:
+where $G_1$ and $G_2$ are two time varying, complex, Gaussian filtered random variables with \emph{Doppler Spread} bandwidth $B_d$ Hz, $d$ is the path delay in seconds. As $B_d<< R_s$ we assume $G_1$ and $G_2$ are complex constants for the duration of a single symbol. Expressed in discrete time for the current symbol:
+\begin{equation}
+y(n) = x(n)G_1 + x(n-dF_s)G_2
+\end{equation}
+where $F_s$ is the sample rate in $\si{Hz}$.  Taking the z-transform:
 \begin{equation}
 \begin{split}
-Y(z) &= X(z)e^{j\phi_1}+X(z)z^{-dF_s}e^{j\phi_2} \\
-\frac{Y(z)}{X(z)} &= e^{j\phi_1}+z^{-dF_s}e^{j\phi_2} \\
-H(z) &= e^{j\phi_1}+z^{-dF_s}e^{j\phi_2} \\
-H(e^{j \omega}) &= e^{j\phi_1}+e^{j(\phi_2 - \omega d F_s)}
+Y(z) &= X(z)G_1+X(z)z^{-dF_s}G_2 \\
+\frac{Y(z)}{X(z)} &= G_1+z^{-dF_s}G_2 \\
+H(z) &= G_1+z^{-dF_s}G_2 \\
+H(e^{j \omega}) &= G_1+e^{-j \omega d F_s}G_2
 \end{split}
 \end{equation}
 For OFDM, the angular frequency of carrier $n$ is given by $\omega=2 \pi n R_s/F_s$, which can be used to derive a single complex coefficient that describes the channel for carrier $n$:
 \begin{equation}
-H_n = e^{j\phi_1}+e^{j (\phi_2 - 2 \pi R_s d)}
+\label{eq:hf_model}
+H_n = G_1+e^{-j 2 \pi R_s d}G_2
 \end{equation} 
-We note there is some symmetry in the RH term in the phase between carrier $n-1$ and carrier $n+1$ which supports averaging over adjacent carriers to estimate $H_n$.
 
 \section{Waveform Improvements}
 
@@ -210,7 +215,36 @@ Take away notes from analysis and simulation (TODO edit and write up properly):
 \item We are showing reasonable HF perf with Np=8, Ts=0.02, 1dB off hf theory for 1Hz, 2dB for 2Hz Doppler - in a single mode.  So this is progress towards our single mode goal, with 0.4dB saving in $L_p$ and bandwidth savings using $N_p=8$. It would be nice to improve slow fading/AWGN perf, and get closer to ideal HF.
 \item idea: try lin2 with adajacent carriers, to see if HF gets closer to ideal and we improve AWGN.  Accidental plotting of time domain adjacent carrier is instructive.  Phase shift of 2nd phase term of adjacent carriers is symmetrical which might help.  It is proportonal to delay spread so we may see more degredation.  lin2 AWGN Improved by 1dB (now 0.5dB), fading improved about 0.5dB (now 1dB).
 \item Same Np, Lp as 700D, but works on 2 Hz (and beyond) fading.  If channel improves, users get benefit of improved perf (unlike 700E where you're stuck with needing a high SNR)).  Less use of bandwidth I think as less pilot overhead (so room for tx diversity). Potential down side is 0.5dB off AWGN for 700D, and (maybe) some loss from bigger CP.  Put perhaps longer symbol will help that.
+\item When correct 4ms delay used for MPD, freq weighting breaks it!  This is explained by (\ref{eq:hf_model}), as $d$ increases phase shift between carriers is greater.  Unfortunately this implies different phase estimators for different channels, something we would like to avoid. Parallel demodulators might be a reasonable approach here - try two different phase estimators.
 \end{enumerate}
+
+Combining pilots from adjacent carriers is used in FreeDV 700D to reduce estimation noise.  Examining (\ref{eq:hf_model}) we can see some symmetry in the RH term in the phase between carrier $n-1$ and carrier $n+1$ which supports averaging over adjacent carriers to estimate $H_n$, especially when the term $2 \pi R_s d$ is small.  A more robust approach is to perform a least squares fit of three equations with $G_1$ and $G_2$ as the two unknowns, and $H_{-1}, H_0, H_1$ as the three pilot samples centred around the current carrier:
+\begin{equation}
+\begin{split}
+G_1 + G_2 e^{j 2 \pi R_sd} &= H_{-1} \\
+G_1 + G_2 &= H_{0} \\
+G_1 + G_2 e^{-j 2 \pi R_sd} &= H_{1} \\
+\begin{bmatrix}
+  1 & e^{j 2 \pi R_sd} \\
+  1 & 1 \\
+  1 & e^{-j 2 \pi R_sd}
+\end{bmatrix} 
+\begin{bmatrix}
+  G_1 \\
+  G_2
+\end{bmatrix} 
+&= \begin{bmatrix}
+  H_{-1} \\
+  H_{0} \\
+  H_{1}
+\end{bmatrix} \\
+Ag &= h \\
+ g &= (A^TA)^{-1}A^Th \\
+ \overline{H_0} &= G_1 + G_2
+\end{split}
+\end{equation} 
+
+where $\overline{H_0}$ is the smoothed estimate of the current carriers pilot symbol.  The $(A^TA)^{-1}A^T$ term can be precomputed as all the parameters of $A$ are known. 
 
 \subsection{Multipath}
 

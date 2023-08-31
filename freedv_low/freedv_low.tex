@@ -2,13 +2,27 @@
 \usepackage{amsmath}
 \usepackage{array}
 \usepackage{siunitx}  
+\usepackage{tikz}
+\usepackage{tkz-euclide}
+\usepackage[numbib]{tocbibind}
 \begin{document}
 
 \title{Low SNR FreeDV Mode}
 \author{David Rowe VK5DGR}
 \maketitle
 
-\section{Glossary}
+
+\section{Introduction}
+
+After 10 years development and on air experience with various FreeDV waveforms, we would like to develop a new waveform that outperforms and replaces a variety of existing modes such as 700C/D/E and 1600.  Requirements include \cite{freedv-020}:
+\begin{enumerate}
+\item Better performance than SSB at 0dB SNR on MPP and MPD channels.
+\item A single mode that can handle MPP, MPD, GEO (e.g. QO-100), and replace several existing FreeDV modes, simplifying the end user experience.
+\item For compliance with Export Control regulations, the minimum speech codec bit rate is 700 bit/s.
+\end{enumerate}
+It is acceptable for performance to gradually decrease as the multipath channel quality declines, but we would like the decline to be gradual, e.g. a few dB more power for operation on MPD versus MPP.
+
+This document explores ways we can improve the existing OFDM modem waveforms in order to meet these requirements.
 
 \begin{table}[h]
 \centering
@@ -52,17 +66,7 @@
 
 \footnotetext[1]{Can be expressed as a linear ratio $E_b/N_0$ or $10log_{10}(E_b/N_0)$ dB}
 
-\section{Introduction}
-
-After 10 years development and on air experience with various FreeDV waveforms, we would like to develop a new waveform that outperforms and replaces a variety of existing modes such as 700C/D/E and 1600.  Requirements include \cite{freedv-020}:
-\begin{enumerate}
-\item Better performance than SSB at 0dB SNR on MPP and MPD channels.
-\item A single mode that can handle MPP, MPD, GEO (e.g. QO-100), and replace several existing FreeDV modes, simplifying the end user experience.
-\item For compliance with Export Control regulations, the minimum speech codec bit rate is 700 bit/s.
-\end{enumerate}
-It is acceptable for performance to gradually decrease as the multipath channel quality declines, but we would like the decline to be gradual, e.g. a few dB more power for operation on MPD versus MPP.
-
-This document explores ways we can improve the existing OFDM modem waveforms in order to meet these requirements.
+\clearpage
 
 \section{Modem and Channel Models}
 
@@ -97,6 +101,29 @@ where $L_p$ is the loss from power allocated to pilot symbols, $L_{il}$ is the r
 TODO: Discuss Available bandwidth. 2000 Hz, using QPSK we can get 4000 bits/s.  Less overheads (which can be expressed as SNR or bandwidth reduction?).  We have 700 bits/s source code or 1400 bits/s with rate 0.5 FEC.
 
 \subsection{Pilot symbol overhead}
+
+\begin{figure}[h]
+\caption{Modem Frame with $N_p=8$, the first pilot of the next modem frame is also shown.}
+\vspace{5mm}
+\label{fig:modem_frame}
+\centering
+\begin{tikzpicture}
+\draw[thick,->] (0,0.5) -- (11,0.5) node [below]{time};
+\draw (1,1) -- (10,1) -- (10,2) -- (1,2) -- (1,1);
+\draw (2,1) -- (2,2); \draw (3,2) -- (3,1); \draw (4,2) -- (4,1);
+\draw (5,1) -- (5,2); \draw (6,2) -- (6,1); \draw (7,2) -- (7,1);
+\draw (8,2) -- (8,1); \draw (9,2) -- (9,1);
+\node[align=center] at (1.5,1.5) {P}; \node[align=center] at (9.5,1.5) {P};
+\foreach \x in {2,3,4,5,6,7,8}
+  \node[align=center] at (\x.5,1.5) {D};
+\draw (2,2.25) -- (2,2.75); \draw (9,2.25) -- (9,2.75); 
+\draw [<->] (2,2.5) -- (9,2.5);
+\node[align=center] at (5.5,3) {$T_f$};
+\draw (1,3.25) -- (1,3.75); \draw (9,3.25) -- (9,3.75); 
+\draw [<->] (1,3.5) -- (9,3.5);
+\node[align=center] at (5.5,4) {$T^\prime_f$};
+\end{tikzpicture}
+\end{figure}
 
 In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_p-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a modem \emph{modem frame}. The frame of $N_p-1$ symbols has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_p$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
 \begin{equation}
@@ -279,6 +306,8 @@ This section presents topics useful to explore in future.
 \item Wades MAP techniques (ref).  This has a lot of promise, need an effective way to simulate and establish benefit with a modest amount of work.  Without a rate 0.5 code this would free up a lot of bandwidth to deal with ISI better, e.g. we could have large gaps between symbols.  Or use parallel tone modem to reduce effects of ISI.  A high rate code on top of this may be useful option (if it can converge).   Can we combine MAP with extra bits?  Index optimisation also a simple approach.
 \end{itemize} 
 
+\nocite{*}
 \bibliographystyle{plain}
 \bibliography{freedv_low_refs}
 \end{document}
+

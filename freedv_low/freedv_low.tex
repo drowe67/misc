@@ -24,6 +24,10 @@ It is acceptable for performance to gradually decrease as the multipath channel 
 
 This document explores ways we can improve the existing OFDM modem waveforms in order to meet these requirements.
 
+\clearpage
+
+\subsection{Glossary}
+
 \begin{table}[h]
 \centering
 \begin{tabular}{l p{8cm} }
@@ -103,7 +107,7 @@ TODO: Discuss Available bandwidth. 2000 Hz, using QPSK we can get 4000 bits/s.  
 \subsection{Pilot symbol overhead}
 
 \begin{figure}[h]
-\caption{Modem Frame with $N_p=8$, the first pilot of the next modem frame is also shown.}
+\caption{Modem Frame with $N_p=8$, the pilot of the next modem frame is also shown.}
 \vspace{5mm}
 \label{fig:modem_frame}
 \centering
@@ -151,13 +155,40 @@ SNR^\prime &= SNR + 10log_{10}\left(\frac{N_s}{N_s-1}\right) \\
 SNR^\prime &= SNR + L_p  \quad [\si{dB}]
 \end{split}
 \end{equation}
-where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example FreeDV 700D uses a pilot insertion rate of $N_s=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to acheive the threshold SNR for the voice link.
+where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example FreeDV 700D uses a pilot insertion rate of $N_s=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to acheive the threshold SNR for the voice link.  To maintain $Rs=700$ data symbols/second over the channel, we require $R^\prime_s = (700)8/7 =800$ symbols/second which introduces a bandwidth overhead.
 
 \subsection{Cyclic Prefix Overhead}
 
-TODO- fix, sould just be one factor of $1 - T_{cp}/T_s$ I think.
+\begin{figure}[h]
+\caption{Construction of composite symbol with a Cyclic Prefix CP pre-pended to a shortened data symbol $D^\prime$.}
+\vspace{5mm}
+\label{fig:composite_symbol}
+\centering
+\begin{tikzpicture}
+\draw[thick,->] (0,0.5) -- (7,0.5) node [below]{time};
 
-Now we consider the SNR overhead for the Cycle Prefix (CP) used in OFDM modems to cope with delay spread on multipath channels.  To achieve our payload data rate (e.g. 700 bits/s), we send symbols $D$ across the channel at a constant symbol rate $R_s$, or one symbol every $T=T_s$ seconds.  To cope with delay spread, we construct a composite symbol by pre-pending a Cyclic Prefix (CP) $T_{cp}$ seconds in duration to a new symbol $D^\prime$ of $T^\prime_s$ seconds in duration.  $D$ and $D^\prime$ contain the same PSK symbol, and convey the same information over the channel. The new composite symbol is now $T^\prime = T_{cp}+T^\prime_s$ seconds long.  The CP contains no additional information, it is just an extension of the single symbol $D^\prime$. Thus we still send one symbol of data over the channel every $T^\prime$ seconds.  To maintain the payload data rate over the channel, we must send the new composite symbol at the same rate as the original symbol:
+\draw (1,1) -- (6,1) -- (6,2) -- (1,2) -- (1,1);
+\node[align=center] at (3.5,1.5) {D};
+
+\draw (1,2.25) -- (1,2.75); \draw (6,2.25) -- (6,2.75); 
+\draw [<->] (1,2.5) -- (6,2.5);
+\node[align=center] at (3.5,2.75) {$T_s$};
+
+\draw (1,3) -- (6,3) -- (6,4) -- (1,4) -- (1,3);
+\draw (2,3) -- (2,4);
+\node[align=center] at (3.5,3.5) {$D^\prime$};
+\node[align=center] at (1.5,3.5) {$CP$};
+
+\draw (1,4.25) -- (1,4.75); \draw (2,4.25) -- (2,4.75); \draw (6,4.25) -- (6,4.75); 
+\draw [<->] (1,4.5) -- (2,4.5);
+\node[align=center] at (1.5,4.75) {$T_{cp}$};
+\draw [<->] (2,4.5) -- (6,4.5);
+\node[align=center] at (3.5,4.75) {$T^\prime_s$};
+
+\end{tikzpicture}
+\end{figure}
+
+Now we consider the SNR overhead for the Cycle Prefix (CP) used in OFDM modems to cope with delay spread on multipath channels.  To achieve our payload data rate (e.g. 700 bits/s), we send symbols $D$ across the channel at a constant symbol rate $R_s$, or one symbol every $T=T_s$ seconds.  To cope with delay spread, we construct a composite symbol by pre-pending a Cyclic Prefix (CP) $T_{cp}$ seconds in duration to a new symbol $D^\prime$ of $T^\prime_s$ seconds in duration.  $D$ and $D^\prime$ contain the same PSK symbol, and convey the same information over the channel. The new composite symbol is now $T^\prime = T_{cp}+T^\prime_s$ seconds long.  The CP contains no additional information, it is just a cyclic extension of the single symbol $D^\prime$. Thus we still send one symbol of data over the channel every $T^\prime$ seconds.  To maintain the payload data rate over the channel, we must send the new composite symbol at the same rate as the original symbol:
 \begin{equation}
 \begin{split}
 T &= T^\prime \\
@@ -165,7 +196,7 @@ T_s &= T_{cp} + T^\prime_s \\
 R^\prime_s &= \frac{R_s}{1 - T_{cp}/T_s}
 \end{split}
 \end{equation}
-It can be observed that $R^\prime_s > R_s$, to account for the portion of the composite symbol allocated to the CP.  For example with $R_s=700$, $T_s=0.02$, $T_{cp}=0.002$, $R^\prime_s=700/(1-0.002/0.02)=777.78$ symbols/second.
+It can be observed that $R^\prime_s > R_s$, to account for the portion of the composite symbol allocated to the CP.  For example with $R_s=700$, $T_s=0.02$, $T_{cp}=0.002$, $R^\prime_s=700/(1-0.002/0.02)=777.78$ symbols/second.  Thus additional bandwidth is required to send the composite symbol including the cyclic prefix.
 
 For the composite signal, the transmitter power $S$ is spread between the CP and $D^\prime$: 
 \begin{equation}
@@ -176,12 +207,11 @@ Only the RH term contributes to the demodulation of $D^\prime$:
 \begin{split}
 \frac{S(1-T_{cp}/T_s)}{N} &= \frac{E_sR^\prime_s}{N_0B} \\
 \frac{S}{N} &= \frac{E_sR^\prime_s}{N_0B}\frac{1}{(1-T_{cp}/T_s)}\\
-            &= \frac{E_sR_s}{N_0B}\frac{1}{(1-T_{cp}/T_s)^2} \\
-SNR         &= 10log10 \left( \frac{E_sR_s}{N_0B} \right) - 20log10(1-T_{cp}/T_s) \\
-            &= 10log10 \left( \frac{E_sR_s}{N_0B} \right) + L_{cp} \quad [\si{dB}]
+SNR         &= 10log_{10} \left( \frac{E_sR^\prime_s}{N_0B} \right) - 10log_{10}(1-T_{cp}/T_s) \\
+            &= 10log_{10} \left( \frac{E_sR^\prime_s}{N_0B} \right) + L_{cp} \quad [\si{dB}]
 \end{split}
 \end{equation}
-Thus to close the link with the composite symbol the $S/N$ must be increased by a factor of $1/(1 - {T_s}/T_{cp})^2$ compared to our ideal modem.  This accounts for the energy allocated to the CP, and the shorter period $T^\prime_s$ of the symbol $D^\prime$.  The squared term suggest SNR is quite sensitive to increasing $T_{cp}$, which is necessary to handle fast fading, high delay spread channels such as MPD. For example FreeDV 700E has $Ts=0.02$, $T_{cp}=0.006$, giving $L_{cp}=-20log10(1-0.006/0.02)=3.1 \si{dB}$.
+Thus to close the link with the composite symbol the $S/N$ must be increased by a factor of $1/(1 - {T_s}/T_{cp})$ compared to our ideal modem, to account for the energy allocated to the CP.  For example FreeDV 700E has $T_s=0.02$, $T_{cp}=0.006$, giving $L_{cp}=-10log10(1-0.006/0.02)=1.55 \si{dB}$.
 
 \subsection{HF Channel Model}
 

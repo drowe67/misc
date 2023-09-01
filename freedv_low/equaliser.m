@@ -171,11 +171,11 @@ function sim_out = ber_test(sim_in)
               hf_model(c,s) = hf_gain*(spread1(s) + exp(-j*a*w)*spread2(s));
             end
            end
-          if sim_in.ideal_phase == 1
-            ch_model = ch_model .* abs(hf_model);
-          else
-            ch_model = ch_model .* hf_model;
-          end
+           if sim_in.ideal_phase == 1
+             ch_model = ch_model .* abs(hf_model);
+           else
+             ch_model = ch_model .* hf_model;
+           end
         end
         rx_symb = rx_symb.*ch_model;
 
@@ -320,7 +320,6 @@ function run_curves
     sim_in.ch = "awgn";
     sim_in.hf_en   = 0;
     sim_in.resampler = "";
-    sim_in.pilot_freq_weights = [0 1 0];
     sim_in.ideal_phase = 0;
     sim_in.ls_pilots = 0;
 
@@ -329,11 +328,10 @@ function run_curves
     awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
     sim_in.nbits  = min(max_nbits, floor(500 ./ awgn_theory));
 
-    sim_in.resampler = "lin2"; awgn_sim_lin2 = ber_test(sim_in);
-    sim_in.resampler = "mean4"; awgn_sim_mean4 = ber_test(sim_in);
     sim_in.pilot_freq_weights = [1 1 1];
-    sim_in.resampler = "mean4"; awgn_sim_mean4w = ber_test(sim_in);
-    sim_in.resampler = "lin2"; awgn_sim_lin2w = ber_test(sim_in);
+    sim_in.resampler = "mean4"; awgn_sim_mean12 = ber_test(sim_in);
+    sim_in.pilot_freq_weights = [0 1 0];
+    sim_in.resampler = "lin2"; awgn_sim_lin2 = ber_test(sim_in);
     sim_in.ls_pilots = 1; awgn_sim_lin2ls = ber_test(sim_in);
      
     % HF -----------------------------
@@ -341,8 +339,7 @@ function run_curves
     hf_sim_in = sim_in; 
     hf_sim_in.EbNovec = 0:16;
     hf_sim_in.ch = "mpp";
-    hf_sim.ideal_phase = 1;
-    hf_sim_in.pilot_freq_weights = [0 1 0];
+    hf_sim_in.ideal_phase = 1;
     hf_sim_in.ls_pilots = 0;
 
     EbNoLin = 10.^(hf_sim_in.EbNovec/10);
@@ -353,46 +350,40 @@ function run_curves
     hf_sim_in.nbits = max(2000, floor(500 ./ hf_theory));
 
     hf_sim = ber_test(hf_sim_in);
-    hf_sim.ideal_phase = 0;
-    hf_sim_in.resampler = "lin2"; hf_sim_lin2 = ber_test(hf_sim_in);
-    hf_sim_in.resampler = "mean4"; hf_sim_mean4 = ber_test(hf_sim_in);
+    hf_sim_in.ideal_phase = 0;
     hf_sim_in.pilot_freq_weights = [1 1 1];
-    hf_sim_in.resampler = "lin2"; hf_sim_lin2w = ber_test(hf_sim_in);
-    hf_sim_in.resampler = "mean4"; hf_sim_mean4w = ber_test(hf_sim_in);
+    hf_sim_in.resampler = "mean4"; hf_sim_mean12 = ber_test(hf_sim_in);
+    hf_sim_in.pilot_freq_weights = [0 1 0];
+    hf_sim_in.resampler = "lin2"; hf_sim_lin2 = ber_test(hf_sim_in);
+    hf_sim_in.ls_pilots = 1; hf_sim_lin2ls = ber_test(hf_sim_in);
 
-    hf_sim_in.resampler = "lin2"; hf_sim_in.ls_pilots = 1;
-    hf_sim_lin2ls = ber_test(hf_sim_in);
-
-    hf_sim_in.pilot_freq_weights = [0 1 0]; hf_sim_in.ls_pilots = 0;
     hf_sim_in.ch = "mpd";
+    hf_sim_in.pilot_freq_weights = [1 1 1]; hf_sim_in.ls_pilots = 0;
+    hf_sim_in.resampler = "mean4"; hf_sim_mean12_mpd = ber_test(hf_sim_in);
+    hf_sim_in.pilot_freq_weights = [0 1 0];
     hf_sim_in.resampler = "lin2"; hf_sim_lin2_mpd = ber_test(hf_sim_in);
-    hf_sim_in.resampler = "mean4"; hf_sim_mean4_mpd = ber_test(hf_sim_in);
-
-    hf_sim_in.resampler = "lin2"; hf_sim_in.ls_pilots = 1;
-    hf_sim_lin2ls_mpd = ber_test(hf_sim_in);
+    hf_sim_in.ls_pilots = 1; hf_sim_lin2ls_mpd = ber_test(hf_sim_in);
 
     % Plot results --------------------
 
     figure (3); clf;
     semilogy(sim_in.EbNovec, awgn_theory,'r+-;AWGN theory;','markersize', 10, 'linewidth', 2)
     hold on;
-    semilogy(sim_in.EbNovec, awgn_sim_lin2.bervec,'bo-;AWGN sim lin2;','markersize', 10, 'linewidth', 2)
-    %semilogy(sim_in.EbNovec, awgn_sim_mean4.bervec,'bx-;AWGN sim mean4;','markersize', 10, 'linewidth', 2)
-    %semilogy(sim_in.EbNovec, awgn_sim_lin2w.bervec,'co-;AWGN sim lin2w;','markersize', 10, 'linewidth', 2)
-    semilogy(sim_in.EbNovec, awgn_sim_mean4w.bervec,'cx-;AWGN sim mean4w;','markersize', 10, 'linewidth', 2)
-    semilogy(sim_in.EbNovec, awgn_sim_lin2ls.bervec,'b*-;AWGN sim lin2ls;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_sim_mean12.bervec,'b+-;AWGN sim mean12;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_sim_lin2.bervec,'g+-;AWGN sim lin2;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_sim_lin2ls.bervec,'m+-;AWGN sim lin2ls;','markersize', 10, 'linewidth', 2)
 
     semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'g+-;HF sim ideal MPP;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_lin2.bervec,'bo-;HF sim MPP lin2;','markersize', 10, 'linewidth', 2)
-    %semilogy(hf_sim_in.EbNovec, hf_sim_mean4.bervec,'bx-;HF sim MPP mean4;','markersize', 10, 'linewidth', 2)
-    %semilogy(hf_sim_in.EbNovec, hf_sim_lin2w.bervec,'co-;HF sim MPP lin2w;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_mean4w.bervec,'cx-;HF sim MPP mean4w;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.bervec,'b*-;HF sim MPP lin2ls;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'c+-;HF sim ideal MPP;','markersize', 10, 'linewidth', 2)
+    hf_sim.bervec
 
-    semilogy(hf_sim_in.EbNovec, hf_sim_lin2_mpd.bervec,'mo-;HF sim lin2 MPD;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_mean4_mpd.bervec,'mx-;HF sim mean4 MPD;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls_mpd.bervec,'b*-;HF sim lin2ls MPD;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_mean12.bervec,'bx-;HF sim mean12 MPP;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2.bervec,'gx-;HF sim lin2 MPP;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.bervec,'mx-;HF sim lin2ls MPP;','markersize', 10, 'linewidth', 2)
+
+    semilogy(hf_sim_in.EbNovec, hf_sim_mean12_mpd.bervec,'bo-;HF sim mean12 MPD;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2_mpd.bervec,'go-;HF sim lin2 MPD;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls_mpd.bervec,'mo-;HF sim lin2ls MPD;','markersize', 10, 'linewidth', 2)
 
     hold off;
     xlabel('Eb/No (dB)')

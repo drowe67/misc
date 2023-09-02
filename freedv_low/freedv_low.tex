@@ -40,8 +40,8 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
  LEO & Low earth orbit satellite channel, AWGN with large freq offset and Doppler shift (high rate of change of freq offset) \\
  GEO & Geosynchronous satellite channel, AWGN but high phase noise and large freq offset \\
  PTT & Push To Talk - voice communications where only one person is transmitting at any one time.  Common in two way radio but not mobile telephones  \\
- MPP & Multipath Poor channel, 1 Hz Doppler, 2ms delay spread, typical for US and Australian interstate propogation \\
- MPD & Multipath Disturbed channel, 2 Hz Doppler, 4ms delay spread, typical for UK Winter NVIS propogation \\
+ MPP & Multipath Poor channel, 1 Hz Doppler spread, 2ms delay spread, typical for US and Australian interstate propogation \\
+ MPD & Multipath Disturbed channel, 2 Hz Doppler spread, 4ms delay spread, typical for UK Winter NVIS propogation \\
  \hline
 \end{tabular}
 \caption{Glossary of Acronyms}
@@ -198,17 +198,22 @@ R^\prime_s &= \frac{R_s}{1 - T_{cp}/T_s}
 \end{equation}
 It can be observed that $R^\prime_s > R_s$, to account for the portion of the composite symbol allocated to the CP.  For example with $R_s=700$, $T_s=0.02$, $T_{cp}=0.002$, $R^\prime_s=700/(1-0.002/0.02)=777.78$ symbols/second.  Thus additional bandwidth is required to send the composite symbol including the cyclic prefix.
 
-The increase in symbol rate does not directly affect the performance if $E_b/N_0$ remains the same. For example if $Rs^\prime=2R_s$ we could send the symbol across the channel in $T_s/2$ seconds at power $2S$, followed by $T_s/2$ seconds of silence.  The energy per bit $E_b$ and average power $S$ would remain the same.
+The increase in symbol rate does not directly affect BER performance if $E_s/N_0$ remains the same. For example if $Rs^\prime=2R_s$ we could send the symbol across the channel in $T_s/2$ seconds at power $2S$, followed by $T_s/2$ seconds of silence.  The energy per symbol $E_s$ and BER would remain the same.
 
-However for the composite symbol, the transmitter power $S^\prime$ is spread between the CP and $D^\prime$: 
-\begin{equation}
-S^\prime = \frac{T_{cp}}{T_s}S^\prime + \left(1 - \frac{T_{cp}}{T_s} \right)S^\prime
-\end{equation}
-Only the RHS contributes to the demodulation of $D^\prime$.  We require the RHS to have the same power as (\ref{eq:snr}) to maintain the same $E_b$:
+For the composite symbol, the transmitter power $S^\prime$ is spread between the CP and $D^\prime$.  Given a constant power $S^\prime$, the energy for the symbol $D^\prime$ is given by:
 \begin{equation}
 \begin{split}
-S           &= \left(1 - \frac{T_{cp}}{T_s} \right)S^\prime \\
-\frac{S}{N} &= \frac{S^\prime}{N}\left(1 - \frac{T_{cp}}{T_s}\right) \\
+E^\prime_s &= \frac{S^\prime}{R^\prime_s}  \\
+           &= \frac{S^\prime}{R_s}(1 - T_{cp}/T_s)
+\end{split}
+\end{equation}
+For the link BER to be maintained the energy per symbol must be unchanged, i.e. $E^\prime_s=E_s$:
+\begin{equation}
+\begin{split}
+E_s           &= \frac{S^\prime}{R_s}(1 - T_{cp}/T_s) \\
+\frac{S}{R_s} &= \frac{S^\prime}{R_s}(1 - T_{cp}/T_s) \\
+\frac{S}{N} &= \frac{S^\prime}{N}(1 - T_{cp}/T_s) \\
+\frac{S^\prime}{N} &= \frac{S}{N}\left(\frac{1}{1 - T_{cp}/T_s}\right) \\
 SNR^\prime  &= SNR - 10log_{10}(1-T_{cp}/T_s) \\
             &= SNR + L_{cp} \quad [\si{dB}] \\
      L_{cp} &= -10log_{10}(1-T_{cp}/T_s)    
@@ -218,12 +223,13 @@ Thus to close the link with the composite symbol the $S/N$ must be increased by 
 
 \subsection{HF Channel Model}
 
-The two path HF channel model \cite{itu1487} is given by:
+A common two path HF channel model \cite{itu1487} is given by:
 \begin{equation}
 y(t) = x(t)G_1(t) + x(t-d)G_2(t)
 \end{equation}
 where $G_1$ and $G_2$ are two time varying, complex, Gaussian filtered random variables with \emph{Doppler Spread} bandwidth $B_d$ Hz, $d$ is the path delay in seconds. As $B_d<< R_s$ we assume $G_1$ and $G_2$ are complex constants for the duration of a single symbol. Expressed in discrete time for the current symbol:
 \begin{equation}
+\label{eq:hf_model_time}
 y(n) = x(n)G_1 + x(n-dF_s)G_2
 \end{equation}
 where $F_s$ is the sample rate in $\si{Hz}$.  Taking the z-transform:
@@ -235,11 +241,52 @@ H(z) &= G_1+z^{-dF_s}G_2 \\
 H(e^{j \omega}) &= G_1+e^{-j \omega d F_s}G_2
 \end{split}
 \end{equation}
-For OFDM, the angular frequency of carrier $n$ is given by $\omega=2 \pi n R_s/F_s$, which can be used to derive a single complex coefficient that describes the channel for carrier $n$:
+For OFDM, the angular frequency of carrier $c$ is given by $\omega=2 \pi c R_s/F_s$, which can be used to derive a single complex coefficient that describes the channel for carrier $c$:
 \begin{equation}
-\label{eq:hf_model}
-H_n = G_1+e^{-j 2 \pi R_s d}G_2
+\label{eq:hf_model_freq}
+H_c = G_1+e^{-j 2 \pi c R_s d}G_2
 \end{equation} 
+Lets examine the effects of intersymbol interference due to the delay spread.  Consider the transmitter sample $x(0)$ where we transition from one PSK phase $\phi_1$ to the next $\phi_2$.  Near the transition we can define $x(n)$ in terms of a step function $s(n)$:
+\begin{equation}
+\begin{split}
+x(n) &=
+	\begin{cases}
+      e^{j (\omega n + \phi_1)}, & n < 0 \\
+      e^{j (\omega n + \phi_2)}, & n \ge 0
+	\end{cases} \\
+	&= s(n)e^{j (\omega n + \phi_2)} + (1-s(n))e^{j (\omega n + \phi_1)}  \\
+s(n) &=
+	\begin{cases}
+      0, & n < 0 \\
+      1, & n \ge 0
+	\end{cases}
+\end{split}
+\end{equation}
+where $\omega=2 \pi c R_s/F_s$ is the frequency of OFDM carrier $c$.  Substituting into (\ref{eq:hf_model_time}): 
+\begin{equation}
+\begin{split}
+y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_1(1-s(n-dF_s))e^{j (\omega n + \phi_1)} \\
+     &+ G_2e^{j (\omega (n-dF_s) + \phi_2)} + G_2(1-s(n-dF_s))e^{j (\omega (n-dF_s) + \phi_1)}
+\end{split}
+\end{equation}
+At $n=0$ we have a mixture of both symbols:
+\begin{equation}
+y(0) = G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j (\omega (n-dF_s) + \phi_1)}
+\end{equation}
+However by $y(dF_s)$ the ISI from $\phi_1$ has gone:
+\begin{equation}
+y(dF_s) = G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j \phi_1}
+\end{equation}
+Or more generally for $n \ge dF_s$:
+\begin{equation}
+\begin{split}
+y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j (\omega (n-dF_s) + \phi_2)} \\
+     &= e^{j (\omega n + \phi_2)} [ G_1 + G_2 e^{-j \omega dF_s } ] \\
+     &= e^{j (\omega n + \phi_2)} [ G_1 + G_2 e^{-j  2 \pi c R_s d} ] \\
+     &= e^{j (\omega n + \phi_2)} H_c \\
+\end{split}
+\end{equation}
+Thus if we start detecting $y(n)$ after the longest delay term we can recover the transmitted PSK symbol without ISI.
 
 \section{Waveform Improvements}
 
@@ -276,9 +323,10 @@ Take away notes from analysis and simulation (TODO edit and write up properly):
 \item idea: try lin2 with adajacent carriers, to see if HF gets closer to ideal and we improve AWGN.  Accidental plotting of time domain adjacent carrier is instructive.  Phase shift of 2nd phase term of adjacent carriers is symmetrical which might help.  It is proportonal to delay spread so we may see more degredation.  lin2 AWGN Improved by 1dB (now 0.5dB), fading improved about 0.5dB (now 1dB).
 \item Same Np, Lp as 700D, but works on 2 Hz (and beyond) fading.  If channel improves, users get benefit of improved perf (unlike 700E where you're stuck with needing a high SNR)).  Less use of bandwidth I think as less pilot overhead (so room for tx diversity). Potential down side is 0.5dB off AWGN for 700D, and (maybe) some loss from bigger CP.  Put perhaps longer symbol will help that.
 \item When correct 4ms delay used for MPD, freq weighting breaks it!  This is explained by (\ref{eq:hf_model}), as $d$ increases phase shift between carriers is greater.  Unfortunately this implies different phase estimators for different channels, something we would like to avoid. Parallel demodulators might be a reasonable approach here - try two different phase estimators.
-\end{enumerate}
+\item Latest plot take aways. mean12 best on AWGN, but linls just 0.5dB worse.  We could try parallel demodulation.  linls 0.5dB on MPP and MPD, which is pretty good, lin 2dB, mean12 breaks on MPP.  Table useful here
 
-Combining pilots from adjacent carriers is used in FreeDV 700D to reduce estimation noise.  Examining (\ref{eq:hf_model}) we can see some symmetry in the RH term in the phase between carrier $n-1$ and carrier $n+1$ which supports averaging over adjacent carriers to estimate $H_n$, especially when the term $2 \pi R_s d$ is small.  A more robust approach is to perform a least squares fit of three equations with $G_1$ and $G_2$ as the two unknowns, and $H_{-1}, H_0, H_1$ as the three pilot samples centred around the current carrier:
+
+Combining pilots from adjacent carriers is used in FreeDV 700D to reduce estimation noise.  Examining (\ref{eq:hf_model_freq}) we can see some symmetry in the RH term in the phase between carrier $c-1$ and carrier $c+1$ which supports averaging over adjacent carriers to estimate $H_c$, especially when the term $2 \pi R_s d$ is small.  A more robust approach is to perform a least squares fit of three equations with $G_1$ and $G_2$ as the two unknowns, and $H_{-1}, H_0, H_1$ as the three pilot samples centred around the current carrier:
 \begin{equation}
 \label{eq:combine_freq}
 \begin{split}
@@ -306,6 +354,30 @@ Ag &= h \\
 \end{equation} 
 
 where $\overline{H_0}$ is the smoothed estimate of the current carriers pilot symbol.  The $(A^TA)^{-1}A^T$ term can be precomputed as all the parameters of $A$ are known. 
+
+\begin{table}[h]
+\centering
+\begin{tabular}{l l l l l l }
+ \hline
+ Algorithm & Mode & Colour & AWGN & MPP & MPD \\
+ \hline
+ mean12 & 700D & blue & 0.0 & 0.5 & unusable \\
+ lin2 & 700E & green & 1.5 & 2.0 & 2.0 \\
+ lin2ls & 700X & magenta & 0.5 & 0.5 & 0.5 \\
+ \hline
+\end{tabular}
+\caption{Comparison of equaliser algorithms for $N_p=8$. The last three numbers are implementation loss in dB, smaller is better.  700X has the advantage of low implementation loss across channels with a single waveform, but is 0.5dB poorer than 700D on the (rare) AWGN channel.  The 700E results are an approximation, as that waveform uses $N_p=5$.}
+\end{table}
+
+\end{enumerate}
+\begin{figure}[h]
+\caption{Performance curves for equaliser algorithms over various channels. \emph{mean12} is the algorithm used for 700D, and \emph{lin2} for 700E.  Note \emph{mean12} (blue) is very close to theory for AWGN but breaks down on MPP. }
+\label{fig:equalisor_curves}
+\begin{center}
+\input equaliser.tex
+\end{center}
+\end{figure}
+
 
 \subsection{Multipath}
 

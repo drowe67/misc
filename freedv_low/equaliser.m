@@ -313,8 +313,8 @@ function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots
     sim_qpsk = ber_test(sim_in);
 endfunction
 
-function run_curves
-    max_nbits = 1E5;
+function run_curves(itut_runtime=0,epslatex=0)
+    max_nbits = 1E4;
     sim_in.verbose = 1;
     sim_in.EbNovec = 0:10;
     sim_in.ch = "awgn";
@@ -345,9 +345,11 @@ function run_curves
     EbNoLin = 10.^(hf_sim_in.EbNovec/10);
     hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
 
-    % run long enough to get sensible results
-    hf_sim_in.nbits = min(max_nbits, floor(500 ./ hf_theory));
-    hf_sim_in.nbits = max(2000, floor(500 ./ hf_theory));
+    % run long enough to get sensible results, using rec from ITUT F.1487
+    Fd_min = 1; run_time_s = 3000/Fd_min; Rb = 100;
+    % default 0.1*run_time_s actually gives results close to theory
+    if itut_runtime==0, run_time_s /= 10; end % default 0.1*run_time_s
+    hf_sim_in.nbits(1:length(hf_sim_in.EbNovec)) = floor(run_time_s*Rb);
 
     hf_sim = ber_test(hf_sim_in);
     hf_sim_in.ideal_phase = 0;
@@ -364,32 +366,48 @@ function run_curves
     hf_sim_in.resampler = "lin2"; hf_sim_lin2_mpd = ber_test(hf_sim_in);
     hf_sim_in.ls_pilots = 1; hf_sim_lin2ls_mpd = ber_test(hf_sim_in);
 
+    if epslatex
+        textfontsize = get(0,"defaulttextfontsize");
+        linewidth = get(0,"defaultlinelinewidth");
+        set(0, "defaulttextfontsize", 12);
+        set(0, "defaultaxesfontsize", 12);
+        set(0, "defaultlinelinewidth", 0.5);
+    end
+
     % Plot results --------------------
 
     figure (3); clf;
-    semilogy(sim_in.EbNovec, awgn_theory,'r+-;AWGN theory;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_theory,'r+-;AWGN theory;')
     hold on;
-    semilogy(sim_in.EbNovec, awgn_sim_mean12.bervec,'b+-;AWGN sim mean12;','markersize', 10, 'linewidth', 2)
-    semilogy(sim_in.EbNovec, awgn_sim_lin2.bervec,'g+-;AWGN sim lin2;','markersize', 10, 'linewidth', 2)
-    semilogy(sim_in.EbNovec, awgn_sim_lin2ls.bervec,'m+-;AWGN sim lin2ls;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, awgn_sim_mean12.bervec,'b+-;AWGN sim mean12;')
+    semilogy(sim_in.EbNovec, awgn_sim_lin2.bervec,'g+-;AWGN sim lin2;')
+    semilogy(sim_in.EbNovec, awgn_sim_lin2ls.bervec,'m+-;AWGN sim lin2ls;')
 
-    semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'c+-;HF sim ideal MPP;','markersize', 10, 'linewidth', 2)
-    hf_sim.bervec
+    semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;')
+    semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'c+-;HF sim ideal MPP;')
+   
+    semilogy(hf_sim_in.EbNovec, hf_sim_mean12.bervec,'bx-;HF sim mean12 MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2.bervec,'gx-;HF sim lin2 MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.bervec,'mx-;HF sim lin2ls MPP;')
 
-    semilogy(hf_sim_in.EbNovec, hf_sim_mean12.bervec,'bx-;HF sim mean12 MPP;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_lin2.bervec,'gx-;HF sim lin2 MPP;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.bervec,'mx-;HF sim lin2ls MPP;','markersize', 10, 'linewidth', 2)
-
-    semilogy(hf_sim_in.EbNovec, hf_sim_mean12_mpd.bervec,'bo-;HF sim mean12 MPD;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_lin2_mpd.bervec,'go-;HF sim lin2 MPD;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls_mpd.bervec,'mo-;HF sim lin2ls MPD;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, hf_sim_mean12_mpd.bervec,'bo-;HF sim mean12 MPD;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2_mpd.bervec,'go-;HF sim lin2 MPD;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls_mpd.bervec,'mo-;HF sim lin2ls MPD;')
 
     hold off;
     xlabel('Eb/No (dB)')
     ylabel('BER')
     grid("minor")
     axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-3 1])
+
+    if epslatex
+        fn = "equaliser.tex";
+        print(fn,"-depslatex","-S350,350");
+        printf("printing... %s\n", fn);
+        set(0, "defaulttextfontsize", textfontsize);
+        set(0, "defaultaxesfontsize", textfontsize);
+        set(0, "defaultlinelinewidth", linewidth);
+    end
 
 endfunction
 

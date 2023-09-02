@@ -267,8 +267,8 @@ s(n) &=
 where $\omega=2 \pi c R_s/F_s$ is the frequency of OFDM carrier $c$.  Substituting into (\ref{eq:hf_model_time}): 
 \begin{equation}
 \begin{split}
-y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_1(1-s(n-dF_s))e^{j (\omega n + \phi_1)} \\
-     &+ G_2e^{j (\omega (n-dF_s) + \phi_2)} + G_2(1-s(n-dF_s))e^{j (\omega (n-dF_s) + \phi_1)}
+y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_1(1-s(n))e^{j (\omega n + \phi_1)} \\
+     &+ G_2s(n-dF_s)e^{j (\omega (n-dF_s) + \phi_2)} + G_2(1-s(n-dF_s))e^{j (\omega (n-dF_s) + \phi_1)}
 \end{split}
 \end{equation}
 At $n=0$ we have a mixture of both symbols:
@@ -288,13 +288,13 @@ y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j (\omega (n-dF_s) + \phi_2)} \
      &= e^{j (\omega n + \phi_2)} H_c \\
 \end{split}
 \end{equation}
-Thus if we start detecting $y(n)$ after the longest delay term we can recover the transmitted PSK symbol without ISI.
+Thus if we start detecting $y(n)$ after the longest delay term $dF_s$ we can recover the transmitted PSK symbol without ISI, and equalise it by estimating a single complex coefficient $H_c$.  In practice detection means integration over a complete symbol $T_s$, therefore the symbol $e^{j \omega n + \phi_n}$ must be transmitted for $d+T^\prime_s=T_{cp}+T^\prime_s$ seconds, with the cyclic prefix length $T_{cp} \ge d$.
 
 \section{Waveform Improvements}
 
-In this section notes on (proposed) waveform improvements are presented.
+In this section waveform improvements are presented.
 
-The general strategy is to propose an innovation, and explore with analysis/maths and Octave simulation. Try low risk approaches to start with, then iterate.  To simulate performance with voice codec, use a threshold of PER=0.1, BER=0.01 voice codec threshold for modem tests alone.
+The general strategy is to propose an innovation, and explore with analysis/maths and Octave simulation. Try low risk approaches to start with, then iterate.  To simulate performance with voice codec, use a threshold of PER=0.1, BER=0.01.
 
 \subsection{Equalisation}
 
@@ -304,9 +304,9 @@ If we detect symbols after ISI has settled, the channel for each OFDM carrier re
 
 Consider the two path time domain channel model (\ref{eq:hf_model_time}). Two additive terms of bandwidth B add linearly, so by linearity the result also has bandwidth B.  The sum is a random modulation of bandwidth $B_d$ about the symbol centre frequency.  The Doppler bandwidth $B_d$ therefore defines the bandwidth required for equalisation. One caveat - if $B_d$ an appreciable fraction of $R_s$ the DFT orthogonality may break down to some extent as energy falls into adjacent DFT bins.
 
-FreeDV 700D samples pilots at $1/(N_pTs)=6.25 \si{Hz}$, which should be an adequate sample rate for our target channels. 700D currently uses a block average over a 2D array (4 pilots in time, across 3 carriers in frequency) of 12 pilots, this can be interpreted as a 2D FIR filter with all coefficients $c_i=1/12$. It is effective on MPP channels ($B_d=1$ Hz), but breaks down on MPD channels ($B_d=2$ Hz).  This suggests a resampler with a wider bandwidth might enable a waveform similar to 700D to be used on MPD channels.
+FreeDV 700D samples pilots and hence $H_c$ at $1/(N_pTs)=6.25$ Hz.  As we are sampling a complex signal, this implies a Nyquist bandwidth of 6.25 Hz, which should be adequate to recover $H_c$ which has a maximum $B_d=2$ Hz on the MPD channel. 700D currently uses a block average over a 2D array (4 pilots in time, across 3 carriers in frequency) of 12 pilots, this can be interpreted as a 2D FIR filter with all coefficients $c_i=1/12$. It is effective on MPP channels ($B_d=1$ Hz), but breaks down on MPD channels ($B_d=2$ Hz).  This suggests a resampler with a wider bandwidth might enable a waveform similar to 700D to be used on MPD channels.
 
-To explore pilot resampling algorithms, a simulation was written to test candidate algorithms, and plot BER versus $E_b/N_0$ curves.  One interpretation of resampling 4 pilots in time is a 4 point FIR filter. This was explored, along with the existing \emph{mean12} resampler (700D), and 2 point linear \emph{lin2} resampler (as used in FreeDV 700E). Figure \ref{fig:interpolator} shows the \emph{lin2} resampler in action.
+To explore pilot resampling algorithms, a simulation was written to evaluate candidate algorithms by comparing uncoded BER versus $E_b/N_0$ curves.  One interpretation of resampling 4 pilots in time is a 4 point FIR filter. This was explored, along with the existing \emph{mean12} resampler (700D), and 2 point linear \emph{lin2} resampler (as used in FreeDV 700E). Figure \ref{fig:interpolator} shows the \emph{lin2} resampler in action.
 
 \begin{figure}[h]
 \caption{\emph{lin2} resampler in action for a MPD channel. The blue continuous line is the simulated channel $H_c$ at each symbol, the red dots are the pilot symbols, and the red line the channel estimates from the linearly interpolated pilots.  Just the real part is plotted.}
@@ -316,7 +316,7 @@ To explore pilot resampling algorithms, a simulation was written to test candida
 \end{center}
 \end{figure}
 
-Attempts were made to design 4 sample FIR filters (e.g. with a $sinc()$ impulse response) however these performed poorly. The \emph{mean12} algorithm used for 700D worked well on AWGN and MPP channels, but has a sluggish frequency response, and can't follow fading with $B_d>1$ Hz.  However on AWGN and slower fading channels it filters the channel noise well, resulting in good low SNR performance.  This is consistent with on air reports of 700D. The \emph{lin2} algorithm (700E) doesn't filter channel noise very well, but was very hard to beat on fast fading channels, and even works with $B_d>2$ Hz.
+Attempts were made to design 4 sample FIR filters (e.g. with a $sinc()$ impulse response) however these performed poorly. The \emph{mean12} algorithm used for 700D works well on AWGN and MPP channels, but has a sluggish frequency response, and can't follow fading with $B_d>1$ Hz.  However on AWGN and slower fading channels it filters the channel noise well, resulting in good low SNR performance.  This is consistent with on air reports of 700D. The \emph{lin2} algorithm (700E) doesn't filter channel noise very well, but is hard to beat on fast fading channels, and even works with $B_d>2$ Hz.
 
 Attempts were therefore made to improve the performance of \emph{lin2} on AWGN and slower fading channels.  Combining pilots from adjacent carriers is used in FreeDV 700D to reduce estimation noise.  Examining (\ref{eq:hf_model_freq}) we can see some symmetry in the RH term in the phase between carrier $c-1$ and carrier $c+1$ which supports averaging over adjacent carriers to estimate $H_c$, especially when the term $2 \pi R_s d$ is small.  A more robust approach is to perform a least squares fit \cite{bergada2014digital} of three equations with $G_1$ and $G_2$ as the two unknowns, and $H_{-1}, H_0, H_1$ as the three pilot samples centred around the current carrier:
 \begin{equation}
@@ -345,9 +345,17 @@ Ag &= h \\
 \end{split}
 \end{equation} 
 
-where $\overline{H_0}$ is the smoothed estimate of the current carriers pilot symbol.  Note that the channel delay $d$ is actually an unknown (and indeed the entire model is an approximation of the real channel). It was found that in simulation, choosing $d=0.002$ or $d=0.004$ produced reasonable results, possibly due to the symmetry of the RHS of (\ref{eq:hf_model_freq}), and the dominance of channel over resampler noise at low SNRs. If $d$ is appropriated with a known value, the $(A^TA)^{-1}A^T$ term can then be precomputed as all the parameters of $A$ are known.
+where $\overline{H_0}$ is the smoothed estimate of the current carriers pilot symbol.  Note that the channel delay $d$ is actually an unknown (and indeed the entire model is an approximation of the real channel). It was found that in simulation, choosing $d=0.002$ or $d=0.004$ produced reasonable results, possibly due to the symmetry of the RHS of (\ref{eq:hf_model_freq}), and the dominance of channel over resampler noise at low SNRs. If $d$ is approximated with a known value, the $(A^TA)^{-1}A^T$ term can then be precomputed as all the parameters of $A$ are known.
 
 This algorithm is denoted \emph{lin2ls}.  It's BER performance is characterised in Figure \ref{fig:equaliser_curves} and three resamplers summarised in Table \ref{tab:resampler_summary}.
+
+\begin{figure}[h]
+\caption{Uncoded BER performance curves for equaliser algorithms over various channels. \emph{mean12} is the algorithm used for 700D, and \emph{lin2} for 700E.  Note \emph{mean12} (blue) is very close to theory for AWGN but breaks down on MPP.  The \emph{lin2ls} algorithm performs quite well on MPP and MPD, and about 0.5dB power than \emph{mean12} on AWGN.}
+\label{fig:equaliser_curves}
+\begin{center}
+\input equaliser.tex
+\end{center}
+\end{figure}
 
 \begin{table}[h]
 \label{tab:resampler_summary}
@@ -368,22 +376,13 @@ The new \emph{lin2ls} resampler has the following benefits:
 \begin{enumerate}
 \item Using a single waveform design, it can operate from AWGN to beyond MPP with low SNR performance similar to 700D.
 \item On fast fading (Doppler Spread $B_d>2$ Hz) channels it will outperform 700E at low SNRs.
-\item The relatively large $N_p=8$ pilot insertion rate means the pilot symbol loss $L_p=0.58 \si{dB}$ is low, giving good low SNR performance.
+\item The $N_p=8$ pilot insertion rate means the pilot symbol loss $L_p=0.58 \si{dB}$ is low, giving good low SNR performance.
 \item Large $N_p$ means the amount of bandwidth used per carrier is small, reducing on air RF bandwidth and giving us options for transmit diversity in the 2000 Hz SSB radio bandwidth.
 \item The new estimator could be applied to the raw data modes to improve low SNR FreeDATA performance.
 \item It uses 2 pilots in time centred around the current modem frame rather than 4 used in \emph{mean12} so will have lower algorithmic delay (one modem frame less) than 700D.
 \end{enumerate}	
 
-There algorithm used to combine adjacent carriers (\ref{eq:combine_freq}) is new and makes an assumption around the estimate of $d$, so it should be tested OTA on real world channels using controlled tests.
-
-\begin{figure}[h]
-\caption{Performance curves for equaliser algorithms over various channels. \emph{mean12} is the algorithm used for 700D, and \emph{lin2} for 700E.  Note \emph{mean12} (blue) is very close to theory for AWGN but breaks down on MPP.  The \emph{lin2ls} algorithm performs quite well on MPP and MPD, and about 0.5dB power than \emph{mean12} on AWGN.}
-\label{fig:equaliser_curves}
-\begin{center}
-\input equaliser.tex
-\end{center}
-\end{figure}
-
+The algorithm used to combine adjacent carriers (\ref{eq:combine_freq}) is new and makes an assumption around the estimate of $d$, so it should be carefully tested OTA on real world channels using objective, controlled tests.
 
 \subsection{Multipath}
 
@@ -401,6 +400,10 @@ If we use diversity, I am not sure how much FEC we can also use, as we may run o
 \item Measure implementation loss or EVM against ISI, we might be able to get away with some ISI, it is acceptable to have performance drop off for MPD, but it needs to be gradual rather than breaking.
 \item 700C had just 13ms symbols but dealt with ISI pretty well - this might be worth exploring.
 \end{enumerate}
+
+\subsection{Timing estimation}
+
+TODO: make sure the current algorithm is doing sensible things on HF channels with complex impulse responses and large delay spreads.
 
 \subsection{Acquisition}
 

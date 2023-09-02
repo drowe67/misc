@@ -332,7 +332,6 @@ function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots
     sim_in.ch_phase    = 0;
     sim_in.ideal_phase = 0;
     sim_in.ls_pilots   = ls_pilots;
-    sim_in.epslatex    = 1;
 
     sim_qpsk = ber_test(sim_in);
 endfunction

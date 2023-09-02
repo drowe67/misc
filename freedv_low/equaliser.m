@@ -255,16 +255,30 @@ function sim_out = ber_test(sim_in)
 
         if verbose == 2
             figure(1); clf;
-            subplot(211); hold on;
-            plot(rx_symb_t,real(ch_model));
-            plot(rx_pilots_t, real(rx_pilots),'ro');
-            plot(rx_symb_t,real(rx_ch));
-            hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('real');
-            subplot(212); hold on;
-            plot(rx_symb_t,imag(ch_model));
-            plot(rx_pilots_t, imag(rx_pilots),'ro');
-            plot(rx_symb_t,imag(rx_ch));
-            hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (symbol)'); ylabel('imag');
+            if isfield(sim_in,"epslatex")
+                % just real part for Latex plot
+                [textfontsize linewidth] = set_fonts(20);
+                hold on;
+                plot(rx_symb_t,real(ch_model(2,:)),'b;channel Hn;');
+                plot(rx_pilots_t, real(rx_pilots),'ro;pilots;');
+                plot(rx_symb_t,real(rx_ch),'r-;lin2 channel est;');
+                hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('real');
+                fn = "interpolator.tex";
+                print(fn,"-depslatex","-S300,300");
+                printf("printing... %s\n", fn);
+                restore_fonts(textfontsize,linewidth);
+            else 
+                subplot(211); hold on;
+                plot(rx_symb_t,real(ch_model(2,:)));
+                plot(rx_pilots_t, real(rx_pilots),'ro');
+                plot(rx_symb_t,real(rx_ch));
+                hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('real');
+                subplot(212); hold on;
+                plot(rx_symb_t,imag(ch_model(2,:)));
+                plot(rx_pilots_t, imag(rx_pilots),'ro');
+                plot(rx_symb_t,imag(rx_ch));
+                hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('imag');
+            end
         end
 
         % extract centre carrier, remove padding at end as equaliser invalid
@@ -288,11 +302,20 @@ function sim_out = ber_test(sim_in)
         if verbose
           printf("EbNodB: % 5.1f nbits: %7d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
           if verbose == 2
+            if isfield(sim_in,"epslatex")
+                [textfontsize linewidth] = set_fonts(20);
+            end
             figure(2); clf;
             plot(rx_symb*exp(j*pi/4),'+','markersize', 10);
             mx = max(abs(rx_symb));
             axis([-mx mx -mx mx]);
-           end
+            if isfield(sim_in,"epslatex")
+                fn = "scatter.tex";
+                print(fn,"-depslatex","-S300,300");
+                printf("printing... %s\n", fn);
+                restore_fonts(textfontsize,linewidth);
+             end
+          end
         end
     end
 
@@ -309,12 +332,13 @@ function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots
     sim_in.ch_phase    = 0;
     sim_in.ideal_phase = 0;
     sim_in.ls_pilots   = ls_pilots;
+    sim_in.epslatex    = 1;
 
     sim_qpsk = ber_test(sim_in);
 endfunction
 
 function run_curves(itut_runtime=0,epslatex=0)
-    max_nbits = 1E4;
+    max_nbits = 1E5;
     sim_in.verbose = 1;
     sim_in.EbNovec = 0:10;
     sim_in.ch = "awgn";
@@ -367,11 +391,7 @@ function run_curves(itut_runtime=0,epslatex=0)
     hf_sim_in.ls_pilots = 1; hf_sim_lin2ls_mpd = ber_test(hf_sim_in);
 
     if epslatex
-        textfontsize = get(0,"defaulttextfontsize");
-        linewidth = get(0,"defaultlinelinewidth");
-        set(0, "defaulttextfontsize", 12);
-        set(0, "defaultaxesfontsize", 12);
-        set(0, "defaultlinelinewidth", 0.5);
+        [textfontsize linewidth] = set_fonts();
     end
 
     % Plot results --------------------
@@ -404,10 +424,21 @@ function run_curves(itut_runtime=0,epslatex=0)
         fn = "equaliser.tex";
         print(fn,"-depslatex","-S350,350");
         printf("printing... %s\n", fn);
-        set(0, "defaulttextfontsize", textfontsize);
-        set(0, "defaultaxesfontsize", textfontsize);
-        set(0, "defaultlinelinewidth", linewidth);
+        restore_fonts(textfontsize,bergada2014digital);
     end
 
 endfunction
 
+function [textfontsize linewidth] = set_fonts(font_size=12)
+    textfontsize = get(0,"defaulttextfontsize");
+    linewidth = get(0,"defaultlinelinewidth");
+    set(0, "defaulttextfontsize", font_size);
+    set(0, "defaultaxesfontsize", font_size);
+    set(0, "defaultlinelinewidth", 0.5);
+end
+
+function restore_fonts(textfontsize,linewidth)
+    set(0, "defaulttextfontsize", textfontsize);
+    set(0, "defaultaxesfontsize", textfontsize);
+    set(0, "defaultlinelinewidth", linewidth);
+end

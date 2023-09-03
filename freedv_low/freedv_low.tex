@@ -19,6 +19,7 @@ After 10 years development and on air experience with various FreeDV waveforms, 
 \item Better performance than SSB at 0dB SNR on MPP and MPD channels.
 \item A single mode that can handle MPP, MPD, GEO (e.g. QO-100), and replace several existing FreeDV modes, simplifying the end user experience.
 \item For compliance with Export Control regulations, the minimum speech codec bit rate is 700 bit/s.
+\item Use of legacy analog HF radio sets with a RF bandwidth of 2000 Hz.
 \end{enumerate}
 It is acceptable for performance to gradually decrease as the multipath channel quality declines, but we would like the decline to be gradual, e.g. a few dB more power for operation on MPD versus MPP.
 
@@ -65,6 +66,7 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
  $SNR$ & Signal to Noise Ratio & dB \\
  $S$ & Signal Power & Watts \\
  $N$ & Noise Power & Watts \\
+ $N_c$ & Number of carriers in an OFDM waveform \\
  \hline
 \end{tabular}
 \caption{Glossary of Symbols}
@@ -77,6 +79,8 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
 \section{Modem and Channel Models}
 
 In this section we will develop theoretical models to help us explore performance limits.
+
+\subsection{SNR and Bandwidth Limits}
 
 For practical PTT voice systems algorithmic delay is limited to a few 100ms, which limits the FEC codeword size and hence the performance of the code.  For PSK channels a threshold $E_b/N_0=2 \, \si{dB}$ and a code rate $R=0.5$ is typical, where $E_b/N_0$ is the energy per payload data bit (coded $E_b/N_0$).  The lowest (threshold) SNR for a viable voice link is given by:
 \begin{equation}
@@ -104,9 +108,16 @@ SNR = 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\rig
 \end{equation}
 where $L_p$ is the loss from power allocated to pilot symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
 
-TODO: Discuss Available bandwidth. 2000 Hz, using QPSK we can get 4000 bits/s.  Less overheads (which can be expressed as SNR or bandwidth reduction?).  We have 700 bits/s source code or 1400 bits/s with rate 0.5 FEC.
+To combat intersymbol interference and Doppler Spread on HF multipath channels, it is convenient to use parallel tone or OFDM modems. The signal is divided into $N_c$ carriers, each carrying $R_b/N_c$ bits/s.  Due to the spectral efficiency of OFDM, the same bit rate, symbol rate, and occupied bandwidth is required for any $N_c$.  For example:
+\begin{enumerate}
+\item A QPSK signal of $R_s=1000$ symbols/s and $R_b=2R_s=2000$ bits/s occupies $B=1000$ Hz (central lobe).
+\item An OFDM signal of $N_c=20$ carriers each at $R_s=50$ symbol/s gives us a total $R_b=2N_cR_s=2000$ bits/s and occupies a RF bandwidth of $B=N_cR_s=1000$ Hz.
+\end{enumerate}
+This simple relationship between per-carrier and total $R_s$ allows us to use them interchangeably for some calculations.
+ 
+FreeDV signals are typically transmitted over the air using legacy HF radios.  We assume an analog bandwidth of 2000 Hz is available, which allows a maximum of 4000 bit/s using QPSK.  In practice the payload data rate is much less, due to various overheads that we will discuss below.
 
-\subsection{Pilot symbol overhead}
+\subsection{Pilot Symbol Overhead}
 
 \begin{figure}[h]
 \caption{Modem Frame with $N_p=8$, the pilot of the next modem frame is also shown.}
@@ -154,10 +165,10 @@ Thus when we insert pilots, the threshold $S/N$ increases by a factor of $N_p/(N
 \begin{split}
 10log_{10}\left(\frac{S^\prime}{N}\right) &= 10log_{10}\left(\frac{S}{N}\right) + 10log_{10}\left(\frac{N_s}{N_s-1}\right) \\
 SNR^\prime &= SNR + 10log_{10}\left(\frac{N_p}{N_p-1}\right) \\
-SNR^\prime &= SNR + L_p  \quad [\si{dB}]
+SNR^\prime &= SNR + L_p  \quad [\si{dB}]Ideal 
 \end{split}
 \end{equation}
-where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example FreeDV 700D uses a pilot insertion rate of $N_s=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to acheive the threshold SNR for the voice link.  To maintain $Rs=700$ data symbols/second over the channel, we require $R^\prime_s = (700)8/7 =800$ symbols/second which introduces a 100 Hz bandwidth overhead.
+where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example FreeDV 700D uses a pilot insertion rate of $N_s=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to achieve the threshold SNR for the voice link.   For this example let $Rs$ be the total symbol rate over all $N_c$ carriers. To maintain $Rs=700$ data symbols/second over the channel, we require $R^\prime_s = (700)8/7 =800$ symbols/second which introduces a 100 Hz bandwidth overhead.
 
 \subsection{Cyclic Prefix Overhead}
 
@@ -190,7 +201,9 @@ where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation
 \end{tikzpicture}
 \end{figure}
 
-Now we consider the SNR overhead for the Cycle Prefix (CP) used in OFDM modems to cope with delay spread on multipath channels.  To achieve our payload data rate (e.g. 700 bits/s), we send symbols $D$ across the channel at a constant symbol rate $R_s$, or one symbol every $T=T_s$ seconds.  To cope with delay spread, we construct a composite symbol by pre-pending a Cyclic Prefix (CP) $T_{cp}$ seconds in duration to a new symbol $D^\prime$ of $T^\prime_s$ seconds in duration.  $D$ and $D^\prime$ contain the same PSK symbol, and convey the same information over the channel. The new composite symbol is now $T^\prime = T_{cp}+T^\prime_s$ seconds long.  The CP contains no additional information, it is just a cyclic extension of the single symbol $D^\prime$. Thus we still send one symbol of data over the channel every $T^\prime$ seconds.  To maintain the payload data rate over the channel, we must send the new composite symbol at the same rate as the original symbol:
+Now we consider the SNR overhead for the Cycle Prefix (CP) used in OFDM modems to cope with delay spread on multipath channels.  To achieve our payload data rate (e.g. 700 bits/s), we FEC encode and map the bits to PSK symbols $D$, and distribute the symbols across $N_c$ parallel carriers.  The transmitter power is spread equally across all carriers.
+
+We send symbols $D$ across the channel at a constant symbol rate $R_s$, or one symbol every $T=T_s$ seconds.  To cope with delay spread, we construct a composite symbol by pre-pending a Cyclic Prefix (CP) $T_{cp}$ seconds in duration to a new symbol $D^\prime$ of $T^\prime_s$ seconds in duration.  $D$ and $D^\prime$ contain the same PSK symbol, and convey the same information over the channel. The new composite symbol is now $T^\prime = T_{cp}+T^\prime_s$ seconds long.  The CP contains no additional information, it is just a cyclic extension of the single symbol $D^\prime$. Thus we still send one symbol of data over the channel every $T^\prime$ seconds.  To maintain the payload data rate over the channel, we must send the new composite symbol at the same rate as the original symbol:
 \begin{equation}
 \begin{split}
 T &= T^\prime \\
@@ -198,7 +211,7 @@ T_s &= T_{cp} + T^\prime_s \\
 R^\prime_s &= \frac{R_s}{1 - T_{cp}/T_s}
 \end{split}
 \end{equation}
-It can be observed that $R^\prime_s > R_s$, to account for the portion of the composite symbol allocated to the CP.  For example with $R_s=700$, $T_s=0.02$, $T_{cp}=0.002$, $R^\prime_s=700/(1-0.002/0.02)=777.78$ symbols/second.  Thus additional bandwidth is required to send the composite symbol including the cyclic prefix.
+It can be observed that $R^\prime_s > R_s$, to account for the portion of the composite symbol allocated to the CP.  For example with $R_s=50$, $T_s=0.02$, $T_{cp}=0.002$, $R^\prime_s=50/(1-0.002/0.02)=55.56$ symbols/second.  Thus additional bandwidth is required to send the composite symbol including the cyclic prefix.
 
 The increase in symbol rate does not directly affect BER performance if $E_s/N_0$ remains the same. For example if $Rs^\prime=2R_s$ we could send the symbol across the channel in $T_s/2$ seconds at power $2S$, followed by $T_s/2$ seconds of silence.  The energy per symbol $E_s$ and BER would remain the same.
 
@@ -289,6 +302,15 @@ y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j (\omega (n-dF_s) + \phi_2)} \
 \end{split}
 \end{equation}
 Thus if we start detecting $y(n)$ after the longest delay term $dF_s$ we can recover the transmitted PSK symbol without ISI, and equalise it by estimating a single complex coefficient $H_c$.  In practice detection means integration over a complete symbol $T_s$, therefore the symbol $e^{j \omega n + \phi_n}$ must be transmitted for $d+T^\prime_s=T_{cp}+T^\prime_s$ seconds, with the cyclic prefix length $T_{cp} \ge d$.
+
+\subsection{Bandwidth}
+
+Using the expressions above, we can estimate the total RF bandwidth of candidate waveforms:
+\begin{equation}
+B = \frac{R_sN_p}{(N_p-1)(1-T_{cp}/T_s)}
+\end{equation}
+
+where $R_s$ is the total symbol rate over the channel.  For example for 700D, $B = 700(8)/((8-1)(1-0.002/0.02))=888.89$ Hz.  In practice 700D has some extra bits allocated for frame synchronisation and auxiliary text, resulting in $B=944$ Hz.
 
 \section{Waveform Improvements}
 

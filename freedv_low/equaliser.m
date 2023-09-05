@@ -352,7 +352,7 @@ function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots
     sim_in.ch          = ch;
     sim_in.resampler   = resampler;
     sim_in.ch_phase    = 0;
-    sim_in.ideal_phase = 0;
+    sim_in.ideal_phase = 1;
     sim_in.ls_pilots   = ls_pilots;
     sim_in.Nd          = Nd;
 
@@ -485,8 +485,10 @@ function run_curves_diversity(itut_runtime=0,epslatex=0)
     hf_sim_in.nbits(1:length(hf_sim_in.EbNovec)) = floor(run_time_s*Rb);
 
     hf_sim = ber_test(hf_sim_in);
-    hf_sim_in.Nd = 2; hf_sim_div2 = ber_test(hf_sim_in);
- 
+    hf_sim_in.Nd = 2; hf_sim_in.ideal_phase = 1;
+    hf_sim_ideal_div2 = ber_test(hf_sim_in);
+    hf_sim_in.ideal_phase = 0; hf_sim_div2 = ber_test(hf_sim_in);
+
     if epslatex
         [textfontsize linewidth] = set_fonts();
     end
@@ -499,8 +501,10 @@ function run_curves_diversity(itut_runtime=0,epslatex=0)
     semilogy(sim_in.EbNovec, awgn_sim.bervec,'m+-;AWGN sim;')
 
     semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2.bervec,'rx-;HF sim div2 MPP;')
     semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'mx-;HF sim MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2.bervec,'mx-;HF sim div2 MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_ideal_div2.bervec,'ro-;HF sim ideal div2 MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2.bervec,'mo-;HF sim div2 MPP;')
 
     hold off;
     xlabel('Eb/No (dB)')

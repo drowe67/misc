@@ -64,7 +64,7 @@ function sim_out = ber_test(sim_in)
     Rs      = 50;        % symbol rate (needed for HF model)
     Ts      = 1/Rs;
     Ns      = 8;         % one pilot every Ns symbols
-    Npad    = 2;         % extra frames at end to deal with interpolator edges
+    Npad    = 3;         % extra frames at end to deal with interpolator edges
     Fs      = 8000;      % sample rate
     Nd      = 1;         % number of diversity channels
     div_Hz  = 1000;      % freq offset of diversity carriers
@@ -73,7 +73,23 @@ function sim_out = ber_test(sim_in)
     EbNovec = sim_in.EbNovec;
     ch      = sim_in.ch;
 
-    % A few sums to set up the packet.  Using our OFDM nomenclature, we have one
+    ch_phase = 0;
+    if isfield(sim_in,"ch_phase")
+      ch_phase = sim_in.ch_phase;
+    end
+    pilot_freq_weights = [0 1 0];
+    if isfield(sim_in,"pilot_freq_weights")
+      pilot_freq_weights = sim_in.pilot_freq_weights;
+    end
+    if isfield(sim_in,"Nd")
+      Nd = sim_in.Nd;
+      combining = "ecg";
+    end
+    if isfield(sim_in,"combining")
+      combining = sim_in.combining;
+    end
+    
+     % A few sums to set up the packet.  Using our OFDM nomenclature, we have one
     % "modem frame" for the packet, so Np=1, Nbitspermodemframe == Nbitsperpacket, and
     % there is just one modem frame for the FEC codeword.  This is common for 
     % digital voice modes.  In this simulation we assume all payload data symbols
@@ -93,27 +109,11 @@ function sim_out = ber_test(sim_in)
     % carrier frequencies, start at 400Hz
     w = 2*pi*(400 + (0:Nc*Nd+1)*Rs)/Fs;
 
-    nbitsvec = sim_in.nbits;
+    nbitsvec = sim_in.nbits
     nframes_max = floor(max(nbitsvec)/npayloadbitsperframe) + Npad
     nsymb_max = nframes_max*Ns
 
-    ch_phase = 0;
-    if isfield(sim_in,"ch_phase")
-      ch_phase = sim_in.ch_phase;
-    end
-    pilot_freq_weights = [0 1 0];
-    if isfield(sim_in,"pilot_freq_weights")
-      pilot_freq_weights = sim_in.pilot_freq_weights;
-    end
-    if isfield(sim_in,"Nd")
-      Nd = sim_in.Nd;
-      combining = "ecg";
-    end
-    if isfield(sim_in,"combining")
-      combining = sim_in.combining;
-    end
-    
-    % init HF model
+   % init HF model
 
     hf_en = 0;
     if strcmp(ch,"mpp") || strcmp(ch,"mpd")
@@ -216,7 +216,7 @@ function sim_out = ber_test(sim_in)
         rx_symb_t = Ts*(0:nsymb-1);          % symbol times
         rx_pilots_t = Ts*(0:Ns:nsymb-1);     % pilot times
 
-        % estimate channel by extracting pilots, smoothing across time and freq,
+        % estimate channel by extracting pilots, smoothing (filtering) across time and freq,
         % and interpolating to obtain channel estimates for every symbol        
         rx_pilots = zeros(Nc*Nd+2,nsymb/Ns); 
         rx_ch = zeros(Nc*Nd+2,nsymb);
@@ -226,8 +226,8 @@ function sim_out = ber_test(sim_in)
 
           if sim_in.ls_pilots
             p = 1; local_path_delay_s = 0.004;
-            a = Rs*local_path_delay_s;
-            A = [1 exp(j*w(c-1)*a); 1 exp(j*w(c)*a); 1 exp(j*w(c+1)*a)];
+            a = local_path_delay_s*Fs;
+            A = [1 exp(-j*w(c-1)*a); 1 exp(-j*w(c)*a); 1 exp(-j*w(c+1)*a)];
             P = inv(A'*A)*A'; 
             for s=1:Ns:nsymb
               h = zeros(3,1);
@@ -235,7 +235,8 @@ function sim_out = ber_test(sim_in)
                 h(c1+2) = rx_symb(c+c1,s);
               end
               g = P*h;
-              rx_pilots(c,p) = g(1) + g(2); p++;
+              rx_pilots(c,p) = g(1) + g(2)*exp(-j*w(c)*a);
+              p++;
             end
           else
             % weighted average across frequency
@@ -285,17 +286,18 @@ function sim_out = ber_test(sim_in)
         % now we have channel estimates perform equalisation of received symbols, discarding
         % padding frames at the end and "wingman" carriers
 
-        nsymb -= Npad;
+        nsymb -= Npad*Ns;
         rx_symb_eq = zeros(Nc*Nd,nsymb);
         s = 1:nsymb;
-        for c=2:Nc*Nd+1
+        for c=2:Nc+1
           if sim_in.ideal_phase == 1
-            rx_symb_eq(c-2,s) = rx_symb(c,s);
+            rx_symb_eq(c-1,s) = rx_symb(c,s);
           else
             for d=0:Nd-1
               if strcmp(combining,"mrc")
-                % maximum ratio combining
-                rx_symb_eq(c-1,s) += rx_symb(2+Nc*d,s)*rx_ch(1+d,s)';
+                %rx_symb(c+d*Nc,s).*rx_ch(c+d*Nc,s)'
+                 % maximum ratio combining
+                rx_symb_eq(c-1,s) += rx_symb(c+d*Nc,s).*rx_ch(c+d*Nc,s)';
               else 
                 % equal ratio combining, just equalise phase
                 rx_symb_eq(c-1,s) += rx_symb(c+d*Nc,s).*exp(-j*angle(rx_ch(c+d*Nc,s)));
@@ -321,14 +323,14 @@ function sim_out = ber_test(sim_in)
                 restore_fonts(textfontsize,linewidth);
             else 
                 subplot(211); hold on;
-                plot(rx_symb_t,real(ch_model(c,:)/sqrt(Nd)),'b-');
-                plot(rx_pilots_t, real(rx_pilots(c,:)),'ro');
-                plot(rx_symb_t,real(rx_ch(c,:)));
+                plot(rx_symb_t,real(ch_model(c,:)),'b-;channel Hn;');
+                plot(rx_pilots_t, real(rx_pilots(c,:)),'ro;pilots;');
+                plot(rx_symb_t,real(rx_ch(c,:)),'r-;channel est;');
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('real');
                 subplot(212); hold on;
-                plot(rx_symb_t,imag(ch_model(c,:)),'b-');
-                plot(rx_pilots_t, imag(rx_pilots(c,:)),'ro');
-                plot(rx_symb_t,imag(rx_ch(c,:)));
+                plot(rx_symb_t,imag(ch_model(c,:)),'b-;channel Hn;');
+                plot(rx_pilots_t, imag(rx_pilots(c,:)),'ro;pilots;');
+                plot(rx_symb_t,imag(rx_ch(c,:)),'r-;channel est;');
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('imag');
             end
         end

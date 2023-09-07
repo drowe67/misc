@@ -19,8 +19,8 @@ function test_resampler
     N  = Fs*Trun;
     [d1 states] = doppler_spread(Fd, Fs, N);
 
-    % Decimate down to pilot symbol rate of 1/(Ts*Np)sample rate 6.25Hz (Np=8 for 700D)
-    Ts=0.02; Np=8; Fp=1/(Ts*Np); Tp=1/Fp;
+    % Decimate down to pilot symbol rate of 1/(Ts*Ns)sample rate 6.25Hz (Ns=8 for 700D)
+    Ts=0.02; Ns=8; Fp=1/(Ts*Ns); Tp=1/Fp;
     M = Fs/Fp;
     assert (M == floor(M));
     n2 = 1:M:length(d1);
@@ -56,42 +56,47 @@ end
 
 % Rate Rs modem simulation model -------------------------------------------------------
 
-#{
-    TODO
-    [X] BER counting with random QPSK symbols
-    [X] with inserted pilots at Np
-    [X] additive noise
-    [X] sample Doppler function at symbol rate
-    [X] estimate channel from pilots using chosen filter function
-    [X] equalise using channel estimate
-    [ ] plot curves from different resamplers
-    [ ] plot curves from different Doppler rates
-    [ ] extend to use pilots from carriers either side, so pilots with slightly different channel
-    [ ] extend to high bandwidth, high SNR fading
-    [ ] diversity
-    [ ] LPDC (combined with diversity)
-    [ ] output curves and write up
-#}
-
 function sim_out = ber_test(sim_in)
     rand('seed',1);
     randn('seed',1);
 
-    bps     = 2;     % two bits/symbol for QPSK
-    Rs      = 50;    % symbol rate (needed for HF model)
+    bps     = 2;         % two bits/symbol for QPSK
+    Rs      = 50;        % symbol rate (needed for HF model)
     Ts      = 1/Rs;
-    Np      = 8;     % one pilot every Np symbols
-    Npad    = Np*3;  % extra symbols at end to deal with interpolator edges
-    Nc      = 3;     % number of carriers
-    Fs      = 8000;  % only used for HF channel model calculations
-    Nd      = 1;     % number of diversity channels
-    div_Hz  = 1000;  % freq offset of diversity carriers
-
+    Ns      = 8;         % one pilot every Ns symbols
+    Npad    = 2;         % extra frames at end to deal with interpolator edges
+    Fs      = 8000;      % sample rate
+    Nd      = 1;         % number of diversity channels
+    div_Hz  = 1000;      % freq offset of diversity carriers
+    
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
-    ch   = sim_in.ch;
+    ch      = sim_in.ch;
+
+    % A few sums to set up the packet.  Using our OFDM nomenclature, we have one
+    % "modem frame" for the packet, so Np=1, Nbitspermodemframe == Nbitsperpacket, and
+    % there is just one modem frame for the FEC codeword.  This is common for 
+    % digital voice modes.  In this simulation we assume all payload data symbols
+    % are used for payload data (no text or unique word symbols).
+
+    npayloadbitsperframe = 224;
+    npayloadsymbolsperframe = npayloadbitsperframe/bps
+    npayloadsymbolsperframepercarrier = Ns-1;
+    Nc = npayloadsymbolsperframe/npayloadsymbolsperframepercarrier;
+    % make sure we have an integer number of carriers
+    assert(floor (Nc) == Nc);
+    if verbose
+      printf("npayloadbitsperframe: %d\n", npayloadbitsperframe);
+      printf("npayloadsymbolsperframe: %d\n",npayloadsymbolsperframe);
+      printf("Nc: %d\n", Nc);
+    end
+    % carrier frequencies, start at 400Hz
+    w = 2*pi*(400 + (0:Nc*Nd+1)*Rs)/Fs;
+
     nbitsvec = sim_in.nbits;
-    nsymb_max = max(nbitsvec)/bps+Npad;
+    nframes_max = floor(max(nbitsvec)/npayloadbitsperframe) + Npad
+    nsymb_max = nframes_max*Ns
+
     ch_phase = 0;
     if isfield(sim_in,"ch_phase")
       ch_phase = sim_in.ch_phase;
@@ -108,8 +113,6 @@ function sim_out = ber_test(sim_in)
       combining = sim_in.combining;
     end
     
-    div_c = floor(div_Hz/Rs);
-
     % init HF model
 
     hf_en = 0;
@@ -118,9 +121,9 @@ function sim_out = ber_test(sim_in)
       % some typical values
 
       if strcmp(ch,"mpp")
-        dopplerSpreadHz = 1.0; path_delay_s = 2.5E-3;
+        dopplerSpreadHz = 1.0; path_delay_s = 2E-3;
       else
-        dopplerSpreadHz = 2.0; path_delay_s = 4.5E-3;
+        dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
       end
 
       spread1 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
@@ -140,34 +143,46 @@ function sim_out = ber_test(sim_in)
 
         % integer number of "modem" frames
         nbits = nbitsvec(ne);
-        nsymb = nbits/bps;
-        nsymb = floor(nsymb/Np)*Np + Npad;
-        nbits = nsymb*bps;
+        nframes = floor(nbits/npayloadbitsperframe) + Npad
+        nsymb = nframes*Ns;
 
         % modulator ------------------------
 
-        tx_bits = rand(1,nbits) > 0.5;    
-        tx_symb = zeros(Nc*Nd,nsymb);
-        prev_tx_symb = 1;
-        for s=1:nsymb
-            % insert pilot every Np symbols
-            if mod(s-1,8) == 0
-              tx_bits(2*s-1:2*s) = [0 0];
+        tx_bits = rand(1,nframes*npayloadbitsperframe) > 0.5; bit = 1;
+        tx_symb = [];
+        for f=1:nframes
+          % set up Nc x Ns array of symbols with pilots
+          atx_symb = zeros(Nc,Ns); 
+          for c=1:Nc
+            atx_symb(c,1) = 1;
+            for s=2:Ns
+              atx_symb(c,s) = qpsk_mod(tx_bits(bit:bit+1)); bit += 2;
             end
-            atx_symb = qpsk_mod(tx_bits(2*s-1:2*s));
-            tx_symb(1,s) = atx_symb;
+          end
+          
+          % diversity copy
+          tmp = [];
+          for d=1:Nd;
+            tmp = [tmp; atx_symb];
+          end
+          atx_symb = tmp;
+
+          % add "wingman" pilots for first and last carriers
+          wingman = [1 zeros(1,Ns-1)];
+          atx_symb = [wingman; atx_symb; wingman];
+
+          % normalise power when using diversity
+          atx_symb *= 1/sqrt(Nd);
+          
+          tx_symb = [tx_symb atx_symb];
         end
-        % set up parallel carriers, only middle one carries data
-        for c=2:Nc*Nd
-          tx_symb(c,:) = tx_symb(1,:);
-        end
-        % normalise power when using diversity
-        tx_symb *= 1/sqrt(Nd);
-        
+        [r c] = size(tx_symb);
+        assert(c == nsymb);
+
         % channel ---------------------------
 
         rx_symb = tx_symb;
-        ch_model = ones(Nc*Nd,nsymb).*exp(j*ch_phase);
+        ch_model = ones(Nc*Nd+2,nsymb).*exp(j*ch_phase);
 
         if hf_en
 
@@ -175,15 +190,11 @@ function sim_out = ber_test(sim_in)
           % ISI, just per carrier freq-domain filtering by a single
           % complex coefficient.
 
-          hf_model = zeros(Nc*Nd, nsymb);
-          for s=1:nsymb 
-            for d=0:Nd-1
-              for c=1:Nc
-                % middle carrier at 0 Hz, note Fs cancels
-                w = 2*pi*(c-2 + div_c*d)*Rs/Fs;
-                a = path_delay_s*Fs;
-                hf_model(c+d*Nc,s) = hf_gain*(spread1(s) + exp(-j*a*w)*spread2(s));
-              end
+          hf_model = zeros(Nc*Nd+2, nsymb);
+          for c=1:Nc*Nd+2
+            for s=1:nsymb
+              a = path_delay_s*Fs;
+              hf_model(c,s) = hf_gain*(spread1(s) + exp(-j*a*w(c))*spread2(s));
             end
           end
  
@@ -197,40 +208,41 @@ function sim_out = ber_test(sim_in)
 
         % variance is noise power, which is divided equally between real and
         % imag components of noise
-        noise = sqrt(variance*0.5)*(randn(Nc*Nd,nsymb) + j*randn(Nc*Nd,nsymb));
+        noise = sqrt(variance*0.5)*(randn(Nc*Nd+2,nsymb) + j*randn(Nc*Nd+2,nsymb));
         rx_symb += noise;
 
         % equaliser ------------------------------------------
 
         rx_symb_t = Ts*(0:nsymb-1);          % symbol times
-        rx_pilots_t = Ts*(0:Np:nsymb-1);     % pilot times
+        rx_pilots_t = Ts*(0:Ns:nsymb-1);     % pilot times
 
-        % estimate channel by extracting pilots and smoothing across time and freq,
-        % and interpolating to obation channel estimates for every symbol        
-        rx_pilots = zeros(Nd,nsymb/Np); 
-        rx_ch = zeros(Nd,nsymb);              % channel estimate of centre carrier
-        for d=0:Nd-1
-          % need to filter each diversity copy separately
+        % estimate channel by extracting pilots, smoothing across time and freq,
+        % and interpolating to obtain channel estimates for every symbol        
+        rx_pilots = zeros(Nc*Nd+2,nsymb/Ns); 
+        rx_ch = zeros(Nc*Nd+2,nsymb);
+
+        for c=2:Nc*Nd+1
+          % need to filter each carrier separately
 
           if sim_in.ls_pilots
             p = 1; local_path_delay_s = 0.004;
-            w = -2*pi*((-1:1) + div_c*d)*Rs*local_path_delay_s;
-            A = [1 exp(j*w(1)); 1 exp(j*w(2)); 1 exp(j*w(3))];
-            P = inv(A'*A)*A';
-            for s=1:Np:nsymb
-              h = zeros(Nc,1);
-              for c=1:Nc
-                h(c) = rx_symb(c+d*Nc,s);
+            a = Rs*local_path_delay_s;
+            A = [1 exp(j*w(c-1)*a); 1 exp(j*w(c)*a); 1 exp(j*w(c+1)*a)];
+            P = inv(A'*A)*A'; 
+            for s=1:Ns:nsymb
+              h = zeros(3,1);
+              for c1=-1:1
+                h(c1+2) = rx_symb(c+c1,s);
               end
               g = P*h;
-              rx_pilots(d+1,p) = g(1) + g(2); p++;
+              rx_pilots(c,p) = g(1) + g(2); p++;
             end
           else
             % weighted average across frequency
-            for c=1:Nc
-              rx_pilots(d+1,:) += pilot_freq_weights(c)*rx_symb(c+d*Nc,1:Np:nsymb);   
+            for c1=-1:1
+              rx_pilots(c,:) += pilot_freq_weights(2+c1)*rx_symb(c+c1,1:Ns:nsymb);   
             end
-            rx_pilots(d+1,:) ./= sum(pilot_freq_weights);
+            rx_pilots(c,:) ./= sum(pilot_freq_weights);
           end
  
           % bunch of options for resampler, takes pilots and estimates channel
@@ -238,82 +250,70 @@ function sim_out = ber_test(sim_in)
           if strcmp(sim_in.resampler,"nearest")
             % use nearest pilot
             for s=0:nsymb-1
-              ind = round(s/Np)+1;
+              ind = round(s/Ns)+1;
               ind = min(length(rx_pilots),ind); ind = max(1,ind);
-              rx_ch(d+1,s+1) = rx_pilots(d+1,ind);
+              rx_ch(c,s+1) = rx_pilots(c,ind);
             end
           end
           if strcmp(sim_in.resampler,"lin2")
             % Linear interpolation between two nearest pilots, used on 700E and datac1 modes
             % 1.5dB Il AWGN, similar performance to mean4 on HF (1.5dB), trade off I guess
-            rx_ch(d+1,:) = interp1(rx_pilots_t,rx_pilots(d+1,:),rx_symb_t);
+            rx_ch(c,:) = interp1(rx_pilots_t,rx_pilots(c,:),rx_symb_t);
           end
           if strcmp(sim_in.resampler,"mean4")
             % Mean of 4 adjacent pilots, similar time duration to 700D.  Lack of HF response in resampler
             % is quite obvious, about 0.5dB IL AWGN
-            filter_delay = 1.5*Np*Ts;
+            filter_delay = 1.5*Ns*Ts;
             h = [1 1 1 1]; h=h./sum(h);
-            rx_pilots_filtered = filter(h,1,rx_pilots(d+1,:));
-            rx_ch(d+1,:) = interp1(rx_pilots_t-filter_delay,rx_pilots_filtered,rx_symb_t,"extrap");
+            rx_pilots_filtered = filter(h,1,rx_pilots(c,:));
+            rx_ch(c,:) = interp1(rx_pilots_t-filter_delay,rx_pilots_filtered,rx_symb_t,"extrap");
           end
           if strcmp(sim_in.resampler,"sinc")
             % use sinc filter to double the sample rate of the pilots, then linear interpolation
             % note delay and B needed hand tweaking using plot_freq_response above, and run_single to adjust delay
-            filter_delay = 3.5*Np*Ts;
+            filter_delay = 3.5*Ns*Ts;
             B=2*pi; n=(-3.5:0.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h);
             rx_pilots2 = zeros(1,2*length(rx_pilots));
-            rx_pilots2(1:2:end) = rx_pilots(d+1,:);
+            rx_pilots2(1:2:end) = rx_pilots(c,:);
             rx_pilots2_filtered = 2*filter(h,1,rx_pilots2);
-            rx_pilots2_t = Ts*(0:Np/2:nsymb-1);
-            rx_ch(d+1,:) = interp1(rx_pilots2_t-filter_delay,rx_pilots2_filtered,rx_symb_t,"extrap");
+            rx_pilots2_t = Ts*(0:Ns/2:nsymb-1);
+            rx_ch(c,:) = interp1(rx_pilots2_t-filter_delay,rx_pilots2_filtered,rx_symb_t,"extrap");
           end
 
-        end % for d=0:Nd-1
-        
-        % now we have channel estimates perform equalisation of received symbols
+        end % for c=2:Nc*Nd+1
+      
+        % now we have channel estimates perform equalisation of received symbols, discarding
+        % padding frames at the end and "wingman" carriers
+
         nsymb -= Npad;
-        rx_symb_single = zeros(1,nsymb);
-        rx_symb(2,1:end-Npad);
-        if sim_in.ideal_phase == 0
-          if Nd == 1
-            % just equalise phase
-            for s=1:nsymb
-              rx_symb_single(s) = rx_symb(2,s)*exp(-j*angle(rx_ch(1,s)));
-            end
+        rx_symb_eq = zeros(Nc*Nd,nsymb);
+        s = 1:nsymb;
+        for c=2:Nc*Nd+1
+          if sim_in.ideal_phase == 1
+            rx_symb_eq(c-2,s) = rx_symb(c,s);
           else
-            if strcmp(combining,"mrc")
-              for d=0:Nd-1
-                for s=1:nsymb
-                  rx_symb_single(s) += rx_symb(2+Nc*d,s)*rx_ch(1+d,s)';
-                end
-              end
-            else
-              % equal ratio combining, just equalise phase
-              for d=0:Nd-1
-                for s=1:nsymb
-                  rx_symb_single(s) += rx_symb(2+Nc*d,s)*exp(-j*angle(rx_ch(1+d,s)));
-                end
+            for d=0:Nd-1
+              if strcmp(combining,"mrc")
+                % maximum ratio combining
+                rx_symb_eq(c-1,s) += rx_symb(2+Nc*d,s)*rx_ch(1+d,s)';
+              else 
+                % equal ratio combining, just equalise phase
+                rx_symb_eq(c-1,s) += rx_symb(c+d*Nc,s).*exp(-j*angle(rx_ch(c+d*Nc,s)));
               end
             end
           end
-        else
-          for d=0:Nd-1
-            for s=1:nsymb
-              rx_symb_single(s) += rx_symb(2+Nc*d,s);
-            end
-          end
-        end
-
+        end % for c=2:Nc*Nd+1 
 
         if verbose == 2
             figure(1); clf;
+            c = 2;
             if isfield(sim_in,"epslatex")
                 % just real part for Latex plot
                 [textfontsize linewidth] = set_fonts(20);
                 hold on;
-                plot(rx_symb_t,real(ch_model(2,:)),'b;channel Hn;');
-                plot(rx_pilots_t, real(rx_pilots),'ro;pilots;');
-                plot(rx_symb_t,real(rx_ch),'r-;lin2 channel est;');
+                plot(rx_symb_t,real(ch_model(c,:)),'b;channel Hn;');
+                plot(rx_pilots_t, real(rx_pilots(c,:)),'ro;pilots;');
+                plot(rx_symb_t,real(rx_ch(c,:)),'r-;lin2 channel est;');
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('real');
                 fn = "interpolator.tex";
                 print(fn,"-depslatex","-S300,300");
@@ -321,31 +321,35 @@ function sim_out = ber_test(sim_in)
                 restore_fonts(textfontsize,linewidth);
             else 
                 subplot(211); hold on;
-                plot(rx_symb_t,real(ch_model(2,:)/sqrt(Nd)),'b-');
-                %plot(rx_symb_t,real(ch_model(5,:)/sqrt(Nd)),'b--');
-                plot(rx_pilots_t, real(rx_pilots(1,:)),'ro');
-                plot(rx_symb_t,real(rx_ch(1,:)));
+                plot(rx_symb_t,real(ch_model(c,:)/sqrt(Nd)),'b-');
+                plot(rx_pilots_t, real(rx_pilots(c,:)),'ro');
+                plot(rx_symb_t,real(rx_ch(c,:)));
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('real');
                 subplot(212); hold on;
-                plot(rx_symb_t,imag(ch_model(2,:)),'b-');
-                plot(rx_pilots_t, imag(rx_pilots),'ro');
-                plot(rx_symb_t,imag(rx_ch));
+                plot(rx_symb_t,imag(ch_model(c,:)),'b-');
+                plot(rx_pilots_t, imag(rx_pilots(c,:)),'ro');
+                plot(rx_symb_t,imag(rx_ch(c,:)));
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('imag');
             end
         end
  
         % demodulate rx symbols to bits
-        rx_bits = [];
-        prev_rx_symb = 1;
-        for s=1:nsymb
-          arx_symb = rx_symb_single(s);
-          two_bits = qpsk_demod(arx_symb);
-          rx_bits = [rx_bits two_bits];
+        nframes -= Npad;
+        rx_bits = zeros(1,nframes*npayloadbitsperframe);
+        bit = 1;
+        for f=1:nframes
+          for c=1:Nc
+            for s=2:Ns
+              arx_symb = rx_symb_eq(c,(f-1)*Ns+s);
+              rx_bits(bit:bit+1) = qpsk_demod(arx_symb);
+              bit+=2;
+            end
+          end
         end
-        
+       
         % count errors -----------------------------------------
 
-        error_pattern = xor(tx_bits(1:end-Npad*bps), rx_bits);
+        error_pattern = xor(tx_bits(1:nframes*npayloadbitsperframe), rx_bits);
         nerrors = sum(error_pattern);
         bervec(ne) = nerrors/nbits + 1E-12;
         if verbose
@@ -355,8 +359,8 @@ function sim_out = ber_test(sim_in)
                 [textfontsize linewidth] = set_fonts(20);
             end
             figure(2); clf;
-            plot(rx_symb_single*exp(j*pi/4),'+','markersize', 10);
-            mx = max(abs(rx_symb_single));
+            plot(rx_symb_eq*exp(j*pi/4),'+','markersize', 10);
+            mx = max(abs(rx_symb_eq(:)));
             axis([-mx mx -mx mx]);
             if isfield(sim_in,"epslatex")
                 fn = "scatter.tex";

@@ -102,7 +102,12 @@ function sim_out = ber_test(sim_in)
     end
     if isfield(sim_in,"Nd")
       Nd = sim_in.Nd;
+      combining = "ecg";
     end
+    if isfield(sim_in,"combining")
+      combining = sim_in.combining;
+    end
+    
     div_c = floor(div_Hz/Rs);
 
     % init HF model
@@ -200,7 +205,8 @@ function sim_out = ber_test(sim_in)
         rx_symb_t = Ts*(0:nsymb-1);          % symbol times
         rx_pilots_t = Ts*(0:Np:nsymb-1);     % pilot times
 
-        % extract pilots, filtering across freq        
+        % estimate channel by extracting pilots and smoothing across time and freq,
+        % and interpolating to obation channel estimates for every symbol        
         rx_pilots = zeros(Nd,nsymb/Np); 
         rx_ch = zeros(Nd,nsymb);              % channel estimate of centre carrier
         for d=0:Nd-1
@@ -262,15 +268,43 @@ function sim_out = ber_test(sim_in)
             rx_ch(d+1,:) = interp1(rx_pilots2_t-filter_delay,rx_pilots2_filtered,rx_symb_t,"extrap");
           end
 
-          % actual equalisation (just of phase)
-          if sim_in.ideal_phase == 0
-            for s=1:nsymb
-              rx_symb(2+Nc*d,s) *= exp(-j*angle(rx_ch(d+1,s)));
-            end
-          end
-
         end % for d=0:Nd-1
         
+        % now we have channel estimates perform equalisation of received symbols
+        nsymb -= Npad;
+        rx_symb_single = zeros(1,nsymb);
+        rx_symb(2,1:end-Npad);
+        if sim_in.ideal_phase == 0
+          if Nd == 1
+            % just equalise phase
+            for s=1:nsymb
+              rx_symb_single(s) = rx_symb(2,s)*exp(-j*angle(rx_ch(1,s)));
+            end
+          else
+            if strcmp(combining,"mrc")
+              for d=0:Nd-1
+                for s=1:nsymb
+                  rx_symb_single(s) += rx_symb(2+Nc*d,s)*rx_ch(1+d,s)';
+                end
+              end
+            else
+              % equal ratio combining, just equalise phase
+              for d=0:Nd-1
+                for s=1:nsymb
+                  rx_symb_single(s) += rx_symb(2+Nc*d,s)*exp(-j*angle(rx_ch(1+d,s)));
+                end
+              end
+            end
+          end
+        else
+          for d=0:Nd-1
+            for s=1:nsymb
+              rx_symb_single(s) += rx_symb(2+Nc*d,s);
+            end
+          end
+        end
+
+
         if verbose == 2
             figure(1); clf;
             if isfield(sim_in,"epslatex")
@@ -299,13 +333,6 @@ function sim_out = ber_test(sim_in)
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('imag');
             end
         end
-
-        % extract centre carrier, remove padding at end as equaliser invalid
-        rx_symb_single = rx_symb(2,1:end-Npad);
-        for d=2:Nd
-          rx_symb_single += rx_symb(2+Nc*(d-1),1:end-Npad);
-        end
-        nsymb -= Npad;
  
         % demodulate rx symbols to bits
         rx_bits = [];
@@ -344,7 +371,7 @@ function sim_out = ber_test(sim_in)
     sim_out.bervec = bervec;
 endfunction
 
-function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots=0, Nd=1)
+function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots=0, Nd=1, combining='egc')
     sim_in.pilot_freq_weights = [0 1 0];
     sim_in.verbose     = 2;
     sim_in.nbits       = nbits;
@@ -352,9 +379,10 @@ function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots
     sim_in.ch          = ch;
     sim_in.resampler   = resampler;
     sim_in.ch_phase    = 0;
-    sim_in.ideal_phase = 1;
+    sim_in.ideal_phase = 0;
     sim_in.ls_pilots   = ls_pilots;
     sim_in.Nd          = Nd;
+    sim_in.combining   = combining;
 
     sim_qpsk = ber_test(sim_in);
 endfunction
@@ -488,7 +516,8 @@ function run_curves_diversity(itut_runtime=0,epslatex=0)
     hf_sim_in.Nd = 2; hf_sim_in.ideal_phase = 1;
     hf_sim_ideal_div2 = ber_test(hf_sim_in);
     hf_sim_in.ideal_phase = 0; hf_sim_div2 = ber_test(hf_sim_in);
-
+    hf_sim_in.combining = "mrc"; hf_sim_div2_mrc = ber_test(hf_sim_in);
+    
     if epslatex
         [textfontsize linewidth] = set_fonts();
     end
@@ -501,11 +530,11 @@ function run_curves_diversity(itut_runtime=0,epslatex=0)
     semilogy(sim_in.EbNovec, awgn_sim.bervec,'m+-;AWGN sim;')
 
     semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2.bervec,'rx-;HF sim div2 MPP;')
     semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'mx-;HF sim MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_ideal_div2.bervec,'ro-;HF sim ideal div2 MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2.bervec,'mo-;HF sim div2 MPP;')
-
+    semilogy(hf_sim_in.EbNovec, hf_sim_ideal_div2.bervec,'ro-;HF sim ideal div2 EGC MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2.bervec,'mo-;HF sim div2 EGC MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.bervec,'co-;HF sim div2 MRC MPP;')
+ 
     hold off;
     xlabel('Eb/No (dB)')
     ylabel('BER')
@@ -516,7 +545,7 @@ function run_curves_diversity(itut_runtime=0,epslatex=0)
         fn = "equaliser_div.tex";
         print(fn,"-depslatex","-S350,350");
         printf("printing... %s\n", fn);
-        restore_fonts(textfontsize,bergada2014digital);
+        restore_fonts(textfontsize);
     end
 
 endfunction

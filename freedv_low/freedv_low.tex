@@ -5,6 +5,7 @@
 \usepackage{tikz}
 \usepackage{tkz-euclide}
 \usepackage[numbib]{tocbibind}
+\usepackage{hyperref}
 \begin{document}
 
 \title{Low SNR FreeDV Mode}
@@ -19,7 +20,8 @@ After 10 years development and on air experience with various FreeDV waveforms, 
 \item Better performance than SSB at 0dB SNR on MPP and MPD channels.
 \item A single mode that can handle MPP, MPD, GEO (e.g. QO-100), and replace several existing FreeDV modes, simplifying the end user experience.
 \item For compliance with Export Control regulations, the minimum speech codec bit rate is 700 bit/s.
-\item Use of legacy analog HF radio sets with a RF bandwidth of 2000 Hz.
+\item Use of legacy analog HF radio sets with a RF bandwidth of around 2000 Hz.
+\item Compliant with the 300 baud per carrier limit set by the United States FCC, which implies a parallel tone or OFDM modem. 
 \end{enumerate}
 It is acceptable for performance to gradually decrease as the multipath channel quality declines, but we would like the decline to be gradual, e.g. a few dB more power for operation on MPD versus MPP.
 
@@ -52,14 +54,14 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
 
 \begin{table}[h]
 \centering
-\begin{tabular}{l l l}
+\begin{tabular}{l m{6cm} l}
  \hline
  Symbol & Explanation & Units \\
  \hline
  $B$ & Noise bandwidth & Hz \\
  $B_d$ & Doppler spreading bandwidth for HF channel model & Hz \\
  $E_b/N_0$ & Energy per bit on spectral noise density & dimensionless, dB\footnote{1} \\
- $N_p$ & Pilot insertion rate & dimensionless \\
+ $N_s$ & Number of symbols in a \emph{modem frame}, pilot insertion rate & dimensionless \\
  $R_b$ & Bit rate & Bits/second \\
  $R_s$ & Symbol rate & symbols/second \\
  $T_s$ & Symbol period & seconds \\
@@ -120,7 +122,7 @@ FreeDV signals are typically transmitted over the air using legacy HF radios.  W
 \subsection{Pilot Symbol Overhead}
 
 \begin{figure}[h]
-\caption{Modem Frame with $N_p=8$, the pilot of the next modem frame is also shown.}
+\caption{Modem Frame with $N_s=8$, the pilot of the next modem frame is also shown.}
 \vspace{5mm}
 \label{fig:modem_frame}
 \centering
@@ -142,12 +144,12 @@ FreeDV signals are typically transmitted over the air using legacy HF radios.  W
 \end{tikzpicture}
 \end{figure}
 
-In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_p-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a modem \emph{modem frame}. The frame of $N_p-1$ symbols has a period of $T_f=(N_p-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_p$ symbols long, with period $T^\prime_f=N_pT_s$.  To maintain the same payload data rate:
+In this section we explore the effect of inserting pilot symbols on the threshold SNR (\ref{eq:snr}). Consider a sequence of $N_s-1$ PSK data symbols that carry the modulated FEC codeword bits (e.g. data and parity bits) over the channel. We denote this sequence a modem \emph{modem frame}. The frame of $N_s-1$ symbols has a period of $T_f=(N_s-1)T_s$ seconds, where $T_s$ is the period of each symbol.  We wish to insert a single pilot symbol after the data symbols, creating a new frame $N_s$ symbols long, with period $T^\prime_f=N_sT_s$.  To maintain the same payload data rate:
 \begin{equation}
 \begin{split}
 T_f &= T^\prime_f \\
-(N_p-1)T_s &= N_pT_s \\
-R^\prime_s &= R_s\frac{N_p}{N_p-1}
+(N_s-1)T_s &= N_sT_s \\
+R^\prime_s &= R_s\frac{N_s}{N_s-1}
 \end{split}
 \end{equation}
 where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ (\ref{eq:snr}) in terms of $E_s$ and $R_s$:
@@ -156,16 +158,16 @@ where the symbol rate $R_s=1/T_s$.  Expressing $S/N$ (\ref{eq:snr}) in terms of 
 \begin{split}
 \frac{S}{N} &= \frac{E_sR_s}{N_0B} \\
 \frac{S}{N}^\prime &= \frac{E_sR^\prime_s}{N_0B} \\
-                   &= \frac{E_sR_sN_s}{N_0B(N_p-1)} \\
-\frac{S^\prime/N}{S/N} &= \frac{N_p}{N_p-1}
+                   &= \frac{E_sR_sN_s}{N_0B(N_s-1)} \\
+\frac{S^\prime/N}{S/N} &= \frac{N_s}{N_s-1}
 \end{split}
 \end{equation}
-Thus when we insert pilots, the threshold $S/N$ increases by a factor of $N_p/(N_p-1)$. Expressed in $\si{dB}$:
+Thus when we insert pilots, the threshold $S/N$ increases by a factor of $N_s/(N_s-1)$. Expressed in $\si{dB}$:
 \begin{equation}
 \begin{split}
 10log_{10}\left(\frac{S^\prime}{N}\right) &= 10log_{10}\left(\frac{S}{N}\right) + 10log_{10}\left(\frac{N_s}{N_s-1}\right) \\
-SNR^\prime &= SNR + 10log_{10}\left(\frac{N_p}{N_p-1}\right) \\
-SNR^\prime &= SNR + L_p  \quad [\si{dB}]Ideal 
+SNR^\prime &= SNR + 10log_{10}\left(\frac{N_s}{N_s-1}\right) \\
+SNR^\prime &= SNR + L_p  \quad [\si{dB}]
 \end{split}
 \end{equation}
 where $L_p$ can be considered the pilot symbol \emph{loss} - the SNR degradation from the ideal performance (\ref{eq:snr}) due to the insertion of pilot symbols. For example FreeDV 700D uses a pilot insertion rate of $N_s=8$ results in $L_p=10log_{10}(8/7)=0.58 \, \si{dB}$, thus we need 0.58 dB more SNR to achieve the threshold SNR for the voice link.   For this example let $Rs$ be the total symbol rate over all $N_c$ carriers. To maintain $Rs=700$ data symbols/second over the channel, we require $R^\prime_s = (700)8/7 =800$ symbols/second which introduces a 100 Hz bandwidth overhead.
@@ -236,13 +238,44 @@ SNR^\prime  &= SNR - 10log_{10}(1-T_{cp}/T_s) \\
 \end{equation}
 Thus to close the link with the composite symbol the $S/N$ must be increased by a factor of $1/(1 - {T_s}/T_{cp})$ compared to our ideal modem, to account for the energy allocated to the CP.  For example FreeDV 700E has $T_s=0.02$, $T_{cp}=0.006$, giving $L_{cp}=-10log10(1-0.006/0.02)=1.55 \si{dB}$.
 
+\subsection{Bandwidth}
+
+Using the expressions above, we can estimate the total RF bandwidth of candidate waveforms:
+\begin{equation}
+B = \frac{R_sN_s}{(N_s-1)(1-T_{cp}/T_s)}
+\end{equation}
+
+where $R_s$ is the total symbol rate over the channel.  For example for 700D, $B = 700(8)/((8-1)(1-0.002/0.02))=888.89$ Hz.  In practice 700D has some extra bits allocated for frame synchronisation and auxiliary text, resulting in $B=944$ Hz.
+
+\subsection{Summary of FreeDV modes}
+
+Using the framework developed above, we can analyse the existing FreeDV waveforms, using the information in \cite{codec2_waveform_spreadsheet}.
+
+\begin{table}[h]
+\label{tab:freedv_wavefoms}
+\centering
+\begin{tabular}{c c c c c c c c}
+ \hline
+ Mode & $N_s$ & $R_s$ & $Ts$ & $T^\prime_s$ & $T_{cp}$ & ${L_p}$ (dB) & $L_{cp}$ (dB)  \\
+ \hline
+ 700C & 3 & 75 & 0.013 & 0.013 & 0.000 & 1.77 & 0.00 \\
+ 700D & 8 & 50 & 0.020 & 0.018 & 0.002 & 0.58 & 0.46 \\
+ 700E & 4 & 50 & 0.020 & 0.014 & 0.006 & 1.24 & 1.55 \\
+ datac4 & 5 & 50 & 0.020 & 0.014 & 0.006 & 0.97 & 1.38 \\
+ \hline
+\end{tabular}
+\caption{Summary of FreeDV waveforms, note the differences in the overheads $L_p$ and $L_{cp}$. $R_s$ and $T_s$ is per-carrier. 700C is a parallel tone modem with no cyclic prefix, the modem frame is comprised of two pilot symbols and 4 data symbols}
+\end{table}
+
 \subsection{HF Channel Model}
 
 A common two path HF channel model \cite{itu1487} is given by:
 \begin{equation}
 y(t) = x(t)G_1(t) + x(t-d)G_2(t)
 \end{equation}
-where $G_1$ and $G_2$ are two time varying, complex, Gaussian filtered random variables with \emph{Doppler Spread} bandwidth $B_d$ Hz, $d$ is the path delay in seconds. As $B_d<< R_s$ we assume $G_1$ and $G_2$ are complex constants for the duration of a single symbol. Expressed in discrete time for the current symbol:
+where $G_1$ and $G_2$ are two time varying, complex, Gaussian filtered random variables with \emph{Doppler Spread} bandwidth $B_d$ Hz, $d$ is the path delay in seconds. Other models with varying delay, number of paths, and fixed frequency offset components are also possible, for example Appendix B of \cite{etsi201}.
+
+As $B_d<< R_s$ we assume $G_1$ and $G_2$ are complex constants for the duration of a single symbol. Expressed in discrete time for the current symbol:
 \begin{equation}
 \label{eq:hf_model_time}
 y(n) = x(n)G_1 + x(n-dF_s)G_2
@@ -303,15 +336,6 @@ y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j (\omega (n-dF_s) + \phi_2)} \
 \end{equation}
 Thus if we start detecting $y(n)$ after the longest delay term $dF_s$ we can recover the transmitted PSK symbol without ISI, and equalise it by estimating a single complex coefficient $H_c$.  In practice detection means integration over a complete symbol $T_s$, therefore the symbol $e^{j \omega n + \phi_n}$ must be transmitted for $d+T^\prime_s=T_{cp}+T^\prime_s$ seconds, with the cyclic prefix length $T_{cp} \ge d$.
 
-\subsection{Bandwidth}
-
-Using the expressions above, we can estimate the total RF bandwidth of candidate waveforms:
-\begin{equation}
-B = \frac{R_sN_p}{(N_p-1)(1-T_{cp}/T_s)}
-\end{equation}
-
-where $R_s$ is the total symbol rate over the channel.  For example for 700D, $B = 700(8)/((8-1)(1-0.002/0.02))=888.89$ Hz.  In practice 700D has some extra bits allocated for frame synchronisation and auxiliary text, resulting in $B=944$ Hz.
-
 \section{Waveform Improvements}
 
 In this section waveform improvements are presented.
@@ -326,7 +350,7 @@ If we detect symbols after ISI has settled, the channel for each OFDM carrier re
 
 Consider the two path time domain channel model (\ref{eq:hf_model_time}). Two additive terms of bandwidth B add linearly, so by linearity the result also has bandwidth B.  The sum is a random modulation of bandwidth $B_d$ about the symbol centre frequency.  The Doppler bandwidth $B_d$ therefore defines the bandwidth required for equalisation. One caveat - if $B_d$ an appreciable fraction of $R_s$ the DFT orthogonality may break down to some extent as energy falls into adjacent DFT bins.
 
-FreeDV 700D samples pilots and hence $H_c$ at $1/(N_pTs)=6.25$ Hz.  As we are sampling a complex signal, this implies a Nyquist bandwidth of 6.25 Hz, which should be adequate to recover $H_c$ which has a maximum $B_d=2$ Hz on the MPD channel. 700D currently uses a block average over a 2D array (4 pilots in time, across 3 carriers in frequency) of 12 pilots, this can be interpreted as a 2D FIR filter with all coefficients $c_i=1/12$. It is effective on MPP channels ($B_d=1$ Hz), but breaks down on MPD channels ($B_d=2$ Hz).  This suggests a resampler with a wider bandwidth might enable a waveform similar to 700D to be used on MPD channels.
+FreeDV 700D samples pilots and hence $H_c$ at $1/(N_sTs)=6.25$ Hz.  As we are sampling a complex signal, this implies a Nyquist bandwidth of 6.25 Hz, which should be adequate to recover $H_c$ which has a maximum $B_d=2$ Hz on the MPD channel. 700D currently uses a block average over a 2D array (4 pilots in time, across 3 carriers in frequency) of 12 pilots, this can be interpreted as a 2D FIR filter with all coefficients $c_i=1/12$. It is effective on MPP channels ($B_d=1$ Hz), but breaks down on MPD channels ($B_d=2$ Hz).  This suggests a resampler with a wider bandwidth might enable a waveform similar to 700D to be used on MPD channels.
 
 To explore pilot resampling algorithms, a simulation was written to evaluate candidate algorithms by comparing uncoded BER versus $E_b/N_0$ curves.  One interpretation of resampling 4 pilots in time is a 4 point FIR filter. This was explored, along with the existing \emph{mean12} resampler (700D), and 2 point linear \emph{lin2} resampler (as used in FreeDV 700E). Figure \ref{fig:interpolator} shows the \emph{lin2} resampler in action.
 
@@ -369,10 +393,10 @@ Ag &= h \\
 
 where $\overline{H_0}$ is the smoothed estimate of the current carriers pilot symbol.  Note that the channel delay $d$ is actually an unknown (and indeed the entire model is an approximation of the real channel). It was found that in simulation, choosing $d=0.002$ or $d=0.004$ produced reasonable results, possibly due to the symmetry of the RHS of (\ref{eq:hf_model_freq}), and the dominance of channel over resampler noise at low SNRs. If $d$ is approximated with a known value, the $(A^TA)^{-1}A^T$ term can then be precomputed as all the parameters of $A$ are known.
 
-This algorithm is denoted \emph{lin2ls}.  It's BER performance is characterised in Figure \ref{fig:equaliser_curves} and three resamplers summarised in Table \ref{tab:resampler_summary}.
+This algorithm is denoted \emph{lin2ls}.  It's BER performance is plotted in Figure \ref{fig:equaliser_curves} and three resamplers summarised in Table \ref{tab:resampler_summary}.
 
 \begin{figure}[h]
-\caption{Uncoded BER performance curves for equaliser algorithms over various channels. \emph{mean12} is the algorithm used for 700D, and \emph{lin2} for 700E.  Note \emph{mean12} (blue) is very close to theory for AWGN but breaks down on MPP.  The \emph{lin2ls} algorithm performs quite well on MPP and MPD, and about 0.5dB power than \emph{mean12} on AWGN.}
+\caption{Uncoded BER performance curves for equaliser algorithms over various channels. \emph{mean12} is the algorithm used for 700D, and \emph{lin2} for 700E.  Note \emph{mean12} (blue) is very close to theory for AWGN but breaks down on MPP.  The \emph{lin2ls} algorithm performs quite well on MPP and MPD, and about 0.5dB poorer than \emph{mean12} on AWGN.}
 \label{fig:equaliser_curves}
 \begin{center}
 \input equaliser.tex
@@ -391,15 +415,15 @@ This algorithm is denoted \emph{lin2ls}.  It's BER performance is characterised 
  lin2ls & 700X & magenta & 0.5 & 0.5 & 0.5 \\
  \hline
 \end{tabular}
-\caption{Comparison of equaliser algorithms for $N_p=8$. The last three numbers are implementation loss in dB, smaller is better.  700X has the advantage of low implementation loss across channels with a single waveform, but is 0.5dB poorer than 700D on the (rare) AWGN channel.  The 700E results are an approximation, as that waveform uses $N_p=5$. }
+\caption{Comparison of equaliser algorithms for $N_s=8$. The last three numbers are implementation loss in dB, smaller is better.  700X has the advantage of low implementation loss across channels with a single waveform, but is 0.5dB poorer than 700D on the (rare) AWGN channel.  The 700E results are an approximation, as that waveform uses $N_s=5$. }
 \end{table}
 
 The new \emph{lin2ls} resampler has the following benefits:
 \begin{enumerate}
 \item Using a single waveform design, it can operate from AWGN to beyond MPP with low SNR performance similar to 700D.
 \item On fast fading (Doppler Spread $B_d>2$ Hz) channels it will outperform 700E at low SNRs.
-\item The $N_p=8$ pilot insertion rate means the pilot symbol loss $L_p=0.58 \si{dB}$ is low, giving good low SNR performance.
-\item Large $N_p$ means the amount of bandwidth used per carrier is small, reducing on air RF bandwidth and giving us options for transmit diversity in the 2000 Hz SSB radio bandwidth.
+\item The $N_s=8$ pilot insertion rate means the pilot symbol loss $L_p=0.58 \si{dB}$ is low, giving good low SNR performance.
+\item Large $N_s$ means the amount of bandwidth used per carrier is small, reducing on air RF bandwidth and giving us options for transmit diversity in the 2000 Hz SSB radio bandwidth.
 \item The new estimator could be applied to the raw data modes to improve low SNR FreeDATA performance.
 \item It uses 2 pilots in time centred around the current modem frame rather than 4 used in \emph{mean12} so will have lower algorithmic delay (one modem frame less) than 700D.
 \end{enumerate}	
@@ -408,11 +432,24 @@ The algorithm used to combine adjacent carriers (\ref{eq:combine_freq}) is new a
 
 \subsection{Multipath}
 
-n=2 diversity to handle multipath.  Say 3dB gain on MPP/MPD.  Research combining techniques. Risks are copies will have half power so estimates will have more noise.
+This section WIP, currently in note form. For the $n=2$ diversity simulation (Figure \ref{fig:equaliser_div_curves}), the signal was split into 2 copies, with half the power going to each copy.  The 2nd copy was shifted 1000 Hz higher in frequency.
 
-\subsection{FEC}
+\begin{enumerate}
+\item We are talking about fast fading here - no much we can do about slow because latency
+\item Maximum Ratio Combining (MRC) seems to get us about 0.5dB over Equal Gain Combining (EGC).
+\item The curves represent the averge BER across the entire simulation.  In practice we are limited by the ability of the FEC to correct errors in a single FEC codeword which is limited by latency to a few 100 ms. So we need a way to test that.  Perhaps simulate all carriers or even include LDPC code.
+\item Current simulation is single carrier so a bit weak, might be best to test with multiple carriers.
+\item Key question is independence of channel $H_c$ at 1 kHz separation of narrow band carriers.  This is actually difficult to simulate as $H_c$ is periodic.
+\item n=2 diversity might also cause PAPR problems as twice as many carriers.
+\end{enumerate}
 
-If we use diversity, I am not sure how much FEC we can also use, as we may run out of bandwidth.  Alternative is MAP techniques or some combination of MAP and FEC.
+\begin{figure}[h]
+\caption{$n=2$ diversity simulation results, all using the \emph{lin2lks} resampler and the MPP channel. At BER=0.1 (where FEC usually falls over) $n=2$ diversity MRC (cyan) has a gain of about 2dB over no diversity (purple). At BER=0.05 about 3dB gain.}
+\label{fig:equaliser_div_curves}
+\begin{center}
+\input equaliser_div.tex
+\end{center}
+\end{figure}
 
 \subsection{Delay Spread (ISI)}
 
@@ -436,11 +473,12 @@ TODO: also include frequency offset estimation and tracking.  Sensitivity of Dop
 This section presents topics useful to explore in future.
 
 \begin{itemize}
-\item Can we include PAPR into model? Can we have different trajectories for QPSK symbols around unit circle that reduce PAPR?  No I don't think that helps when multiple carriers are added together.  ECSSB techniques may be useful.
+\item Can we include PAPR into model?  What can we do about improving PAPR, e.g. successive clipper/filter of ECSSB.
 \item Expression for Fading channels, block error rate, why 2020 is a lemon.
+\item Test against simulations other channel models, for example Appendix B of \cite{etsi201}.
 \item Table of FreeDV waveforms and values, plugged into formula, effect of increasing pilot symbol rate.
 \item Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
-\item Wades MAP techniques (ref).  This has a lot of promise, need an effective way to simulate and establish benefit with a modest amount of work.  Without a rate 0.5 code this would free up a lot of bandwidth to deal with ISI better, e.g. we could have large gaps between symbols.  Or use parallel tone modem to reduce effects of ISI.  A high rate code on top of this may be useful option (if it can converge).   Can we combine MAP with extra bits?  Index optimisation also a simple approach.
+\item Wades MAP techniques (ref).  This has a lot of promise, need an effective way to simulate and establish benefit with a modest amount of work.  Can we combine MAP with extra bits for FEC?  Index optimisation also a simple approach.
 \item Extending (\ref{eq:combine_freq}) to more carriers, it is essentially estimating the entire channel.  Literature search, I'm sure this is nothing new.  Determine if (\ref{eq:combine_freq}) is a reasonable approximation for real HF channels - we have derived it from a simulation model.
 \end{itemize} 
 

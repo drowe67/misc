@@ -81,9 +81,9 @@ function sim_out = ber_test(sim_in)
     if isfield(sim_in,"pilot_freq_weights")
       pilot_freq_weights = sim_in.pilot_freq_weights;
     end
+    combining = "ecg";
     if isfield(sim_in,"Nd")
       Nd = sim_in.Nd;
-      combining = "ecg";
     end
     if isfield(sim_in,"combining")
       combining = sim_in.combining;
@@ -96,12 +96,12 @@ function sim_out = ber_test(sim_in)
     % are used for payload data (no text or unique word symbols).
 
     npayloadbitsperframe = 224;
-    npayloadsymbolsperframe = npayloadbitsperframe/bps
+    npayloadsymbolsperframe = npayloadbitsperframe/bps;
     npayloadsymbolsperframepercarrier = Ns-1;
     Nc = npayloadsymbolsperframe/npayloadsymbolsperframepercarrier;
     % make sure we have an integer number of carriers
     assert(floor (Nc) == Nc);
-    if verbose
+    if verbose == 2
       printf("npayloadbitsperframe: %d\n", npayloadbitsperframe);
       printf("npayloadsymbolsperframe: %d\n",npayloadsymbolsperframe);
       printf("Nc: %d\n", Nc);
@@ -109,11 +109,11 @@ function sim_out = ber_test(sim_in)
     % carrier frequencies, start at 400Hz
     w = 2*pi*(400 + (0:Nc*Nd+1)*Rs)/Fs;
 
-    nbitsvec = sim_in.nbits
-    nframes_max = floor(max(nbitsvec)/npayloadbitsperframe) + Npad
-    nsymb_max = nframes_max*Ns
+    nbitsvec = sim_in.nbits;
+    nframes_max = floor(max(nbitsvec)/npayloadbitsperframe) + Npad;
+    nsymb_max = nframes_max*Ns;
 
-   % init HF model
+    % init HF model
 
     hf_en = 0;
     if strcmp(ch,"mpp") || strcmp(ch,"mpd")
@@ -143,8 +143,12 @@ function sim_out = ber_test(sim_in)
 
         % integer number of "modem" frames
         nbits = nbitsvec(ne);
-        nframes = floor(nbits/npayloadbitsperframe) + Npad
+        nframes = floor(nbits/npayloadbitsperframe) + Npad;
         nsymb = nframes*Ns;
+        if verbose == 2
+          printf("nframes: %d\n", nframes);
+          printf("nsymb: %d\n", nsymb);
+        end
 
         % modulator ------------------------
 
@@ -287,17 +291,16 @@ function sim_out = ber_test(sim_in)
         % padding frames at the end and "wingman" carriers
 
         nsymb -= Npad*Ns;
-        rx_symb_eq = zeros(Nc*Nd,nsymb);
+        rx_symb_eq = zeros(Nc,nsymb);
         s = 1:nsymb;
         for c=2:Nc+1
           if sim_in.ideal_phase == 1
-            rx_symb_eq(c-1,s) = rx_symb(c,s);
+            rx_symb_eq(c-1,s) += rx_symb(c,s);
           else
             for d=0:Nd-1
               if strcmp(combining,"mrc")
-                %rx_symb(c+d*Nc,s).*rx_ch(c+d*Nc,s)'
                  % maximum ratio combining
-                rx_symb_eq(c-1,s) += rx_symb(c+d*Nc,s).*rx_ch(c+d*Nc,s)';
+                rx_symb_eq(c-1,s) += rx_symb(c+d*Nc,s).*conj(rx_ch(c+d*Nc,s));
               else 
                 % equal ratio combining, just equalise phase
                 rx_symb_eq(c-1,s) += rx_symb(c+d*Nc,s).*exp(-j*angle(rx_ch(c+d*Nc,s)));
@@ -305,7 +308,7 @@ function sim_out = ber_test(sim_in)
             end
           end
         end % for c=2:Nc*Nd+1 
-
+        
         if verbose == 2
             figure(1); clf;
             c = 2;
@@ -485,7 +488,7 @@ function run_curves(itut_runtime=0,epslatex=0)
 
 endfunction
 
-function run_curves_diversity(itut_runtime=0,epslatex=0)
+function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     max_nbits = 1E5;
     sim_in.verbose = 1;
     sim_in.EbNovec = 0:10;
@@ -513,9 +516,10 @@ function run_curves_diversity(itut_runtime=0,epslatex=0)
     hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
 
     % run long enough to get sensible results, using rec from ITUT F.1487
-    Fd_min = 1; run_time_s = 3000/Fd_min; Rb = 100;
+    Fd_min = 1; run_time_s = 3000/Fd_min; Rb = 1400;
+    % sometimes useful to run quickly to test code
     % default 0.1*run_time_s actually gives results close to theory
-    if itut_runtime==0, run_time_s /= 10; end % default 0.1*run_time_s
+    run_time_s *= runtime_scale;
     hf_sim_in.nbits(1:length(hf_sim_in.EbNovec)) = floor(run_time_s*Rb);
 
     hf_sim = ber_test(hf_sim_in);

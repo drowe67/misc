@@ -267,6 +267,8 @@ Using the framework developed above, we can analyse the existing FreeDV waveform
 \caption{Summary of FreeDV waveforms, note the differences in the overheads $L_p$ and $L_{cp}$. $R_s$ and $T_s$ is per-carrier. 700C is a parallel tone modem with no cyclic prefix, the modem frame is comprised of two pilot symbols and 4 data symbols}
 \end{table}
 
+TODO: $L_{il}$ estimate using \emph{lin2} modelling below, likely to be greater for 700C/E.  We could also include ${N_c}$, total $R_s$, and SNR estimates.
+
 \subsection{HF Channel Model}
 
 A common two path HF channel model \cite{itu1487} is given by:
@@ -282,6 +284,7 @@ y(n) = x(n)G_1 + x(n-dF_s)G_2
 \end{equation}
 where $F_s$ is the sample rate in $\si{Hz}$.  Taking the z-transform:
 \begin{equation}
+\label{eq:hf_model_freq}
 \begin{split}
 Y(z) &= X(z)G_1+X(z)z^{-dF_s}G_2 \\
 \frac{Y(z)}{X(z)} &= G_1+z^{-dF_s}G_2 \\
@@ -289,11 +292,7 @@ H(z) &= G_1+z^{-dF_s}G_2 \\
 H(e^{j \omega}) &= G_1+e^{-j \omega d F_s}G_2
 \end{split}
 \end{equation}
-For OFDM, the angular frequency of carrier $c$ is given by $\omega=2 \pi c R_s/F_s$, which can be used to derive a single complex coefficient that describes the channel for carrier $c$:
-\begin{equation}
-\label{eq:hf_model_freq}
-H_c = G_1+e^{-j 2 \pi c R_s d}G_2
-\end{equation} 
+
 Lets examine the effects of intersymbol interference due to the delay spread.  Consider the transmitter sample $x(0)$ where we transition from one PSK phase $\phi_1$ to the next $\phi_2$.  Near the transition we can define $x(n)$ in terms of a step function $s(n)$:
 \begin{equation}
 \begin{split}
@@ -330,11 +329,10 @@ Or more generally for $n \ge dF_s$:
 \begin{split}
 y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j (\omega (n-dF_s) + \phi_2)} \\
      &= e^{j (\omega n + \phi_2)} [ G_1 + G_2 e^{-j \omega dF_s } ] \\
-     &= e^{j (\omega n + \phi_2)} [ G_1 + G_2 e^{-j  2 \pi c R_s d} ] \\
-     &= e^{j (\omega n + \phi_2)} H_c \\
+     &= e^{j (\omega n + \phi_2)} H(e^{j \omega}) 
 \end{split}
 \end{equation}
-Thus if we start detecting $y(n)$ after the longest delay term $dF_s$ we can recover the transmitted PSK symbol without ISI, and equalise it by estimating a single complex coefficient $H_c$.  In practice detection means integration over a complete symbol $T_s$, therefore the symbol $e^{j \omega n + \phi_n}$ must be transmitted for $d+T^\prime_s=T_{cp}+T^\prime_s$ seconds, with the cyclic prefix length $T_{cp} \ge d$.
+Thus if we start detecting $y(n)$ after the longest delay term $dF_s$ we can recover the transmitted PSK symbol without ISI, and equalise it by estimating a single complex coefficient $H(e^{j \omega})$.  In practice detection means integration over a complete symbol $T_s$, therefore the symbol $e^{j \omega n + \phi_n}$ must be transmitted for $d+T^\prime_s=T_{cp}+T^\prime_s$ seconds, with the cyclic prefix length $T_{cp} \ge d$.
 
 \section{Waveform Improvements}
 
@@ -364,34 +362,42 @@ To explore pilot resampling algorithms, a simulation was written to evaluate can
 
 Attempts were made to design 4 sample FIR filters (e.g. with a $sinc()$ impulse response) however these performed poorly. The \emph{mean12} algorithm used for 700D works well on AWGN and MPP channels, but has a sluggish frequency response, and can't follow fading with $B_d>1$ Hz.  However on AWGN and slower fading channels it filters the channel noise well, resulting in good low SNR performance.  This is consistent with on air reports of 700D. The \emph{lin2} algorithm (700E) doesn't filter channel noise very well, but is hard to beat on fast fading channels, and even works with $B_d>2$ Hz.
 
-Attempts were therefore made to improve the performance of \emph{lin2} on AWGN and slower fading channels.  Combining pilots from adjacent carriers is used in FreeDV 700D to reduce estimation noise.  Examining (\ref{eq:hf_model_freq}) we can see some symmetry in the RH term in the phase between carrier $c-1$ and carrier $c+1$ which supports averaging over adjacent carriers to estimate $H_c$, especially when the term $2 \pi R_s d$ is small.  A more robust approach is to perform a least squares fit \cite{bergada2014digital} of three equations with $G_1$ and $G_2$ as the two unknowns, and $H_{-1}, H_0, H_1$ as the three pilot samples centred around the current carrier:
+Attempts were therefore made to improve the performance of \emph{lin2} on AWGN and slower fading channels.  Simple averaging of pilots from adjacent carriers is used in FreeDV 700D to reduce estimation noise.  Consider (\ref{eq:hf_model_freq}) when the carriers are spaced $R_s$ Hz apart such that $\omega_c = 2 \pi c R_s/F_s$:
+\begin{equation}
+\begin{split}
+H(e^{j \omega_c})      &= G_1 + G_2 e^{-j 2 \pi c R_s d} \\
+H(e^{j \omega_{c-1}}) &= G_1 + G_2 e^{-j 2 \pi c R_s d + 2 \pi c R_s d} \\
+H(e^{j \omega_{c+1}}) &= G_1 + G_2 e^{-j 2 \pi c R_s d - 2 \pi c R_s d}
+\end{split}
+\end{equation}
+We can see some symmetry in the RH term in the phase between carrier $c-1$ and carrier $c+1$ which supports averaging over adjacent carriers to estimate $H(e^{j \omega_c})$, especially when the term $2 \pi R_s d$ is small.  A more robust approach is to perform a least squares fit \cite{bergada2014digital} of three equations with $G_1$ and $G_2$ as the two unknowns, and treating the three pilot samples centred around the current carrier as estimates of the channel at three frequencies $H(e^{j \omega_{c-1}}), H(e^{ j\omega_{c-1}}), H(e^{j\omega_{c+1}})$:
 \begin{equation}
 \label{eq:combine_freq}
 \begin{split}
-G_1 + G_2 e^{j 2 \pi R_sd} &= H_{-1} \\
-G_1 + G_2 &= H_{0} \\
-G_1 + G_2 e^{-j 2 \pi R_sd} &= H_{1} \\
+G_1 + G_2 e^{-j \omega_{c-1} d F_s} &= H(e^{j \omega_{c-1}}) \\
+G_1 + G_2 e^{-j \omega_{c}   d F_s} &= H(e^{j \omega_c})      \\
+G_1 + G_2 e^{-j \omega_{c+1} d F_s} &= H(e^{j \omega_{c+1}}) \\
 \begin{bmatrix}
-  1 & e^{j 2 \pi R_sd} \\
-  1 & 1 \\
-  1 & e^{-j 2 \pi R_sd}
+  1 & e^{-j \omega_{c-1} d F_s} \\
+  1 & e^{-j \omega_{c}   d F_s} \\
+  1 & e^{-j \omega_{c+1} d F_s}
 \end{bmatrix} 
 \begin{bmatrix}
   G_1 \\
   G_2
 \end{bmatrix} 
 &= \begin{bmatrix}
-  H_{-1} \\
-  H_{0} \\
-  H_{1}
+  H(e^{j \omega_{c-1}}) \\
+  H(e^{j \omega_c}) \\
+  H(e^{j \omega_{c+1}})
 \end{bmatrix} \\
 Ag &= h \\
  g &= (A^TA)^{-1}A^Th \\
- \overline{H_0} &= G_1 + G_2
+ \overline{H(e^{j \omega_c})} &= G_1 + G_2e^{-j \omega_{c}   d F_s}
 \end{split}
 \end{equation} 
 
-where $\overline{H_0}$ is the smoothed estimate of the current carriers pilot symbol.  Note that the channel delay $d$ is actually an unknown (and indeed the entire model is an approximation of the real channel). It was found that in simulation, choosing $d=0.002$ or $d=0.004$ produced reasonable results, possibly due to the symmetry of the RHS of (\ref{eq:hf_model_freq}), and the dominance of channel over resampler noise at low SNRs. If $d$ is approximated with a known value, the $(A^TA)^{-1}A^T$ term can then be precomputed as all the parameters of $A$ are known.
+where $\overline{H(e^{j \omega_c})}$ is the smoothed estimate of the channel at $\omega_c$.  Note that the channel delay $d$ is actually an unknown (and indeed the entire model is an approximation of the real channel). It was found that in simulation, choosing $d=0.002$ or $d=0.004$ produced reasonable results, possibly due to the symmetry of the RHS of (\ref{eq:hf_model_freq}), and the dominance of channel over resampler noise at low SNRs. If $d$ is approximated with a known value, the $(A^TA)^{-1}A^T$ term can then be precomputed as all the parameters of $A$ are known.
 
 This algorithm is denoted \emph{lin2ls}.  It's BER performance is plotted in Figure \ref{fig:equaliser_curves} and three resamplers summarised in Table \ref{tab:resampler_summary}.
 
@@ -437,7 +443,8 @@ This section WIP, currently in note form. For the $n=2$ diversity simulation (Fi
 \begin{enumerate}
 \item We are talking about fast fading here - no much we can do about slow because latency
 \item Maximum Ratio Combining (MRC) seems to get us about 0.5dB over Equal Gain Combining (EGC).
-\item The curves represent the averge BER across the entire simulation.  In practice we are limited by the ability of the FEC to correct errors in a single FEC codeword which is limited by latency to a few 100 ms. So we need a way to test that.  Perhaps simulate all carriers or even include LDPC code.
+\item The curves represent the average BER across the entire simulation.  In practice we are limited by the ability of the FEC to correct errors in a single FEC codeword which is limited by latency to a few 100 ms. So we need a way to test the PER and compare to existing waveforms to see if we have any gain.  Perhaps simulate all carriers or even include LDPC code.
+\item Does $n=4$ diversity give us any gains?  We would need a lower code rate for that.
 \item Current simulation is single carrier so a bit weak, might be best to test with multiple carriers.
 \item Key question is independence of channel $H_c$ at 1 kHz separation of narrow band carriers.  This is actually difficult to simulate as $H_c$ is periodic.
 \item n=2 diversity might also cause PAPR problems as twice as many carriers.

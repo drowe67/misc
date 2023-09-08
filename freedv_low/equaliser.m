@@ -295,7 +295,9 @@ function sim_out = ber_test(sim_in)
         s = 1:nsymb;
         for c=2:Nc+1
           if sim_in.ideal_phase == 1
-            rx_symb_eq(c-1,s) += rx_symb(c,s);
+            for d=0:Nd-1
+              rx_symb_eq(c-1,s) += rx_symb(c+d*Nc,s);
+            end
           else
             for d=0:Nd-1
               if strcmp(combining,"mrc")

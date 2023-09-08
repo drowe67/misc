@@ -359,8 +359,22 @@ function sim_out = ber_test(sim_in)
         error_pattern = xor(tx_bits(1:nframes*npayloadbitsperframe), rx_bits);
         nerrors = sum(error_pattern);
         bervec(ne) = nerrors/nbits + 1E-12;
+
+        % assume our FEC code can correct 10% random errors in one frame
+        nframe_errors = 0;
+        for f=1:nframes
+          st = (f-1)*npayloadbitsperframe + 1;
+          en = st + npayloadbitsperframe - 1;
+          nerr = sum(error_pattern(st:en));
+          if nerr > 0.1*npayloadbitsperframe
+            nframe_errors++;
+          end
+          pervec(ne) = nframe_errors/nframes + 1E-12;
+        end
+
         if verbose
-          printf("EbNodB: % 5.1f nbits: %7d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
+          printf("EbNodB: % 5.1f nbits: %7d nerrors: %5d ber: %4.3f npackets %7d nperrors: %5d per: %4.3f\n", 
+                 EbNodB, nbits, nerrors, bervec(ne), nframes, nframe_errors, pervec(ne));
           if verbose == 2
             if isfield(sim_in,"epslatex")
                 [textfontsize linewidth] = set_fonts(20);
@@ -380,6 +394,7 @@ function sim_out = ber_test(sim_in)
     end
 
     sim_out.bervec = bervec;
+    sim_out.pervec = pervec;
 endfunction
 
 function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots=0, Nd=1, combining='egc')
@@ -559,6 +574,21 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
         printf("printing... %s\n", fn);
         restore_fonts(textfontsize);
     end
+
+    figure (4); clf;
+    hold on;
+    semilogy(sim_in.EbNovec, awgn_sim.pervec,'m+-;AWGN sim;')
+    semilogy(hf_sim_in.EbNovec, hf_sim.pervec,'mx-;HF sim MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_ideal_div2.pervec,'ro-;HF sim ideal div2 EGC MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2.pervec,'mo-;HF sim div2 EGC MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.pervec,'co-;HF sim div2 MRC MPP;')
+ 
+    hold off;
+    xlabel('Eb/No (dB)')
+    ylabel('PER')
+    grid("minor")
+    axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-3 1])
+
 
 endfunction
 

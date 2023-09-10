@@ -5,7 +5,7 @@
 % and apply corrections to (equalise) received data symbols.  
 
 1;
-pkg load signal;
+pkg load signal matgeom;
 qpsk;
 
 % simple time domain example of resampling
@@ -68,6 +68,7 @@ function sim_out = ber_test(sim_in)
     Fs      = 8000;      % sample rate
     Nd      = 1;         % number of diversity channels
     div_Hz  = 1000;      % freq offset of diversity carriers
+    npayloadbitsperframe = 224; % payload bits in a modem frame
     
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
@@ -88,8 +89,12 @@ function sim_out = ber_test(sim_in)
     if isfield(sim_in,"combining")
       combining = sim_in.combining;
     end
-    
-     % A few sums to set up the packet.  Using our OFDM nomenclature, we have one
+    nbitsperpacket = npayloadbitsperframe;
+    if isfield(sim_in,"nbitsperpacket")
+       nbitsperpacket= sim_in.nbitsperpacket;
+    end
+   
+    % A few sums to set up the packet.  Using our OFDM nomenclature, we have one
     % "modem frame" for the packet, so Np=1, Nbitspermodemframe == Nbitsperpacket, and
     % there is just one modem frame for the FEC codeword.  This is common for 
     % digital voice modes.  In this simulation we assume all payload data symbols
@@ -105,7 +110,8 @@ function sim_out = ber_test(sim_in)
       printf("npayloadbitsperframe: %d\n", npayloadbitsperframe);
       printf("npayloadsymbolsperframe: %d\n",npayloadsymbolsperframe);
       printf("Nc: %d\n", Nc);
-    end
+      printf("nbitsperpacket: %d\n", nbitsperpacket);
+   end
     % carrier frequencies, start at 400Hz
     w = 2*pi*(400 + (0:Nc*Nd+1)*Rs)/Fs;
 
@@ -312,7 +318,7 @@ function sim_out = ber_test(sim_in)
         end % for c=2:Nc*Nd+1 
         
         if verbose == 2
-            figure(1); clf;
+            figure(3); clf;
             c = 2;
             if isfield(sim_in,"epslatex")
                 % just real part for Latex plot
@@ -360,26 +366,32 @@ function sim_out = ber_test(sim_in)
         nerrors = sum(error_pattern);
         bervec(ne) = nerrors/nbits + 1E-12;
 
-        % assume our FEC code can correct 10% random errors in one frame
-        nframe_errors = 0;
-        for f=1:nframes
-          st = (f-1)*npayloadbitsperframe + 1;
-          en = st + npayloadbitsperframe - 1;
+        % assume our FEC code can correct 10% random errors in one packet
+        npacket_errors = 0;
+        npackets = floor(length(rx_bits)/nbitsperpacket); berperpacket = [];
+        for f=1:npackets
+          st = (f-1)*nbitsperpacket + 1;
+          en = st + nbitsperpacket - 1;
           nerr = sum(error_pattern(st:en));
-          if nerr > 0.1*npayloadbitsperframe
-            nframe_errors++;
+          berperpacket = [berperpacket nerr/nbitsperpacket];
+          if nerr > 0.1*nbitsperpacket
+            npacket_errors++;
           end
-          pervec(ne) = nframe_errors/nframes + 1E-12;
+        end
+        pervec(ne) = npacket_errors/npackets + 1E-12;
+        if verbose == 2
+          figure(6);
+          plot(berperpacket); title('BER per packet')
         end
 
         if verbose
           printf("EbNodB: % 5.1f nbits: %7d nerrors: %5d ber: %4.3f npackets %7d nperrors: %5d per: %4.3f\n", 
-                 EbNodB, nbits, nerrors, bervec(ne), nframes, nframe_errors, pervec(ne));
+                 EbNodB, nbits, nerrors, bervec(ne), npackets, npacket_errors, pervec(ne));
           if verbose == 2
             if isfield(sim_in,"epslatex")
                 [textfontsize linewidth] = set_fonts(20);
             end
-            figure(2); clf;
+            figure(4); clf;
             plot(rx_symb_eq*exp(j*pi/4),'+','markersize', 10);
             mx = max(abs(rx_symb_eq(:)));
             axis([-mx mx -mx mx]);
@@ -389,6 +401,22 @@ function sim_out = ber_test(sim_in)
                 printf("printing... %s\n", fn);
                 restore_fonts(textfontsize,linewidth);
              end
+
+            % Spectrogram, first we need to transform into the time domain.  This is a bit unconventional,
+            % as the IDFT is done on the received symbols after channel impairments have been added.  Might
+            % need a full rate Fs simulation to do this properly.
+
+            M = Fs/Rs;
+            assert(M == floor(M));
+            rx = zeros(1,nsymb*M);
+            for s=1:nsymb
+              for c=1:Nc*Nd+2
+                st = (s-1)*M+1; en = st+M-1;
+                rx(st:en) += exp(j*(0:M-1)*w(c)).*rx_symb(c,s);
+              end
+            end
+            
+            figure(5); clf; plot_specgram(real(rx),Fs,0,3000);
           end
         end
     end
@@ -397,18 +425,36 @@ function sim_out = ber_test(sim_in)
     sim_out.pervec = pervec;
 endfunction
 
-function run_single(nbits = 1000,ch='awgn',EbNodB=100,resampler="lin2",ls_pilots=0, Nd=1, combining='egc')
+function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.pilot_freq_weights = [0 1 0];
     sim_in.verbose     = 2;
     sim_in.nbits       = nbits;
     sim_in.EbNovec     = EbNodB;
     sim_in.ch          = ch;
-    sim_in.resampler   = resampler;
+    sim_in.resampler   = "lin2";
     sim_in.ch_phase    = 0;
     sim_in.ideal_phase = 0;
-    sim_in.ls_pilots   = ls_pilots;
-    sim_in.Nd          = Nd;
-    sim_in.combining   = combining;
+    sim_in.ls_pilots   = 1;
+    sim_in.Nd          = 1;
+    sim_in.combining   = 'mrc';
+  
+    i = 1;
+    while i <= length(varargin)
+      if strcmp(varargin{i},"combining")
+        sim_in.combining = varargin{i+1}; i++;
+      elseif strcmp(varargin{i},"resampler")
+        sim_in.resampler = varargin{i+1}; i++;
+      elseif strcmp(varargin{i},"Nd")
+        sim_in.Nd = varargin{i+1}; i++;
+      elseif strcmp(varargin{i},"bitsperpacket")
+        sim_in.nbitsperpacket = varargin{i+1};
+        i++;    
+      else
+        printf("\nERROR unknown argument: %s\n", varargin{i});
+        return;
+      end
+      i++; 
+    end
 
     sim_qpsk = ber_test(sim_in);
 endfunction
@@ -472,7 +518,7 @@ function run_curves(itut_runtime=0,epslatex=0)
 
     % Plot results --------------------
 
-    figure (3); clf;
+    figure (1); clf;
     semilogy(sim_in.EbNovec, awgn_theory,'r+-;AWGN theory;')
     hold on;
     semilogy(sim_in.EbNovec, awgn_sim_mean12.bervec,'b+-;AWGN sim mean12;')
@@ -521,12 +567,12 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
     sim_in.nbits  = min(max_nbits, floor(500 ./ awgn_theory));
 
-    awgn_sim = ber_test(sim_in);
+    awgn_sim_lin2ls = ber_test(sim_in);
      
     % HF -----------------------------
 
     hf_sim_in = sim_in; 
-    hf_sim_in.EbNovec = 0:16;
+    hf_sim_in.EbNovec = 0:10;
     hf_sim_in.ch = "mpp";
  
     EbNoLin = 10.^(hf_sim_in.EbNovec/10);
@@ -538,12 +584,23 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     % default 0.1*run_time_s actually gives results close to theory
     run_time_s *= runtime_scale;
     hf_sim_in.nbits(1:length(hf_sim_in.EbNovec)) = floor(run_time_s*Rb);
+    printf("runtime (s): %f\n", run_time_s);
+    
+    hf_sim_in.ideal_phase = 0; 
+    sim_in.ls_pilots = 0;
+    hf_sim_in.pilot_freq_weights = [1 1 1];
+    hf_sim_in.resampler = "mean4";
+    hf_sim_mean12 = ber_test(hf_sim_in);
 
-    hf_sim = ber_test(hf_sim_in);
-    hf_sim_in.Nd = 2; hf_sim_in.ideal_phase = 1;
-    hf_sim_ideal_div2 = ber_test(hf_sim_in);
-    hf_sim_in.ideal_phase = 0; hf_sim_div2 = ber_test(hf_sim_in);
-    hf_sim_in.combining = "mrc"; hf_sim_div2_mrc = ber_test(hf_sim_in);
+    hf_sim.ls_pilots = 1;
+    hf_sim_in.resampler = "lin2";
+    hf_sim_lin2ls = ber_test(hf_sim_in);
+ 
+    hf_sim_in.Nd = 2;
+    hf_sim_in.combining = "mrc"; 
+    hf_sim_div2_mrc = ber_test(hf_sim_in);
+    hf_sim_in.nbitsperpacket = 224*10; 
+    hf_sim_div2_mrc_long = ber_test(hf_sim_in);
     
     if epslatex
         [textfontsize linewidth] = set_fonts();
@@ -551,17 +608,18 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
 
     % Plot results --------------------
 
-    figure (3); clf;
+    figure (1); clf;
     semilogy(sim_in.EbNovec, awgn_theory,'r+-;AWGN theory;')
     hold on;
-    semilogy(sim_in.EbNovec, awgn_sim.bervec,'m+-;AWGN sim;')
+    semilogy(sim_in.EbNovec, awgn_sim_lin2ls.bervec,'b+-;AWGN lin2ls;')
 
-    semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;HF theory;')
-    semilogy(hf_sim_in.EbNovec, hf_sim.bervec,'mx-;HF sim MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_ideal_div2.bervec,'ro-;HF sim ideal div2 EGC MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2.bervec,'mo-;HF sim div2 EGC MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.bervec,'co-;HF sim div2 MRC MPP;')
- 
+    semilogy(hf_sim_in.EbNovec, hf_theory,'r+-;MPP theory;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_mean12.bervec,'g-;MPP mean12 MPP;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.bervec,'b+-;MPP lin2ls;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.bervec,'co-;MPP div2 MRC;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_long.bervec,'kx-;MPP sim div2 MRC long;')
+    drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
+
     hold off;
     xlabel('Eb/No (dB)')
     ylabel('BER')
@@ -575,14 +633,15 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
         restore_fonts(textfontsize);
     end
 
-    figure (4); clf;
+    figure (2); clf;
     hold on;
-    semilogy(sim_in.EbNovec, awgn_sim.pervec,'m+-;AWGN sim;')
-    semilogy(hf_sim_in.EbNovec, hf_sim.pervec,'mx-;HF sim MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_ideal_div2.pervec,'ro-;HF sim ideal div2 EGC MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2.pervec,'mo-;HF sim div2 EGC MPP;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.pervec,'co-;HF sim div2 MRC MPP;')
- 
+    semilogy(sim_in.EbNovec, awgn_sim_lin2ls.pervec,'b+-;AWGN lin2ls;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_mean12.pervec,'g+-;MPP mean12;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.pervec,'b+-;MPP lin2ls;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.pervec,'co-;MPP div2 MRC;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_long.pervec,'kx-;MPP div2 MRC long;')
+    drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
+
     hold off;
     xlabel('Eb/No (dB)')
     ylabel('PER')

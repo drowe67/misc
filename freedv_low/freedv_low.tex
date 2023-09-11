@@ -247,6 +247,57 @@ B = \frac{R_sN_s}{(N_s-1)(1-T_{cp}/T_s)}
 
 where $R_s$ is the total symbol rate over the channel.  For example for 700D, $B = 700(8)/((8-1)(1-0.002/0.02))=888.89$ Hz.  In practice 700D has some extra bits allocated for frame synchronisation and auxiliary text, resulting in $B=944$ Hz.
 
+\subsection{Latency}
+
+Latency is delay experienced by end users when using a speech processing system such as a FreeDV mode. Latency is an important trade off for real time, Push To Talk (PTT) speech communication. Speech compression and FEC tend to work better with latency, but perceptual quality tends to decrease whenever there is delay in conversational speech.
+
+The algorithmic delay is defined as the number of seconds $D$ of signal that must be collected in order to start processing. A typical speech codec will collect 20-40ms of speech samples before starting analysis.  FEC codeword sizes spanning several seconds are common for HF data modes in order to ride over fades.  All bits in the codewords must be received before FEC decoding starts.  In FreeDV 700D, there is a one frame look ahead for pilot symbols, which also contributes to algorithmic delay.
+
+Consider a FreeDV mode with algorithmic delay $D$ seconds (Figure \ref{fig:latency})
+\begin{enumerate}
+\item First we must collect $D$ seconds of speech samples.
+\item The speech samples are encoded and a buffer of $D$ seconds of modem samples generated.
+\item The modem samples are sent over the radio channel, where they are buffered at the receiver.
+\item When a $D$ second buffer of modem samples is collected at the receiver, the modem samples can be decoded to a buffer of output speech samples.
+\item The output speech samples are played to a listener.
+\end{enumerate}  
+
+Latency is the time from when a speech sample enters the input buffer to when it is played at the receiver. If we assume infinite CPU such that the encode and decode times are zero, and zero propagation delay across the channel, the minimum latency experienced by an end user is twice the algorithmic delay, or $2D$.
+
+\begin{figure}[h]
+\caption{Latency of a waveform with algorithmic delay $D$ seconds}
+\vspace{5mm}
+\label{fig:latency}
+\centering
+\begin{tikzpicture}
+\draw[thick,->] (0,0.5) -- (11,0.5) node [below]{time};
+
+\draw (0,1) -- (3,1) -- (3,2) -- (0,2) -- (0,1);
+\node[align=center] at (1.5,1.5) {Buffer speech};
+
+\draw (3,1) -- (4,1) -- (4,2) -- (3,2) -- (3,1);
+\node[align=center] at (3.5,1.5) {Enc};
+
+\draw (4,1) -- (7,1) -- (7,2) -- (4,2) -- (4,1);
+\node[align=center] at (5.5,1.5) {Buffer Rx};
+
+\draw (7,1) -- (8,1) -- (8,2) -- (7,2) -- (7,1);
+\node[align=center] at (7.5,1.5) {Dec};
+
+\draw (8,1) -- (11,1) -- (11,2) -- (8,2) -- (8,1);
+\node[align=center] at (9.5,1.5) {Play Speech};
+
+\draw (0,2.25) -- (0,2.75); \draw (3,2.25) -- (3,2.75); 
+\draw [<->] (0,2.5) -- (3,2.5);
+\node[align=center] at (1.5,2.75) {$D$};
+
+\draw (4,2.25) -- (4,2.75); \draw (7,2.25) -- (7,2.75); 
+\draw [<->] (4,2.5) -- (7,2.5);
+\node[align=center] at (5.5,2.75) {$D$};
+
+\end{tikzpicture}
+\end{figure}
+
 \subsection{Summary of FreeDV modes}
 
 Using the framework developed above, we can analyse the existing FreeDV waveforms, using the information in \cite{codec2_waveform_spreadsheet}.
@@ -370,7 +421,7 @@ H(e^{j \omega_{c-1}}) &= G_1 + G_2 e^{-j 2 \pi c R_s d + 2 \pi c R_s d} \\
 H(e^{j \omega_{c+1}}) &= G_1 + G_2 e^{-j 2 \pi c R_s d - 2 \pi c R_s d}
 \end{split}
 \end{equation}
-We can see some symmetry in the RH term in the phase between carrier $c-1$ and carrier $c+1$ which supports averaging over adjacent carriers to estimate $H(e^{j \omega_c})$, especially when the term $2 \pi R_s d$ is small.  A more robust approach is to perform a least squares fit \cite{bergada2014digital} of three equations with $G_1$ and $G_2$ as the two unknowns, and treating the three pilot samples centred around the current carrier as estimates of the channel at three frequencies $H(e^{j \omega_{c-1}}), H(e^{ j\omega_{c-1}}), H(e^{j\omega_{c+1}})$:
+We can see some symmetry in the RH term in the phase between carrier $c-1$ and carrier $c+1$ which supports averaging over adjacent carriers to estimate $H(e^{j \omega_c})$, especially when the term $2 \pi R_s d$ is small.  A more robust approach is to perform a least squares fit \cite{bergada2014digital} of three equations with $G_1$ and $G_2$ as the two unknowns, and treating the three pilot samples centred around the current carrier as samples of the channel at three frequencies $H(e^{j \omega_{c-1}}), H(e^{ j\omega_{c-1}}), H(e^{j\omega_{c+1}})$:
 \begin{equation}
 \label{eq:combine_freq}
 \begin{split}
@@ -446,8 +497,12 @@ This section WIP, currently in note form. For the $n=2$ diversity simulation (Fi
 \item The curves represent the average BER across the entire simulation.  In practice we are limited by the ability of the FEC to correct errors in a single FEC codeword which is limited by latency to a few 100 ms. So we need a way to test the PER and compare to existing waveforms to see if we have any gain.  Perhaps simulate all carriers or even include LDPC code.
 \item Does $n=4$ diversity give us any gains?  We would need a lower code rate for that.
 \item Current simulation is single carrier so a bit weak, might be best to test with multiple carriers.
-\item Key question is independence of channel $H_c$ at 1 kHz separation of narrow band carriers.  This is actually difficult to simulate as $H_c$ is periodic.
-\item n=2 diversity might also cause PAPR problems as twice as many carriers.
+\item Key question is independence of channel $H(e^{j\omega_c})$ at 1 kHz (ish) separation of narrow band carriers.  This is actually difficult to simulate as with our model $H(e^{j\omega_c})$ is periodic.
+\item $n=2$ diversity might also cause PAPR problems as twice as many carriers, we should simulate this, and establish overall performance.
+\item initial PER curves (all carriers) based on 10\% per packet threshold show a 2dB gain over no diversity.  6dB off AWGN. Gain is greater at higher Eb/No - is it possible to shift our operating point there, e.g. lower code rate?  Goal is lower SNR I guess, we need  model to investigate.
+\item Clear from spectrogram that $H(e^{j\omega_c})$ are indeed correlated - it's quite common to have the entire channel fall over at all frequencies.  This limits the benefits from frequency diversity.  This suggest we need to try time diversity (however we need a way to deal with latency).
+\item First pass long latency (10 modem frame) PER results are very impressive, around 6dB over mean12 (700D).  Rule I guess is interleaver twice the length of fading period so this makes sense.  Losing 2 seconds of speech would have a significant cost.  How could we architect this for minimum latency (2 and a bit seconds), e.g. buffering just one modem frame?  How to make usable for PTT as well?
+\item Good to include actual FEC code at some point, to test FEC simulation (just measuring BER for the packet).
 \end{enumerate}
 
 \begin{figure}[h]

@@ -68,7 +68,7 @@ function sim_out = ber_test(sim_in)
     Fs      = 8000;      % sample rate
     Nd      = 1;         % number of diversity channels
     div_Hz  = 1000;      % freq offset of diversity carriers
-    npayloadbitsperframe = 224; % payload bits in a modem frame
+    nbitsperframe = 224; % bits in a modem frame
     
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
@@ -89,26 +89,25 @@ function sim_out = ber_test(sim_in)
     if isfield(sim_in,"combining")
       combining = sim_in.combining;
     end
-    nbitsperpacket = npayloadbitsperframe;
+    nbitsperpacket = nbitsperframe;
     if isfield(sim_in,"nbitsperpacket")
        nbitsperpacket= sim_in.nbitsperpacket;
     end
-   
+  
     % A few sums to set up the packet.  Using our OFDM nomenclature, we have one
     % "modem frame" for the packet, so Np=1, Nbitspermodemframe == Nbitsperpacket, and
     % there is just one modem frame for the FEC codeword.  This is common for 
     % digital voice modes.  In this simulation we assume all payload data symbols
     % are used for payload data (no text or unique word symbols).
 
-    npayloadbitsperframe = 224;
-    npayloadsymbolsperframe = npayloadbitsperframe/bps;
-    npayloadsymbolsperframepercarrier = Ns-1;
-    Nc = npayloadsymbolsperframe/npayloadsymbolsperframepercarrier;
+    nsymbolsperframe = nbitsperframe/bps;
+    nsymbolsperframepercarrier = Ns-1;
+    Nc = nsymbolsperframe/nsymbolsperframepercarrier;
     % make sure we have an integer number of carriers
     assert(floor (Nc) == Nc);
     if verbose == 2
-      printf("npayloadbitsperframe: %d\n", npayloadbitsperframe);
-      printf("npayloadsymbolsperframe: %d\n",npayloadsymbolsperframe);
+      printf("nbitsperframe: %d\n", nbitsperframe);
+      printf("nsymbolsperframe: %d\n",nsymbolsperframe);
       printf("Nc: %d\n", Nc);
       printf("nbitsperpacket: %d\n", nbitsperpacket);
    end
@@ -116,7 +115,7 @@ function sim_out = ber_test(sim_in)
     w = 2*pi*(400 + (0:Nc*Nd+1)*Rs)/Fs;
 
     nbitsvec = sim_in.nbits;
-    nframes_max = floor(max(nbitsvec)/npayloadbitsperframe) + Npad;
+    nframes_max = floor(max(nbitsvec)/nbitsperframe) + Npad;
     nsymb_max = nframes_max*Ns;
 
     % init HF model
@@ -149,7 +148,7 @@ function sim_out = ber_test(sim_in)
 
         % integer number of "modem" frames
         nbits = nbitsvec(ne);
-        nframes = floor(nbits/npayloadbitsperframe) + Npad;
+        nframes = floor(nbits/nbitsperframe) + Npad;
         nsymb = nframes*Ns;
         if verbose == 2
           printf("nframes: %d\n", nframes);
@@ -158,7 +157,7 @@ function sim_out = ber_test(sim_in)
 
         % modulator ------------------------
 
-        tx_bits = rand(1,nframes*npayloadbitsperframe) > 0.5; bit = 1;
+        tx_bits = rand(1,nframes*nbitsperframe) > 0.5; bit = 1;
         tx_symb = [];
         for f=1:nframes
           % set up Nc x Ns array of symbols with pilots
@@ -348,7 +347,7 @@ function sim_out = ber_test(sim_in)
  
         % demodulate rx symbols to bits
         nframes -= Npad;
-        rx_bits = zeros(1,nframes*npayloadbitsperframe);
+        rx_bits = zeros(1,nframes*nbitsperframe);
         bit = 1;
         for f=1:nframes
           for c=1:Nc
@@ -362,7 +361,7 @@ function sim_out = ber_test(sim_in)
        
         % count errors -----------------------------------------
 
-        error_pattern = xor(tx_bits(1:nframes*npayloadbitsperframe), rx_bits);
+        error_pattern = xor(tx_bits(1:nframes*nbitsperframe), rx_bits);
         nerrors = sum(error_pattern);
         bervec(ne) = nerrors/nbits + 1E-12;
 
@@ -600,7 +599,9 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     hf_sim_in.combining = "mrc"; 
     hf_sim_div2_mrc = ber_test(hf_sim_in);
     hf_sim_in.nbitsperpacket = 224*10; 
-    hf_sim_div2_mrc_long = ber_test(hf_sim_in);
+    hf_sim_div2_mrc_1800 = ber_test(hf_sim_in);
+    hf_sim_in.nbitsperpacket = 224*20; 
+    hf_sim_div2_mrc_3600 = ber_test(hf_sim_in);
     
     if epslatex
         [textfontsize linewidth] = set_fonts();
@@ -617,7 +618,8 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_mean12.bervec,'g-;MPP mean12 MPP;')
     semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.bervec,'b+-;MPP lin2ls;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.bervec,'co-;MPP div2 MRC;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_long.bervec,'kx-;MPP sim div2 MRC long;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.bervec,'kx-;MPP sim div2 MRC 1.8s;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.bervec,'ox-;MPP sim div2 MRC 3.6s;')
     drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
 
     hold off;
@@ -639,7 +641,8 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_mean12.pervec,'g+-;MPP mean12;')
     semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.pervec,'b+-;MPP lin2ls;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.pervec,'co-;MPP div2 MRC;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_long.pervec,'kx-;MPP div2 MRC long;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.8s;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.6s;')
     drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
 
     hold off;

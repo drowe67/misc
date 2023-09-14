@@ -89,9 +89,12 @@ function sim_out = ber_test(sim_in)
     if isfield(sim_in,"combining")
       combining = sim_in.combining;
     end
+    if isfield(sim_in,"nbitsperframe")
+       nbitsperframe = sim_in.nbitsperframe;
+    end
     nbitsperpacket = nbitsperframe;
     if isfield(sim_in,"nbitsperpacket")
-       nbitsperpacket= sim_in.nbitsperpacket;
+       nbitsperpacket = sim_in.nbitsperpacket;
     end
   
     % A few sums to set up the packet.  Using our OFDM nomenclature, we have one
@@ -439,15 +442,17 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
   
     i = 1;
     while i <= length(varargin)
+      varargin{i}
       if strcmp(varargin{i},"combining")
         sim_in.combining = varargin{i+1}; i++;
       elseif strcmp(varargin{i},"resampler")
         sim_in.resampler = varargin{i+1}; i++;
       elseif strcmp(varargin{i},"Nd")
         sim_in.Nd = varargin{i+1}; i++;
-      elseif strcmp(varargin{i},"bitsperpacket")
-        sim_in.nbitsperpacket = varargin{i+1};
-        i++;    
+      elseif strcmp(varargin{i},"bitsperframe")
+        sim_in.nbitsperframe = varargin{i+1}; i++;
+       elseif strcmp(varargin{i},"bitsperpacket")
+        sim_in.nbitsperpacket = varargin{i+1}; i++;    
       else
         printf("\nERROR unknown argument: %s\n", varargin{i});
         return;
@@ -545,11 +550,12 @@ function run_curves(itut_runtime=0,epslatex=0)
         fn = "equaliser.tex";
         print(fn,"-depslatex","-S350,350");
         printf("printing... %s\n", fn);
-        restore_fonts(textfontsize,bergada2014digital);
+        restore_fonts(textfontsize,linewidth);
     end
 
 endfunction
 
+% BER and PER curves to explore the effect of diveristy and time interleaving
 function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     max_nbits = 1E5;
     sim_in.verbose = 1;
@@ -622,17 +628,14 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.bervec,'ox-;MPP sim div2 MRC 3.6s;')
     drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
 
-    hold off;
-    xlabel('Eb/No (dB)')
-    ylabel('BER')
-    grid("minor")
-    axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-3 1])
+    hold off; xlabel('Eb/No (dB)'); ylabel('BER'); grid("minor");
+    legend('boxoff'); legend('location','southwest');
+    axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-3 0.5])
 
     if epslatex
-        fn = "equaliser_div.tex";
+        fn = "equaliser_div_ber.tex";
         print(fn,"-depslatex","-S350,350");
         printf("printing... %s\n", fn);
-        restore_fonts(textfontsize);
     end
 
     figure (2); clf;
@@ -645,12 +648,15 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.6s;')
     drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
 
-    hold off;
-    xlabel('Eb/No (dB)')
-    ylabel('PER')
-    grid("minor")
-    axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-3 1])
+    hold off; xlabel('Eb/No (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
+    axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-2 1])
 
+    if epslatex
+        fn = "equaliser_div_per.tex";
+        print(fn,"-depslatex","-S350,350");
+        printf("printing... %s\n", fn);
+        restore_fonts(textfontsize,linewidth);
+    end
 
 endfunction
 

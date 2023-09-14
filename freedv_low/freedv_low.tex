@@ -12,7 +12,6 @@
 \author{David Rowe VK5DGR}
 \maketitle
 
-
 \section{Introduction}
 
 After 10 years development and on air experience with various FreeDV waveforms, we would like to develop a new waveform that outperforms and replaces a variety of existing modes such as 700C/D/E and 1600.  Requirements include \cite{freedv-020}:
@@ -58,10 +57,11 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
  \hline
  Symbol & Explanation & Units \\
  \hline
- $B$ & Noise bandwidth & Hz \\
+ $B$ & Noise or signal bandwidth & Hz \\
  $B_d$ & Doppler spreading bandwidth for HF channel model & Hz \\
+ $D$ & Algorithmic delay, how much speech we need to buffer before processing starts & seconds \\
  $E_b/N_0$ & Energy per bit on spectral noise density & dimensionless, dB\footnote{1} \\
- $N_s$ & Number of symbols in a \emph{modem frame}, pilot insertion rate & dimensionless \\
+ $N_s$ & Number of symbols in a \emph{modem frame}, pilot insertion rate  \\
  $R_b$ & Bit rate & Bits/second \\
  $R_s$ & Symbol rate & symbols/second \\
  $T_s$ & Symbol period & seconds \\
@@ -117,7 +117,7 @@ To combat intersymbol interference and Doppler Spread on HF multipath channels, 
 \end{enumerate}
 This simple relationship between per-carrier and total $R_s$ allows us to use them interchangeably for some calculations.
  
-FreeDV signals are typically transmitted over the air using legacy HF radios.  We assume an analog bandwidth of 2000 Hz is available, which allows a maximum of 4000 bit/s using QPSK.  In practice the payload data rate is much less, due to various overheads that we will discuss below.
+FreeDV signals are typically transmitted over the air using analog HF radios.  We assume a RF bandwidth of 2000 Hz is available, which allows a maximum of 4000 bit/s using QPSK.  In practice the payload data rate is much less, due to various overheads that we will discuss below.
 
 \subsection{Pilot Symbol Overhead}
 
@@ -249,9 +249,9 @@ where $R_s$ is the total symbol rate over the channel.  For example for 700D, $B
 
 \subsection{Latency}
 
-Latency is delay experienced by end users when using a speech processing system such as a FreeDV mode. Latency is an important trade off for real time, Push To Talk (PTT) speech communication. Speech compression and FEC tend to work better with latency, but perceptual quality tends to decrease whenever there is delay in conversational speech.
+Latency is delay experienced by end users when using a speech processing system such as FreeDV. Latency is an important trade off for real time, Push To Talk (PTT) speech communication. Speech compression and FEC tend to work better with latency, but subjective quality tends to decrease whenever there is delay in conversational speech.
 
-The algorithmic delay is defined as the number of seconds $D$ of signal that must be collected in order to start processing. A typical speech codec will collect 20-40ms of speech samples before starting analysis.  FEC codeword sizes spanning several seconds are common for HF data modes in order to ride over fades.  All bits in the codewords must be received before FEC decoding starts.  In FreeDV 700D, there is a one frame look ahead for pilot symbols, which also contributes to algorithmic delay.
+The algorithmic delay is defined as the number of seconds $D$ of signal that must be collected in order to start processing. A typical speech codec will collect 20-40ms of speech samples before starting analysis.  However much longer FEC codewords sizes are desirable in order to ride over fades.  For example FEC codeword sizes spanning several seconds are common for HF data modes.  For maximum robustness, interleaving require all bits in the codewords to be received before FEC decoding starts.  The modem may also introduce delay, for example FreeDV 700D has a one frame look ahead for pilot symbols.
 
 Consider a FreeDV mode with algorithmic delay $D$ seconds (Figure \ref{fig:latency})
 \begin{enumerate}
@@ -300,7 +300,7 @@ Latency is the time from when a speech sample enters the input buffer to when it
 
 \subsection{Summary of FreeDV modes}
 
-Using the framework developed above, we can analyse the existing FreeDV waveforms, using the information in \cite{codec2_waveform_spreadsheet}.
+Using the framework developed above and the information in \cite{codec2_waveform_spreadsheet}, we can analyse the existing FreeDV waveforms.
 
 \begin{table}[h]
 \label{tab:freedv_wavefoms}
@@ -489,7 +489,13 @@ The algorithm used to combine adjacent carriers (\ref{eq:combine_freq}) is new a
 
 \subsection{Multipath}
 
-This section WIP, currently in note form. For the $n=2$ diversity simulation (Figure \ref{fig:equaliser_div_curves}), the signal was split into 2 copies, with half the power going to each copy.  The 2nd copy was shifted 1000 Hz higher in frequency.
+Maintaining a viable digital voice link on multipath channels is challenging, as there are periods when the SNR of a packet is very low across all carriers. For HF data we can use long FEC codewords to ride over the fades but letancy concerns make this difficult for PTT speech.
+
+
+TODO: spectrogram figure
+TODO: simulate low rate code
+
+This section WIP, currently in note form. For the $n=2$ diversity simulation (Figure \ref{fig:div_ber_curves}), the signal was split into 2 copies, with half the power going to each copy.  The 2nd copy was shifted 1000 Hz higher in frequency.
 
 \begin{enumerate}
 \item We are talking about fast fading here - no much we can do about slow because latency
@@ -503,13 +509,22 @@ This section WIP, currently in note form. For the $n=2$ diversity simulation (Fi
 \item Clear from spectrogram that $H(e^{j\omega_c})$ are indeed correlated - it's quite common to have the entire channel fall over at all frequencies.  This limits the benefits from frequency diversity.  This suggest we need to try time diversity (however we need a way to deal with latency).
 \item First pass long latency (10 modem frame) PER results are very impressive, around 6dB over mean12 (700D).  Rule I guess is interleaver twice the length of fading period so this makes sense.  Losing 2 seconds of speech would have a significant cost.  How could we architect this for minimum latency (2 and a bit seconds), e.g. buffering just one modem frame?  How to make usable for PTT as well?
 \item Good to include actual FEC code at some point, to test FEC simulation (just measuring BER for the packet).
+\item TODO: simulate low rate code.  This makes sense giving $H_c$ are correlated, ie entire channel is often quite down.
 \end{enumerate}
 
 \begin{figure}[h]
-\caption{$n=2$ diversity simulation results, all using the \emph{lin2lks} resampler and the MPP channel. At BER=0.1 (where FEC usually falls over) $n=2$ diversity MRC (cyan) has a gain of about 2dB over no diversity (purple). At BER=0.05 about 3dB gain.}
-\label{fig:equaliser_div_curves}
+\caption{$n=2$ diversity simulation BER results. The 1.8 and 3.6 second curves simulate long delay $D$ (long FEC codewords). Note there is no effect on BER with large codewords as these curves are the average BER over the entire simulation, they do not model the non-uniform distribution of errors on multipath channels.}
+\label{fig:div_ber_curves}
 \begin{center}
-\input equaliser_div.tex
+\input equaliser_div_ber.tex
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{$n=2$ diversity simulation PER results. This metric better represents the effects of a non-uniform distribution of errors.  The benefits of larger delay are also clear.}
+\label{fig:div_per_curves}
+\begin{center}
+\input equaliser_div_per.tex
 \end{center}
 \end{figure}
 
@@ -538,6 +553,7 @@ This section presents topics useful to explore in future.
 \item Can we include PAPR into model?  What can we do about improving PAPR, e.g. successive clipper/filter of ECSSB.
 \item Expression for Fading channels, block error rate, why 2020 is a lemon.
 \item Test against simulations other channel models, for example Appendix B of \cite{etsi201}.
+\item Test with impulse noise.  With a good code this should have a small effect.  Does it cause problems with estimators?
 \item Table of FreeDV waveforms and values, plugged into formula, effect of increasing pilot symbol rate.
 \item Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
 \item Wades MAP techniques (ref).  This has a lot of promise, need an effective way to simulate and establish benefit with a modest amount of work.  Can we combine MAP with extra bits for FEC?  Index optimisation also a simple approach.

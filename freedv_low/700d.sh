@@ -8,8 +8,29 @@ PATH=$PATH:$CODEC2
 # length of simulation
 MPP_SAMPLES=fast_fading_samples.float
 TEST_SEC=300
-RESULTS="700d_results.txt"
-No_list='-18 -19 -20 -21 -22 -23 -24 -26'
+No_awgn='-12 -12.5 -13 -13.5 -14 -15 -16 -18'
+No_mpp='-18 -19 -20 -21 -22 -23 -24 -26'
+
+function run_sim {
+    results=$1
+    channel=$2
+    No_list=$3
+    rm $results
+    log_ch=$(mktemp)
+    log_demod=$(mktemp)
+
+    for No in $No_list
+    do
+        ofdm_mod --in /dev/zero --ldpc 1 --testframes $TEST_SEC --txbpf | \
+        ch - - --No ${No} $channel --fading_dir . 2> $log_ch | \
+        ofdm_demod --out /dev/null --testframes --verbose 2 --ldpc 1 2> $log_demod
+        snrdB=$(cat $log_ch | grep "SNR3k(dB)" | tr -s ' ' | cut -d' ' -f3)
+        uber=$(cat $log_demod | grep "BER\." | tr -s ' ' | cut -d' ' -f2)
+        cber=$(cat $log_demod | grep "Coded BER" | tr -s ' ' | cut -d' ' -f3)
+        cper=$(cat $log_demod | grep "Coded PER" | tr -s ' ' | cut -d' ' -f3)
+        echo $snrdB $uber $cber $cper >> $results
+    done
+}
 
 # Generate fading data files
 if [ ! -f $MPP_SAMPLES ]; then
@@ -19,17 +40,5 @@ if [ ! -f $MPP_SAMPLES ]; then
     [ ! $? -eq 0 ] && { echo "octave failed to run correctly .... exiting"; exit 1; }
 fi
 
-# Run 700D
-rm $RESULTS
-results_ch=$(mktemp)
-results=$(mktemp)
-for No in $No_list
-do
-    ofdm_mod --in /dev/zero --ldpc 1 --testframes $TEST_SEC --txbpf | \
-    ch - - --No ${No} -f -10 --mpp --fading_dir . 2> $results_ch | \
-    ofdm_demod --out /dev/null --testframes --verbose 2 --ldpc 1 2> $results
-    snrdB=$(cat $results_ch | grep "SNR3k(dB)" | tr -s ' ' | cut -d' ' -f3)
-    cber=$(cat $results | grep "Coded BER" | tr -s ' ' | cut -d' ' -f3)
-    cper=$(cat $results | grep "Coded PER" | tr -s ' ' | cut -d' ' -f3)
-    echo $snrdB $cber $cper >> $RESULTS
-done
+run_sim "700d_awgn.txt" "" "${No_awgn}"
+run_sim "700d_mpp.txt" "--mpp" "${No_mpp}"

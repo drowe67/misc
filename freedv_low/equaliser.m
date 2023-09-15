@@ -555,7 +555,24 @@ function run_curves(itut_runtime=0,epslatex=0)
 
 endfunction
 
-% BER and PER curves to explore the effect of diveristy and time interleaving
+function [textfontsize linewidth] = set_fonts(font_size=12)
+    textfontsize = get(0,"defaulttextfontsize");
+    linewidth = get(0,"defaultlinelinewidth");
+    set(0, "defaulttextfontsize", font_size);
+    set(0, "defaultaxesfontsize", font_size);
+    set(0, "defaultlinelinewidth", 0.5);
+end
+
+function restore_fonts(textfontsize,linewidth)
+    set(0, "defaulttextfontsize", textfontsize);
+    set(0, "defaultaxesfontsize", textfontsize);
+    set(0, "defaultlinelinewidth", linewidth);
+end
+
+% BER and PER curves to explore the effect of diversity and time interleaving
+% usage:
+%   octave> equaliser; run_curves_diversity()
+
 function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     max_nbits = 1E5;
     sim_in.verbose = 1;
@@ -573,7 +590,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     sim_in.nbits  = min(max_nbits, floor(500 ./ awgn_theory));
 
     awgn_sim_lin2ls = ber_test(sim_in);
-     
+    
     % HF -----------------------------
 
     hf_sim_in = sim_in; 
@@ -658,18 +675,90 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
         restore_fonts(textfontsize,linewidth);
     end
 
+    % save results for plotting later
+    save run_curves_diversity.txt sim_in awgn_sim_lin2ls hf_sim_in hf_sim_mean12 ...
+         hf_sim_lin2ls hf_sim_div2_mrc hf_sim_div2_mrc_1800 hf_sim_div2_mrc_3600
 endfunction
 
-function [textfontsize linewidth] = set_fonts(font_size=12)
-    textfontsize = get(0,"defaulttextfontsize");
-    linewidth = get(0,"defaultlinelinewidth");
-    set(0, "defaulttextfontsize", font_size);
-    set(0, "defaultaxesfontsize", font_size);
-    set(0, "defaultlinelinewidth", 0.5);
-end
+% load up externally generated simulation data and plot on SNR axis
+% usage:
+%   octave> equaliser; plot_curves_snr()
+function plot_curves_snr(epslatex=0)
+    Ns = 8; Ts = 0.02; Tcp = 0.002;
+    Lp = 10*log10(Ns/(Ns-1));        # 700D pilot symbol loss
+    Lcp = -10*log10(1-Tcp/Ts);       # 700D cyclic prefix loss
+    Lil = 0.5 + 1;                   # 0.5dB IL plus 1dB for compression (to help PAPR)
+    Rb = 1400;                       # Uncoded (raw) bitrate for rate 0.5 code
+    B = 3000;                        # we measure SNR in a 3000 Hz bandwidth
+    rate = 0.5;                      # code rate
+    EbNo_to_SNR = 10*log10(Rb/B) + Lp + Lcp + Lil;
+    
+    # data from run_curves_diversity() above
+    load("run_curves_diversity.txt");
 
-function restore_fonts(textfontsize,linewidth)
-    set(0, "defaulttextfontsize", textfontsize);
-    set(0, "defaultaxesfontsize", textfontsize);
-    set(0, "defaultlinelinewidth", linewidth);
-end
+    # data from ./ofdm_c.sh
+    x700d_awgn = load("700d_awgn.txt");
+    x700d_mpp = load("700d_mpp.txt");
+    x700e_awgn = load("700e_awgn.txt");
+    x700e_mpp = load("700e_mpp.txt");
+   
+    awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
+    EbNoLin = 10.^(hf_sim_in.EbNovec/10);
+    hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
+   
+    if epslatex
+        [textfontsize linewidth] = set_fonts();
+    end
+
+    % Plot results --------------------
+
+    snrvec = sim_in.EbNovec + EbNo_to_SNR;
+    snrvec_coded = snrvec + 10*log10(rate);
+
+    figure (1); clf;
+    semilogy(snrvec, awgn_theory,'r+-;AWGN theory;')
+    hold on;
+    semilogy(x700d_awgn(:,1), x700d_awgn(:,2)+1E-12,'b+-;AWGN 700D;')
+    semilogy(snrvec, awgn_sim_lin2ls.bervec,'g+-;AWGN lin2ls;')
+   
+    semilogy(snrvec, hf_theory,'r+-;MPP theory;')
+    semilogy(x700d_mpp(:,1), x700d_mpp(:,2)+1E-12,'b+-;MPP 700D;')
+    semilogy(snrvec, hf_sim_lin2ls.bervec,'g+-;MPP lin2ls;')
+    semilogy(snrvec, hf_sim_div2_mrc.bervec,'co-;MPP div2 MRC;')
+   
+    hold off; xlabel('SNR (dB)'); ylabel('UBER'); grid("minor");
+    legend('boxoff'); legend('location','southwest');
+    axis([min(snrvec) max(snrvec) 1E-3 0.5])
+
+    if epslatex
+        fn = "snr_ber.tex";
+        print(fn,"-depslatex","-S350,350");
+        printf("printing... %s\n", fn);
+    end
+
+    figure (2); clf;
+    hold on;
+    semilogy(snrvec_coded, awgn_sim_lin2ls.pervec,'b+-;AWGN lin2ls;')
+    semilogy(x700d_awgn(:,1), x700d_awgn(:,4)+1E-12,'g+-;AWGN 700D;')
+
+    semilogy(x700d_mpp(:,1), x700d_mpp(:,4)+1E-12,'g+-;MPP 700D;')
+    semilogy(snrvec_coded, hf_sim_lin2ls.pervec,'b+-;MPP lin2ls;')
+    semilogy(snrvec_coded, hf_sim_div2_mrc.pervec,'co-;MPP div2 MRC;')
+    semilogy(snrvec_coded, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.8s;')
+    semilogy(snrvec_coded, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.6s;')
+
+    xlabel('SNR (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
+    axis([min(snrvec_coded) max(snrvec) 1E-2 1])
+    a = axis; c = (a(2)+a(1))/2; r = (a(2)-a(1))/2;
+    drawEllipse([c 0.1 r 0.02],'r--;operating point;'); 
+    hold off;
+
+    if epslatex
+        fn = "snr_per.tex";
+        print(fn,"-depslatex","-S350,350");
+        printf("printing... %s\n", fn);
+        restore_fonts(textfontsize,linewidth);
+    end
+
+endfunction
+

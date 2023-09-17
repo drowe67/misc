@@ -383,7 +383,16 @@ function sim_out = ber_test(sim_in)
         pervec(ne) = npacket_errors/npackets + 1E-12;
         if verbose == 2
           figure(6);
-          plot(berperpacket); title('BER per packet')
+          Ts
+          Ns
+          Tpacket=Ts*Ns*nbitsperpacket/nbitsperframe;
+          plot((0:npackets-1)*Tpacket,berperpacket);
+          axis([0 npackets*Tpacket 0 0.2]); xlabel('Time (s)'); ylabel('BER/packet'); grid;
+          if isfield(sim_in,"epslatex")
+              fn = "ber_packet.tex";
+              print(fn,"-depslatex","-S200,200");
+              printf("printing... %s\n", fn);
+          end
         end
 
         if verbose
@@ -399,7 +408,7 @@ function sim_out = ber_test(sim_in)
             axis([-mx mx -mx mx]);
             if isfield(sim_in,"epslatex")
                 fn = "scatter.tex";
-                print(fn,"-depslatex","-S300,300");
+                print(fn,"-depslatex","-S200,200");
                 printf("printing... %s\n", fn);
                 restore_fonts(textfontsize,linewidth);
              end
@@ -418,8 +427,13 @@ function sim_out = ber_test(sim_in)
               end
             end
             
-            figure(5); clf; plot_specgram(real(rx),Fs,0,3000);
-          end
+            figure(5); clf; plot_specgram(real(rx),Fs,0,2500);
+            if isfield(sim_in,"epslatex")
+              fn = "spectrogram.tex";
+              print(fn,"-depslatex","-S200,200");
+              printf("printing... %s\n", fn);
+           end
+         end
         end
     end
 
@@ -451,8 +465,10 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.Nd = varargin{i+1}; i++;
       elseif strcmp(varargin{i},"bitsperframe")
         sim_in.nbitsperframe = varargin{i+1}; i++;
-       elseif strcmp(varargin{i},"bitsperpacket")
+      elseif strcmp(varargin{i},"bitsperpacket")
         sim_in.nbitsperpacket = varargin{i+1}; i++;    
+      elseif strcmp(varargin{i},"epslatex")
+        sim_in.epslatex = 1;    
       else
         printf("\nERROR unknown argument: %s\n", varargin{i});
         return;
@@ -663,7 +679,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.pervec,'co-;MPP div2 MRC;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.8s;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.6s;')
-    drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
+    drawEllipse([5 0.1 5 0.02],'r--;link clcoses;'); 
 
     hold off; xlabel('Eb/No (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
     axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-2 1])
@@ -720,7 +736,7 @@ function plot_curves_snr(epslatex=0)
     hold on;
     semilogy(x700d_awgn(:,1), x700d_awgn(:,2)+1E-12,'b+-;AWGN 700D;')
     semilogy(snrvec, awgn_sim_lin2ls.bervec,'g+-;AWGN lin2ls;')
-   
+  
     semilogy(snrvec, hf_theory,'r+-;MPP theory;')
     semilogy(x700d_mpp(:,1), x700d_mpp(:,2)+1E-12,'b+-;MPP 700D;')
     semilogy(snrvec, hf_sim_lin2ls.bervec,'g+-;MPP lin2ls;')
@@ -750,7 +766,7 @@ function plot_curves_snr(epslatex=0)
     xlabel('SNR (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
     axis([min(snrvec_coded) max(snrvec) 1E-2 1])
     a = axis; c = (a(2)+a(1))/2; r = (a(2)-a(1))/2;
-    drawEllipse([c 0.1 r 0.02],'r--;operating point;'); 
+    drawEllipse([c 0.1 r 0.02],'r--;link closes;'); 
     hold off;
 
     if epslatex

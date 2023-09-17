@@ -489,11 +489,27 @@ The algorithm used to combine adjacent carriers (\ref{eq:combine_freq}) is new a
 
 \subsection{Multipath}
 
-Maintaining a viable digital voice link on multipath channels is challenging, as there are periods when the SNR of a packet is very low across all carriers. For HF data we can use long FEC codewords to ride over the fades but letancy concerns make this difficult for PTT speech.
+Maintaining a viable digital voice link on multipath channels is challenging, as there are periods when the SNR of a packet is very low across all carriers. For HF data we can use long FEC codewords to ride over the fades but latency concerns make this difficult for PTT speech.
 
+\begin{figure}[h]
+\caption{Spectrogram of 15 seconds of $n=2$ diversity signal over a MPP channel. At some points in time the signal is faded at all frequencies, so frequency diversity cannot help.}
+\label{fig:spectrogram}
+\begin{center}
+\input spectrogram.tex
+\end{center}
+\end{figure}
+\begin{figure}[h]
 
-TODO: spectrogram figure
-TODO: simulate low rate code
+\caption{BER/packet for 0.16s packets, same channel as Figure \ref{fig:spectrogram}.  Larger packets allow us to spread the errors over time, beneath a BER threshold where they can be corrected by FEC.}
+\label{fig:ber_packet}
+\begin{center}
+\input ber_packet.tex
+\end{center}
+\end{figure}
+
+TODO: spectrogram figure, discuss why time domain diversity is required.
+TODO: BER per packet figure, I think this is instructive, explain swhy smoothing out errors in time will help.
+TODO: smaller BER/PER plot so they don't all end up one per page?
 
 This section WIP, currently in note form. For the $n=2$ diversity simulation (Figure \ref{fig:div_ber_curves}), the signal was split into 2 copies, with half the power going to each copy.  The 2nd copy was shifted 1000 Hz higher in frequency.
 
@@ -512,6 +528,7 @@ This section WIP, currently in note form. For the $n=2$ diversity simulation (Fi
 \item TODO: simulate low rate code.  This makes sense giving $H_c$ are correlated, ie entire channel is often quite down.
 \end{enumerate}
 
+
 \begin{figure}[h]
 \caption{$n=2$ diversity simulation BER results. The 1.8 and 3.6 second curves simulate long delay $D$ (long FEC codewords). Note there is no effect on BER with large codewords as these curves are the average BER over the entire simulation, they do not model the non-uniform distribution of errors on multipath channels.}
 \label{fig:div_ber_curves}
@@ -521,10 +538,18 @@ This section WIP, currently in note form. For the $n=2$ diversity simulation (Fi
 \end{figure}
 
 \begin{figure}[h]
-\caption{$n=2$ diversity simulation PER results. This metric better represents the effects of a non-uniform distribution of errors.  The benefits of larger delay are also clear.}
+\caption{$n=2$ diversity simulation PER results. A packet error is declared if the BER inside the packet exceeds 0.1 (approximating the performance of a rate 0.5 LDPC code). The packet length is 0.16s unless indicated in the legend. This metric better represents the effects of a non-uniform distribution of errors.}
 \label{fig:div_per_curves}
 \begin{center}
 \input equaliser_div_per.tex
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\caption{$n=2$ diversity simulation PER results, mapped to a SNR axis and compared to 700D. 700E (not shown) is about 2dB worse than 700D on the MPP channel. The red oval is where a voice link becomes possible.}
+\label{fig:snr_per_curves}
+\begin{center}
+\input snr_per.tex
 \end{center}
 \end{figure}
 

@@ -657,8 +657,8 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_mean12.bervec,'g-;MPP mean12 MPP;')
     semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.bervec,'b+-;MPP lin2ls;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.bervec,'co-;MPP div2 MRC;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.bervec,'kx-;MPP sim div2 MRC 1.8s;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.bervec,'ox-;MPP sim div2 MRC 3.6s;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.bervec,'kx-;MPP sim div2 MRC 1.6s;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.bervec,'ox-;MPP sim div2 MRC 3.2s;')
     drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
 
     hold off; xlabel('Eb/No (dB)'); ylabel('BER'); grid("minor");
@@ -677,8 +677,8 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_mean12.pervec,'g+-;MPP mean12;')
     semilogy(hf_sim_in.EbNovec, hf_sim_lin2ls.pervec,'b+-;MPP lin2ls;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.pervec,'co-;MPP div2 MRC;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.8s;')
-    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.6s;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.6s;')
+    semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.2s;')
     drawEllipse([5 0.1 5 0.02],'r--;link clcoses;'); 
 
     hold off; xlabel('Eb/No (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
@@ -760,8 +760,8 @@ function plot_curves_snr(epslatex=0)
     semilogy(x700d_mpp(:,1), x700d_mpp(:,4)+1E-12,'g+-;MPP 700D;')
     semilogy(snrvec_coded, hf_sim_lin2ls.pervec,'b+-;MPP lin2ls;')
     semilogy(snrvec_coded, hf_sim_div2_mrc.pervec,'co-;MPP div2 MRC;')
-    semilogy(snrvec_coded, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.8s;')
-    semilogy(snrvec_coded, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.6s;')
+    semilogy(snrvec_coded, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.6s;')
+    semilogy(snrvec_coded, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.2s;')
 
     xlabel('SNR (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
     axis([min(snrvec_coded) max(snrvec) 1E-2 1])

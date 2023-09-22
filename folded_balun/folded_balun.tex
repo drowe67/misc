@@ -2,35 +2,43 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usetikzlibrary{shapes}
 \begin{document}
 
 \title{Folded Balun}
 \maketitle
 
-Disclaimer: This document has been written as my attempt to understand the operation of a Folded Balun, also known as a Pawsey Stub.  I used information drawn from \cite{stack_exchange}\cite{antenna_theory}\cite{duffey}.  It is the work of an amateur in this field, rather than an expert.
+This document has been written as my attempt to understand the operation of a Folded Balun, also known as a Pawsey Stub.  I used information drawn from \cite{stack_exchange}\cite{antenna_theory}\cite{duffey}.  It is the work of an amateur in this field, rather than an expert.
 
 TODO: photo
 
-\begin{center}
-\begin{tikzpicture}
-\draw (1,2) -- (2,2);
-\draw (2.5,0.75) -- (2.5,1.5);
-\draw (2.5,2) circle (0.5);
-\draw (2.25,2) -- (2.75,2);
-\draw (2.5,1.75) -- (2.5,2.25);
-\draw (3,2) -- (4,2);
-\draw (4,1.5) rectangle (5,2.5);
-\draw (5,2) -- (6,2) -- (6,1.5);
-\draw (5.75,1.5) rectangle (6.25,0.5);
-\draw (6,0.5) -- (6,0);
-\draw (5.75,0) -- (6.25,0);
+\begin{figure}[h]
+\caption{Dipole with coax feedline and stub}
+\label{fig:assembly}
+\vspace{5mm}
 
-\node[] at (0.5,2) {$P_{sun}$};
-\node[] at (2.5,0.5) {$P_{quiet}$};
-\node[] at (4.5,2) {$G$};
-\node[align=right] at (6.75,1) {Rx};
+\begin{tikzpicture}
+\node (A) at (2,1) [cylinder, shape border rotate=90, draw, minimum height=4cm, minimum width=1cm] {};
+\node[] at (2,1) {Stub};
+\node (B) at (3.5,0) [cylinder, shape border rotate=90, draw, minimum height=6cm, minimum width=1cm] {};
+\node[] at (3.5,1) {Coax};
+
+% right diople arm
+\draw (4.0,3) -- (4.0,3.5);
+\draw (4.0,3.5) -- (9.0,3.5);
+
+% left diople arm
+\draw (3.5,3) -- (3.5,3.5);
+\draw (3.5,3.5) -- (-1.5,3.5);
+
+% stub connections
+\draw (2.5,3) -- (2.5,3.5);
+\draw (2.5,-0.75) -- (3,-0.75);
+
+\node[] at (3.75,4) {Feedpoint};
+
 \end{tikzpicture}
-\end{center}
+\end{figure}
 
 Consider a dipole driven by a coax feedline.  The purpose of the balun is to remove any current on the coax shield outer, so the currents in each dipole arm are balanced.
 
@@ -38,15 +46,64 @@ The balun is formed by the addition of a quarter wave stub to an existing coax f
 
 Only the shield of the stub is used.  The inner of the coax feedline is connected to the stub at the feedpoint, and the stub is connected to the feedline coax outer a quarter wavelength from the feedpoint.
 
-Consider just the coax shield outer and the stub (TODO Figure).  This is two similar conductors with a constant separation, shorted at one end.  It can be viewed a twin wire transmission line connected across the terminals of the coax feedline.  The short at one end results in a high impedance presented across the feedpoint. Thus the addition of the stub has no affect on the dipole operation.
+\begin{figure}[h]
+\caption{Dipole in parallel with shorted transmission line}
+\label{fig:shorted}
+\vspace{5mm}
 
-Now consider the current on the coax shield inner $I$ at the feedpoint.  It will be split between the desired dipole arm and the coax shield outer. The amount of current flowing down the coax shield outer $I_{outer}$ depends on the impedance $Z$ of this path.
+\begin{tikzpicture}
+\node (A) at (3,1) [cylinder, shape border rotate=90, draw, minimum height=4cm, minimum width=1cm] {};
+\node (B) at (4.5,1) [cylinder, shape border rotate=90, draw, minimum height=4cm, minimum width=1cm] {};
+
+% right diople arm
+\draw (4.0,3) -- (4.0,3.5);
+\draw (4.0,3.5) -- (9.0,3.5);
+
+% left diople arm
+\draw (3.5,3.5) -- (-1.5,3.5);
+
+% stub connections
+\draw (3.5,3) -- (3.5,3.5);
+\draw (3.5,-0.75) -- (4,-0.75);
+
+\node[] at (3.75,4) {Feedpoint};
+
+\end{tikzpicture}
+\end{figure}
+
+Consider just the coax shield outer and the stub in Figure \ref{fig:shorted}.  We can see two similar conductors with a constant separation, shorted at one end.  It can be viewed a twin wire transmission line, one quarter wavelength long, connected across the feedpoint.  The short is transformed to a high impedance across the feedpoint. Thus the addition of the stub has no affect on the dipole operation.
+
+\begin{figure}[h]
+\caption{Folded balun currents}
+\label{fig:shorted}
+\vspace{5mm}
+
+\begin{tikzpicture}
+
+% right diople arm
+\draw (4.0,3) -- (4.0,3.5);
+\draw (4.0,3.5) -- (9.0,3.5);
+
+% left diople arm
+\draw (3.5,3.5) -- (-1.5,3.5);
+\draw (3.5,3.5) -- (-1.5,3.5);
+
+% stub connections
+\draw (3.5,3) -- (3.5,3.5);
+\draw (3.5,-0.75) -- (4,-0.75);
+
+\node[] at (3.75,4) {Feedpoint};
+
+\end{tikzpicture}
+\end{figure}
+
+In practice some of the differential, balanced current flowing inside the coax feedline is converted to common mode current.  Consider current on the coax shield inner $I$ at the feedpoint.  It will be split between the desired dipole arm and the coax shield outer. The amount of current flowing down the coax shield outer $I_{outer}$ depends on the impedance $Z$ of this path.
 
 The current flowing in the coax inner $-I$ is equal in magnitude but opposite it direction to the current on the coax shield inner.  This current will be split in the same way, the desired current down the dipole arm, and the undesired component $I_{stub}$ down the stub.  Because the stub is made of the same material as the feedline, and is located at approximately the same position, $Z$ will be the same, and the current flowing will be the same magnitude but opposite sign $I_{stub}=-I_{outer}$.  
 
 These currents cancel at the point where the stub connects to the coax shield, resulting in zero current on the coax shield outer beneath this point - achieving the goal of the balun.
 
-Now the coax shield outer and stub are carrying RF current and are a significant fraction of a wavelength. However the stub and coax shield outer do not radiate as their currents are equal and opposite, the conductors are close together, so the far field radiation is cancelled.  In other words, they form a transmission line.
+Now the coax shield outer and stub are carrying common mode RF currents and are a significant fraction of a wavelength. However the stub and coax shield outer do not radiate as their currents are equal and opposite, the conductors are close together, so the far field radiation is cancelled.  In other words, they form a transmission line.  A transmission line, by definition, does not radiate RF power. This means that no RF power is radiated from the common mode currents on the coax shield outer or stub, and hence all RF power must be radiated by the dipole.
 
 In short, the stub draws a current from the coax inner that cancels the current flowing down the coax outer \cite{antenna_theory}.
 

@@ -266,6 +266,8 @@ Consider a FreeDV mode with algorithmic delay $D$ seconds (Figure \ref{fig:laten
 
 Latency is the time from when a speech sample enters the input buffer to when it is played at the receiver. If we assume infinite CPU such that the encode and decode times are zero, and zero propagation delay across the channel, the minimum latency experienced by an end user is twice the algorithmic delay, or $2D$.
 
+The real world impacts of latency can be even more severe.  On poor channels, it may take a few frames to  syncronise.  If one frame is lost or cannot be decoded there will be silence or garbled speech for $D$ seconds.  On marginal channels, several attempts may be required to determine if an "over" was received - each attempt will experience long PTT turn around delays.
+
 \begin{figure}[h]
 \caption{Latency of a waveform with algorithmic delay $D$ seconds}
 \vspace{5mm}
@@ -391,7 +393,7 @@ Thus if we start detecting $y(n)$ after the longest delay term $dF_s$ we can rec
 
 In this section waveform improvements are presented.
 
-The general strategy is to propose an innovation, and explore with analysis/maths and Octave simulation. Try low risk approaches to start with, then iterate.  To simulate performance with voice codec, use a threshold of PER=0.1, BER=0.01.
+The general strategy is to propose an innovation, and explore with analysis/maths and Octave simulation. To simulate performance with voice codec, we use a threshold of PER=0.1, BER=0.01 as the threshold for establishing a voice link.
 
 \subsection{Equalisation}
 
@@ -495,7 +497,7 @@ The multipath channel exhibits frequency selective fading.  Spreading bits in a 
 
 Figure \ref{fig:spectrogram} illustrates an example of $n=2$ diversity over a multipath channel, using a $Nc=8$ carrier waveform waveform similar to 700D.  The original transmit signal has been copied to higher frequencies to produce $Nc=16$ carrier signal of the same total power but with twice the bandwidth.
 
-Frequency diversity helps, as there are times when one carrier is faded, but it's diversity copy at about 800 Hz offset is not faded.  Then when recombined we can recover that carrier.  However observing Figure \ref{fig:spectrogram} there are some periods where the entire channel at all frequencies is faded for up to 1 second. This is supported by \ref{fig:ber_packet} which shows large burst of errors during fades. This leads us to the idea of diversity in time, where the bits of packet are spread over a period longer than the duration of a fade, lowering the bit error rate of that packet. One the BER is reduced beneath a threshold, the FEC code can all errors in the packet, and we can recover intelligible speech. The trade off is latency, which makes fast turn around PTT speech difficult.
+Frequency diversity helps, as there are times when one carrier is faded, but it's diversity copy at about 800 Hz offset is not faded.  When recombined we can recover that carrier.  However observing Figure \ref{fig:spectrogram} there are some periods where the entire channel at all frequencies is faded for up to 1 second. This is supported by \ref{fig:ber_packet} which shows large burst of errors during fades. This leads us to the idea of diversity in time, where the bits of packet are spread over a period longer than the duration of a fade, lowering the average bit error rate of that packet. Once the BER is reduced beneath a threshold, the FEC code can correct all errors in the packet, and we can recover intelligible speech. The trade off is latency, which makes fast turn around PTT speech difficult.
 
 \begin{figure}[H]
 \caption{Spectrogram of 15 seconds of $n=2$ diversity signal over a MPP channel. At some points in time the signal is faded at all frequencies, so frequency diversity cannot help.}
@@ -515,11 +517,11 @@ Frequency diversity helps, as there are times when one carrier is faded, but it'
 
 Figures \ref{fig:div_ber_curves} and \ref{fig:div_per_curves} show the results of frequency and time domain ($D=1.6$ and $D=3.2$ second packet) diversity on BER and PER.  The simulations were run for 300 seconds, which should give reasonable results down to a BER of $10^{-2}$ \cite{itu1487}. Care needs to be taken with HF simulation models such as \cite{itu1487} that have fixed delay, as it is possible for the resulting notches in the spectrum to be the same separation as a diversity carrier pair - a situation unlikely in a real world channel.
 
-Maximum Ratio Combining (MRC) is used for recombination, simulations indicate this was about 0.5dB better than Equal Gain Combining (EGC). As per Section \ref{sec:latency} an algorithmic delay of $D$ seconds implies a perceived latency of $2D$ seconds, so with $D=3.2$, the user would experience a 6.4 second latency, making PTT speech impossible.  Such latencies may be useful for an emergency voice mode of last resort. Smaller $D$ algorithmic delays can also be used, and will still have some benefit.
+Maximum Ratio Combining (MRC) is used for recombination, simulations indicate this is about 0.5dB better than Equal Gain Combining (EGC). As per Section \ref{sec:latency} an algorithmic delay of $D$ seconds implies a perceived latency of $2D$ seconds, so with $D=3.2$, the user would experience a latency greater than 6.4 seconds, making PTT speech awkward.  Such latencies may be useful for an emergency voice mode of last resort. Smaller $D$ algorithmic delays can also be used, and will still have some benefit.
 
-The waveform simulated is comparable to 700D, the \emph{mean12} curve is the expected performance form FreeDV 700D.  The combination of frequency and time domain interleaving gives impressive gains in PER performance, up to a total of 5dB with $D=3.2$, and 2.5dB with $n=2$ frequency diversity alone.  It is conceivable that with a more realistic $D<1$ second and frequency diversity, a 3dB improvement over 700D should be possible.
+The waveform simulated is comparable to 700D, the \emph{mean12} curve is the expected performance from FreeDV 700D.  The combination of frequency and time domain interleaving gives impressive gains in PER performance, up to a total of 5dB with $D=3.2$, and 2.5dB with $n=2$ frequency diversity alone.  With a more realistic $D<1$ second and frequency diversity, a 3dB improvement over 700D should be possible.
 
-Figure \ref{fig:snr_per_curves} shows the PER results of the C implementation of 700D, compared to the Octave simulations of the proposed waveforms, expressed on a SNR x axis.  It should be noted that the C implementation also includes timing and frequency offset estimation which are non ideal and will have small losses.  The proposed waveforms have been adjusted to include the same $L_p$, $L_{cp}$ and a 1dB loss for PAPR compression, to make the comparison with 700D realistic.
+Figure \ref{fig:snr_per_curves} shows the PER results of the C implementation of 700D, compared to the Octave simulations of the proposed waveforms, expressed against SNR.  It should be noted that the C implementation also includes timing and frequency offset estimation which are non ideal and will have small losses.  The proposed waveforms have been adjusted to include the same $L_p$, $L_{cp}$ and a 1dB loss for PAPR compression, to make the comparison with 700D realistic.
 
 \begin{table}[h]
 \centering
@@ -537,16 +539,18 @@ Figure \ref{fig:snr_per_curves} shows the PER results of the C implementation of
 \caption{Threshold SNR of proposed multipath waveforms on MPP Channel}
 \end{table}
 
-Additional notes:
+Additional notes and further work:
 \begin{enumerate}
 \item The $n=2$ diversity waveforms may suffer an additional PAPR loss due to the large number of carriers. PAPR compression with these waveforms should be simulated.
 \item The longer $D$ waveforms allow the use of longer FEC codes which will provide an additional boost to SNR performance.
 \item An alternative to frequency domain diversity is a low rate FEC code applied across a large number of carriers spanning a wide bandwidth.  This has not been simulated to date.  An advantage of the diversity approach is we can selectively decode just one of the diversity copies - this can be used to decode speech in high SNR, but crowed band conditions where one of the diversity copies is impacted by strong co-channel interference. 
-\item Diversity works well when the symbols being combined are uncorrelated.  Another approach would be to send a low $D$ waveform on one diversity channel, and a high $D$ copy on another.  For high SNR channels the benefits of low $D$ PTT speech could be enjoyed.  For poor channels, the high latency copy can be combined for improved performance at the expense of longer latency.
+\item Diversity works well when the symbols being combined are uncorrelated.  Another approach is to send a low $D$ waveform on one diversity channel, and a high $D$ copy on another (or a low $D$ waveform packet delayed by $D_2>1$ seconds).  For high SNR channels the benefits of low $D$ PTT speech could be enjoyed.  For poor channels, the high latency copy can be combined for improved performance at the expense of longer latency. This idea exploits the fact that when $D_2>D_{thresh}$, error bursts are uncorrelated in time, as shown in Figure \ref{fig:ber_packet}.  The performance would be 3dB less than 700D when just using the low diversity channel, due to the power split between the two channels.
+\item These results simulated the use of a FEC code using a bit errors per packet metric.  It would be useful to extend the simulation to run the actual LDPC codes.
+\item To help ensure we are on the right track for a waveform usable on many channels it would be useful to test performance with other channel models such as those found in Appendix B of \cite{etsi201}, and perform controlled Over the Air (OTA) experiments on real channels as early as possible.
 \end{enumerate}
 
 \begin{figure}[H]
-\caption{$n=2$ diversity simulation BER results. The 1.6 and 3.2 second curves simulate long delay $D$ (long FEC codewords). Note there is no effect on BER with large codewords as these curves are the average BER over the entire simulation, they do not model the non-uniform distribution of errors on multipath channels.}
+\caption{$n=2$ diversity simulation BER results. The 1.6 and 3.2 second curves simulate long delay $D$ (long FEC codewords). Note there is no effect on BER with large $D$ as these curves are the average BER over the entire simulation, they do not model the non-uniform distribution of errors over time on multipath channels as show in Figure \ref{fig:ber_packet}.}
 \label{fig:div_ber_curves}
 \begin{center}
 \input equaliser_div_ber.tex
@@ -580,11 +584,11 @@ Additional notes:
 
 \subsection{Timing estimation}
 
-TODO: make sure the current algorithm is doing sensible things on HF channels with complex impulse responses and large delay spreads.
+TODO: make sure the current algorithm is doing sensible things on real world HF channels with complex impulse responses and large delay spreads.
 
 \subsection{Acquisition}
 
-TODO: also include frequency offset estimation and tracking.  Sensitivity of Doppler spread, freq offset errors with reduced $R_s$. Can we use othogonality property to track freq offset, e.g. iterative adjustments of offset to peak OFDM carriers?
+TODO: Develop a wide range frequency offset estimator (+/- 200Hz) and way to track frequency drift.  Measure and plot implementation loss. Can it work on GEO and LEO channels? Sensitivity of Doppler spread, freq offset errors with reduced $R_s$. Can we use othogonality property to track freq offset, e.g. iterative adjustments of offset to peak OFDM carriers?
 
 \section{Further Work}
 
@@ -598,7 +602,7 @@ This section presents topics useful to explore in future.
 \item Table of FreeDV waveforms and values, plugged into formula, effect of increasing pilot symbol rate.
 \item Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
 \item Wades MAP techniques (ref).  This has a lot of promise, need an effective way to simulate and establish benefit with a modest amount of work.  Can we combine MAP with extra bits for FEC?  Index optimisation also a simple approach.
-\item Extending (\ref{eq:combine_freq}) to more carriers, it is essentially estimating the entire channel.  Literature search, I'm sure this is nothing new.  Determine if (\ref{eq:combine_freq}) is a reasonable approximation for real HF channels - we have derived it from a simulation model.
+\item Equalisation (\ref{eq:combine_freq}). Literature search, I'm sure this nothing new. Determine if (\ref{eq:combine_freq}) is a reasonable approximation for real HF channels - we have derived it from a simulation model.  From VK5DSP review Sep 2023: Compare variance of $\overline{H(e^{j \omega_c})}$ to $H(e^{j \omega_c})$. Consider extending (\ref{eq:combine_freq}) to more carriers, it is essentially estimating the entire channel.  Consider different estimators to MMSE, e.g. BLE. Consider modulating pilots as a side data channel or to aid frequency offset estimation.
 \end{itemize} 
 
 \nocite{*}

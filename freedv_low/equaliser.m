@@ -679,7 +679,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.pervec,'co-;MPP div2 MRC;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.6s;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.2s;')
-    drawEllipse([5 0.1 5 0.02],'r--;link clcoses;'); 
+    drawEllipse([5 0.1 5 0.02],'r--;link closes;'); 
 
     hold off; xlabel('Eb/No (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
     axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-2 1])

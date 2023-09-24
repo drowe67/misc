@@ -137,10 +137,10 @@ function sim_out = ber_test(sim_in)
       else
         dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
       end
-      path_delay_samples = round(path_delay_s);
+      path_delay_samples = round(path_delay_s*Fs);
       
-      spread1 = doppler_spread(dopplerSpreadHz, Fs, nsymb_max);
-      spread2 = doppler_spread(dopplerSpreadHz, Fs, nsymb_max);
+      spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam_max);
+      spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam_max);
 
       % normalise power through HF channel
       hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
@@ -161,6 +161,7 @@ function sim_out = ber_test(sim_in)
         if verbose == 2
           printf("nframes: %d\n", nframes);
           printf("nsymb: %d\n", nsymb);
+          printf("Seconds: %f\n", nsymb*Ts);
         end
 
         % modulator ------------------------
@@ -203,44 +204,52 @@ function sim_out = ber_test(sim_in)
         for s=1:nsymb
           for c=1:Nc*Nd+2
             st = (s-1)*M+1; en = st+M-1;
-            tx(st:en) += exp(j*(0:M-1)*w(c)).*tx_symb(c,s);
+            tx(st:en) += exp(j*(0:M-1)*w(c)).*tx_symb(c,s)/M;
           end
         end
        
         % channel ---------------------------
 
         rx = tx;
-        ch = ones(1,nsam).*exp(j*ch_phase);
-
+        rx *= exp(j*ch_phase);
+        ch_model = ones(Nc*Nd+2, nsymb).*exp(j*ch_phase);
+        
         if hf_en
 
-          hf_model = ones(1, nsam);
+          % time domain rate Fs HF channel simulation
+          
+          rx_hf = rx;
           for n=path_delay_samples+1:nsam
-            hf(n) = hf_gain*(spread1(n) + spread2(n-path_delay_samples));
+            rx_hf(n) = hf_gain*(spread1(n)*rx(n) + spread2(n)*rx(n-path_delay_samples));
           end
- 
-          if sim_in.ideal_phase == 1
-             ch = ch .* abs(hf);
-           else
-             ch = ch .* hf;
+          rx = rx_hf;
+          
+          % frequency domain rate Rs HF simulation for reference.
+          % This is an approximation as spread1 & spread2 are changing
+          % slowly across the symbol
+          
+          for c=1:Nc*Nd+2
+            for s=1:nsymb
+              st = (s-1)*M+1; en = st+M-1;
+              g1 = mean(spread1(st:en)); g2 = mean(spread2(st:en));
+              ch_model(c,s) *= hf_gain*(g1 + exp(-j*path_delay_samples*w(c))*g2);
+            end
           end
+          
         end
-        rx = rx.*ch;
 
         % variance is noise power, which is divided equally between real and
         % imag components of noise
-        noise = sqrt(variance*0.5)*(randn(1,nsam) + j*randn(1,nsam));
+        noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
         rx += noise;
 
         % DFT to convert from time domain back to rate Rs freq domain
         
-        rx_symb = ones(Nc*Nd,nsymb);
-        ch_model = ones(Nc*Nd,nsymb);
+        rx_symb = ones(Nc*Nd+2,nsymb);
         for s=1:nsymb
           for c=1:Nc*Nd+2
             st = (s-1)*M+1; en = st+M-1;
             rx_symb(c,s) = rx(st:en)*exp(j*(0:M-1)*w(c))';
-            ch_model(c,s) = ch(st:en)*exp(j*(0:M-1)*w(c))';
           end
         end
         
@@ -448,6 +457,13 @@ function sim_out = ber_test(sim_in)
     sim_out.pervec = pervec;
 endfunction
 
+#{
+  Single point simulation, various command line arguments.
+  
+  usage:
+    octave:13> equaliser; run_single(1000,'awgn',4)
+#}
+
 function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.pilot_freq_weights = [0 1 0];
     sim_in.verbose     = 2;
@@ -464,7 +480,9 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     i = 1;
     while i <= length(varargin)
       varargin{i}
-      if strcmp(varargin{i},"combining")
+      if strcmp(varargin{i},"ch_phase")
+        sim_in.ch_phase = varargin{i+1}; i++;
+      elseif strcmp(varargin{i},"combining")
         sim_in.combining = varargin{i+1}; i++;
       elseif strcmp(varargin{i},"resampler")
         sim_in.resampler = varargin{i+1}; i++;

@@ -5,7 +5,7 @@
 % and apply corrections to (equalise) received data symbols.  
 
 1;
-pkg load signal matgeom;
+pkg load signal;
 qpsk;
 
 % simple time domain example of resampling
@@ -69,6 +69,9 @@ function sim_out = ber_test(sim_in)
     Nd      = 1;         % number of diversity channels
     div_Hz  = 1000;      % freq offset of diversity carriers
     nbitsperframe = 224; % bits in a modem frame
+    M       = Fs/Rs;     % oversamplerate, number of samples/symbol
+
+    assert(floor(M) == M);
     
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
@@ -120,7 +123,8 @@ function sim_out = ber_test(sim_in)
     nbitsvec = sim_in.nbits;
     nframes_max = floor(max(nbitsvec)/nbitsperframe) + Npad;
     nsymb_max = nframes_max*Ns;
-
+    nsam_max = M*nsymb_max;
+    
     % init HF model
 
     hf_en = 0;
@@ -133,9 +137,10 @@ function sim_out = ber_test(sim_in)
       else
         dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
       end
-
-      spread1 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
-      spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb_max);
+      path_delay_samples = round(path_delay_s);
+      
+      spread1 = doppler_spread(dopplerSpreadHz, Fs, nsymb_max);
+      spread2 = doppler_spread(dopplerSpreadHz, Fs, nsymb_max);
 
       % normalise power through HF channel
       hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
@@ -191,38 +196,54 @@ function sim_out = ber_test(sim_in)
         [r c] = size(tx_symb);
         assert(c == nsymb);
 
+        % IDFT to convert to from freq domain rate Rs to time domain rate Fs
+
+        nsam = M*nsymb;
+        tx = zeros(1,nsam);
+        for s=1:nsymb
+          for c=1:Nc*Nd+2
+            st = (s-1)*M+1; en = st+M-1;
+            tx(st:en) += exp(j*(0:M-1)*w(c)).*tx_symb(c,s);
+          end
+        end
+       
         % channel ---------------------------
 
-        rx_symb = tx_symb;
-        ch_model = ones(Nc*Nd+2,nsymb).*exp(j*ch_phase);
+        rx = tx;
+        ch = ones(1,nsam).*exp(j*ch_phase);
 
         if hf_en
 
-          % Simplified rate Rs simulation model that doesn't include
-          % ISI, just per carrier freq-domain filtering by a single
-          % complex coefficient.
-
-          hf_model = zeros(Nc*Nd+2, nsymb);
-          for c=1:Nc*Nd+2
-            for s=1:nsymb
-              a = path_delay_s*Fs;
-              hf_model(c,s) = hf_gain*(spread1(s) + exp(-j*a*w(c))*spread2(s));
-            end
+          hf_model = ones(1, nsam);
+          for n=path_delay_samples+1:nsam
+            hf(n) = hf_gain*(spread1(n) + spread2(n-path_delay_samples));
           end
  
           if sim_in.ideal_phase == 1
-             ch_model = ch_model .* abs(hf_model);
+             ch = ch .* abs(hf);
            else
-             ch_model = ch_model .* hf_model;
+             ch = ch .* hf;
           end
         end
-        rx_symb = rx_symb.*ch_model;
+        rx = rx.*ch;
 
         % variance is noise power, which is divided equally between real and
         % imag components of noise
-        noise = sqrt(variance*0.5)*(randn(Nc*Nd+2,nsymb) + j*randn(Nc*Nd+2,nsymb));
-        rx_symb += noise;
+        noise = sqrt(variance*0.5)*(randn(1,nsam) + j*randn(1,nsam));
+        rx += noise;
 
+        % DFT to convert from time domain back to rate Rs freq domain
+        
+        rx_symb = ones(Nc*Nd,nsymb);
+        ch_model = ones(Nc*Nd,nsymb);
+        for s=1:nsymb
+          for c=1:Nc*Nd+2
+            st = (s-1)*M+1; en = st+M-1;
+            rx_symb(c,s) = rx(st:en)*exp(j*(0:M-1)*w(c))';
+            ch_model(c,s) = ch(st:en)*exp(j*(0:M-1)*w(c))';
+          end
+        end
+        
         % equaliser ------------------------------------------
 
         rx_symb_t = Ts*(0:nsymb-1);          % symbol times
@@ -411,22 +432,8 @@ function sim_out = ber_test(sim_in)
                 print(fn,"-depslatex","-S200,200");
                 printf("printing... %s\n", fn);
                 restore_fonts(textfontsize,linewidth);
-             end
-
-            % Spectrogram, first we need to transform into the time domain.  This is a bit unconventional,
-            % as the IDFT is done on the received symbols after channel impairments have been added.  Might
-            % need a full rate Fs simulation to do this properly.
-
-            M = Fs/Rs;
-            assert(M == floor(M));
-            rx = zeros(1,nsymb*M);
-            for s=1:nsymb
-              for c=1:Nc*Nd+2
-                st = (s-1)*M+1; en = st+M-1;
-                rx(st:en) += exp(j*(0:M-1)*w(c)).*rx_symb(c,s);
-              end
             end
-            
+
             figure(5); clf; plot_specgram(real(rx),Fs,0,2500);
             if isfield(sim_in,"epslatex")
               fn = "spectrogram.tex";

@@ -8,50 +8,15 @@
 pkg load signal;
 qpsk;
 
-% simple time domain example of resampling
-function test_resampler
-    randn('seed',1);
+function draw_ellipse(x1,y1,a,b,angle, leg)
 
-    % Fd is Doppler bandwidth (Hz).  Doppler signal is complex so
-    % this is a total bandwidth of Fd, sperad Fd/2 either side of 0 Hz
-    Fd = 2;          
-    Fs = 8000; T=1/Fs; Trun=5;
-    N  = Fs*Trun;
-    [d1 states] = doppler_spread(Fd, Fs, N);
+  % Generate points on the ellipse
+  theta = linspace(0, 2*pi, 100);  % Angle values
+  x = x1 + a * cos(theta) * cos(angle) - b * sin(theta) * sin(angle);
+  y = y1 + a * cos(theta) * sin(angle) + b * sin(theta) * cos(angle);
 
-    % Decimate down to pilot symbol rate of 1/(Ts*Ns)sample rate 6.25Hz (Ns=8 for 700D)
-    Ts=0.02; Ns=8; Fp=1/(Ts*Ns); Tp=1/Fp;
-    M = Fs/Fp;
-    assert (M == floor(M));
-    n2 = 1:M:length(d1);
-    d2 = d1(n2);
-    
-    % attempt resampling at mid point (doubling sample rate of d2), using a 6 point resampler
-    % uses 4 past pilots and 2 future
-    B=pi; n=(-3.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h);
-    d3 = filter(h,1,d2);
-
-    figure(1); clf; 
-    subplot(211); hold on;
-    plot(T*(0:N-1),real(d1));
-    stem(Tp*(0:length(d2)-1),real(d2));
-    stem(Tp*(0:length(d2)-1) - 3.5*Tp,real(d3));
-    hold off; axis([0 Trun -1 1]); xlabel('time (s)'); ylabel('real');
-    subplot(212); hold on;
-    plot(T*(0:N-1),imag(d1));
-    stem(Tp*(0:length(d2)-1),imag(d2));
-    stem(Tp*(0:length(d2)-1) - 3.5*Tp,imag(d3));
-    hold off; axis([0 Trun -1 1]); xlabel('time (s)'); ylabel('imag');
-end
-
-% plot frequency response of different resamplers
-function plot_resampler_freq_response
-    figure(4); clf; hold on;
-    h = [1 1 1 1]/4; [H w] = freqz(h); plot(w,20*log10(H),'b;[1 1 1 1];');
-    B=pi/2; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'g;sinc pi/2;');
-    B=pi; n=(-1.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'r;sinc pi;');
-    B=2*pi; n=(-3.5:0.5:1.5); h=(B/(2*pi))*sinc(n*B/(2*pi)); h=h./sum(h); [H w] = freqz(h); plot(w,20*log10(H),'c;6 tap pi;');
-    axis([0 pi -20 3]); grid; title('4 sample resamplers freq resp')
+  % Plot the ellipse
+  plot(x, y, leg);
 end
 
 % Rate Rs modem simulation model -------------------------------------------------------
@@ -148,7 +113,7 @@ function sim_out = ber_test(sim_in)
       % normalise power through HF channel
       hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
     end
-
+    printf("a\n");
     for ne = 1:length(EbNovec)
 
         % work out noise power -------------
@@ -201,7 +166,7 @@ function sim_out = ber_test(sim_in)
         assert(c == nsymb);
 
         % IDFT to convert to from freq domain rate Rs to time domain rate Fs
-
+        printf("b\n");
         nsam = (M+Ncp)*nsymb;
         tx = zeros(1,nsam);
         for s=1:nsymb
@@ -212,6 +177,7 @@ function sim_out = ber_test(sim_in)
           % cyclic prefix
           tx(st:st+Ncp-1) = tx(st+M:en);
         end
+        printf("c\n");
        
         % channel ---------------------------
 
@@ -229,20 +195,23 @@ function sim_out = ber_test(sim_in)
           end
           rx = rx_hf;
           
-          % frequency domain rate Rs HF simulation for reference.
-          % This is an approximation as spread1 & spread2 are changing
-          % slowly across the symbol
+          if verbose == 2
+            % frequency domain rate Rs HF simulation for reference.
+            % This is an approximation as spread1 & spread2 are changing
+            % slowly across the symbol
           
-          for c=1:Nc*Nd+2
-            for s=1:nsymb
-              st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
-              g1 = mean(spread1(st:en)); g2 = mean(spread2(st:en));
-              ch_model(c,s) *= hf_gain*(g1 + exp(-j*path_delay_samples*w(c))*g2);
+            for c=1:Nc*Nd+2
+              for s=1:nsymb
+                st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
+                g1 = mean(spread1(st:en)); g2 = mean(spread2(st:en));
+                ch_model(c,s) *= hf_gain*(g1 + exp(-j*path_delay_samples*w(c))*g2);
+              end
             end
           end
-          
         end
-
+        
+        printf("d\n");
+        
         % variance is noise power, which is divided equally between real and
         % imag components of noise
 
@@ -259,7 +228,7 @@ function sim_out = ber_test(sim_in)
             rx_symb(c,s) = rx(st+Ncp:en)*exp(j*(0:M-1)*w(c))';
           end
         end
-        
+        printf("e\n");
         % equaliser ------------------------------------------
 
         rx_symb_t = Ts*(0:nsymb-1);          % symbol times
@@ -384,7 +353,7 @@ function sim_out = ber_test(sim_in)
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('imag');
             end
         end
- 
+        printf("f\n");
         % demodulate rx symbols to bits
         nframes -= Npad;
         rx_bits = zeros(1,nframes*nbitsperframe);
@@ -689,7 +658,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.bervec,'co-;MPP div2 MRC;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.bervec,'kx-;MPP sim div2 MRC 1.6s;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.bervec,'ox-;MPP sim div2 MRC 3.2s;')
-    drawEllipse([5 0.1 5 0.02],'r--;operating point;'); 
+    draw_ellipse(5, 0.1 , 5, 0.02, 0, 'r--;operating point;'); 
 
     hold off; xlabel('Eb/No (dB)'); ylabel('BER'); grid("minor");
     legend('boxoff'); legend('location','southwest');
@@ -709,7 +678,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.pervec,'co-;MPP div2 MRC;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.pervec,'kx-;MPP div2 MRC 1.6s;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.pervec,'ox-;MPP div2 MRC 3.2s;')
-    drawEllipse([5 0.1 5 0.02],'r--;link closes;'); 
+    draw_ellipse(5, 0.1, 5, 0.02, 0, 'r--;link closes;'); 
 
     hold off; xlabel('Eb/No (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
     axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-2 1])
@@ -796,7 +765,7 @@ function plot_curves_snr(epslatex=0)
     xlabel('SNR (dB)'); ylabel('PER'); grid("minor"); legend('boxoff');
     axis([min(snrvec_coded) max(snrvec) 1E-2 1])
     a = axis; c = (a(2)+a(1))/2; r = (a(2)-a(1))/2;
-    drawEllipse([c 0.1 r 0.02],'r--;link closes;'); 
+    draw_ellipse(c,0.1,r,0.02,0,'r--;link closes;'); 
     hold off;
 
     if epslatex

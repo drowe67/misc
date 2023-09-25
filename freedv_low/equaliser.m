@@ -70,8 +70,11 @@ function sim_out = ber_test(sim_in)
     div_Hz  = 1000;      % freq offset of diversity carriers
     nbitsperframe = 224; % bits in a modem frame
     M       = Fs/Rs;     % oversamplerate, number of samples/symbol
-
+    Tcp     = 0.004;     % length of cyclic prefix
+    Ncp     = Tcp*Fs;
+    
     assert(floor(M) == M);
+    assert(floor(Ncp) == Ncp);
     
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
@@ -123,7 +126,7 @@ function sim_out = ber_test(sim_in)
     nbitsvec = sim_in.nbits;
     nframes_max = floor(max(nbitsvec)/nbitsperframe) + Npad;
     nsymb_max = nframes_max*Ns;
-    nsam_max = M*nsymb_max;
+    nsam_max = (M+Ncp)*nsymb_max;
     
     % init HF model
 
@@ -199,13 +202,15 @@ function sim_out = ber_test(sim_in)
 
         % IDFT to convert to from freq domain rate Rs to time domain rate Fs
 
-        nsam = M*nsymb;
+        nsam = (M+Ncp)*nsymb;
         tx = zeros(1,nsam);
         for s=1:nsymb
           for c=1:Nc*Nd+2
-            st = (s-1)*M+1; en = st+M-1;
-            tx(st:en) += exp(j*(0:M-1)*w(c)).*tx_symb(c,s)/M;
+            st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
+            tx(st+Ncp:en) += exp(j*(0:M-1)*w(c)).*tx_symb(c,s)/M;
           end
+          % cyclic prefix
+          tx(st:st+Ncp-1) = tx(st+M:en);
         end
        
         % channel ---------------------------
@@ -230,7 +235,7 @@ function sim_out = ber_test(sim_in)
           
           for c=1:Nc*Nd+2
             for s=1:nsymb
-              st = (s-1)*M+1; en = st+M-1;
+              st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
               g1 = mean(spread1(st:en)); g2 = mean(spread2(st:en));
               ch_model(c,s) *= hf_gain*(g1 + exp(-j*path_delay_samples*w(c))*g2);
             end
@@ -240,16 +245,18 @@ function sim_out = ber_test(sim_in)
 
         % variance is noise power, which is divided equally between real and
         % imag components of noise
+
         noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
         rx += noise;
 
         % DFT to convert from time domain back to rate Rs freq domain
-        
+        % We assume "genie" timing, set just after cyclic prefix        
+
         rx_symb = ones(Nc*Nd+2,nsymb);
         for s=1:nsymb
           for c=1:Nc*Nd+2
-            st = (s-1)*M+1; en = st+M-1;
-            rx_symb(c,s) = rx(st:en)*exp(j*(0:M-1)*w(c))';
+            st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
+            rx_symb(c,s) = rx(st+Ncp:en)*exp(j*(0:M-1)*w(c))';
           end
         end
         
@@ -413,8 +420,6 @@ function sim_out = ber_test(sim_in)
         pervec(ne) = npacket_errors/npackets + 1E-12;
         if verbose == 2
           figure(6);
-          Ts
-          Ns
           Tpacket=Ts*Ns*nbitsperpacket/nbitsperframe;
           plot((0:npackets-1)*Tpacket,berperpacket);
           axis([0 npackets*Tpacket 0 0.2]); xlabel('Time (s)'); ylabel('BER/packet'); grid;

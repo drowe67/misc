@@ -84,10 +84,17 @@ function sim_out = ber_test(sim_in)
       printf("nsymbolsperframe: %d\n",nsymbolsperframe);
       printf("Nc: %d\n", Nc);
       printf("nbitsperpacket: %d\n", nbitsperpacket);
-   end
+    end
+    
     % carrier frequencies, start at 400Hz
     w = 2*pi*(400 + (0:Nc*Nd+1)*Rs)/Fs;
-
+    W = zeros(Nc*Nd,M);
+    Wi = zeros(M,Nc*Nd);
+    for c=1:Nc*Nd+2
+      Wfwd(c,:) = exp(-j*(0:M-1)*w(c));
+      Winv(:,c) = exp(j*(0:M-1)*w(c));
+    end
+    
     nbitsvec = sim_in.nbits;
     nframes_max = floor(max(nbitsvec)/nbitsperframe) + Npad;
     nsymb_max = nframes_max*Ns;
@@ -113,7 +120,7 @@ function sim_out = ber_test(sim_in)
       % normalise power through HF channel
       hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
     end
-    printf("a\n");
+
     for ne = 1:length(EbNovec)
 
         % work out noise power -------------
@@ -164,20 +171,18 @@ function sim_out = ber_test(sim_in)
         end
         [r c] = size(tx_symb);
         assert(c == nsymb);
-
+        
         % IDFT to convert to from freq domain rate Rs to time domain rate Fs
-        printf("b\n");
+
         nsam = (M+Ncp)*nsymb;
         tx = zeros(1,nsam);
-        for s=1:nsymb
-          for c=1:Nc*Nd+2
-            st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
-            tx(st+Ncp:en) += exp(j*(0:M-1)*w(c)).*tx_symb(c,s)/M;
-          end
+        for s=1:nsymb          
+          st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
+          tx(st+Ncp:en) = Winv*tx_symb(:,s)/M;
+          
           % cyclic prefix
           tx(st:st+Ncp-1) = tx(st+M:en);
         end
-        printf("c\n");
        
         % channel ---------------------------
 
@@ -188,11 +193,10 @@ function sim_out = ber_test(sim_in)
         if hf_en
 
           % time domain rate Fs HF channel simulation
-          
-          rx_hf = rx;
-          for n=path_delay_samples+1:nsam
-            rx_hf(n) = hf_gain*(spread1(n)*rx(n) + spread2(n)*rx(n-path_delay_samples));
-          end
+
+          x = path_delay_samples;
+          rx_hf = hf_gain*spread1(1:nsam).*rx;
+          rx_hf(x+1:end) += hf_gain*spread2(1:nsam-x).*rx(1:nsam-x);
           rx = rx_hf;
           
           if verbose == 2
@@ -210,8 +214,6 @@ function sim_out = ber_test(sim_in)
           end
         end
         
-        printf("d\n");
-        
         % variance is noise power, which is divided equally between real and
         % imag components of noise
 
@@ -223,12 +225,10 @@ function sim_out = ber_test(sim_in)
 
         rx_symb = ones(Nc*Nd+2,nsymb);
         for s=1:nsymb
-          for c=1:Nc*Nd+2
-            st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
-            rx_symb(c,s) = rx(st+Ncp:en)*exp(j*(0:M-1)*w(c))';
-          end
+          st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
+          rx_symb(:,s) = Wfwd*rot90(rx(st+Ncp:en),3);
         end
-        printf("e\n");
+        
         % equaliser ------------------------------------------
 
         rx_symb_t = Ts*(0:nsymb-1);          % symbol times
@@ -353,7 +353,7 @@ function sim_out = ber_test(sim_in)
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('imag');
             end
         end
-        printf("f\n");
+ 
         % demodulate rx symbols to bits
         nframes -= Npad;
         rx_bits = zeros(1,nframes*nbitsperframe);
@@ -602,7 +602,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     % AWGN -----------------------------
 
     awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
-    sim_in.nbits  = min(max_nbits, floor(500 ./ awgn_theory));
+    sim_in.nbits = min(max_nbits, floor(100 ./ awgn_theory));
 
     awgn_sim_lin2ls = ber_test(sim_in);
     

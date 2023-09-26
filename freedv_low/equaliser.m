@@ -104,7 +104,7 @@ function sim_out = ber_test(sim_in)
     if verbose == 2
       printf("nframes: %d\n", nframes);
       printf("nsymb..: %d\n", nsymb);
-      printf("Seconds: %f\n", nsymb*Ts);
+      printf("Seconds: %f\n", nsymb*(Ts+Tcp));
     end
    
     % init HF model
@@ -391,12 +391,12 @@ function sim_out = ber_test(sim_in)
         pervec(ne) = npacket_errors/npackets + 1E-12;
         if verbose == 2
           figure(6);
-          Tpacket=Ts*Ns*nbitsperpacket/nbitsperframe;
+          Tpacket=(Ts+Tcp)*Ns*nbitsperpacket/nbitsperframe;
           stem((0:npackets-1)*Tpacket,berperpacket);
-          axis([0 npackets*Tpacket 0 0.2]); xlabel('Time (s)'); ylabel('BER/packet'); grid;
+          axis([0 npackets*Tpacket 0 0.25]); xlabel('Time (s)'); ylabel('BER/packet'); grid;
           if isfield(sim_in,"epslatex")
               fn = "ber_packet.tex";
-              print(fn,"-depslatex","-S200,200");
+              print(fn,"-depslatex","-S300,200");
               printf("printing... %s\n", fn);
           end
         end
@@ -419,10 +419,10 @@ function sim_out = ber_test(sim_in)
                 restore_fonts(textfontsize,linewidth);
             end
 
-            figure(5); clf; plot_specgram(real(rx),Fs,0,2500);
+            figure(5); clf; plot_specgram(real(rx_noise),Fs,0,2500);
             if isfield(sim_in,"epslatex")
               fn = "spectrogram.tex";
-              print(fn,"-depslatex","-S200,200");
+              print(fn,"-depslatex","-S300,200");
               printf("printing... %s\n", fn);
            end
          end

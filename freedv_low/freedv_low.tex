@@ -62,6 +62,8 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
  $B_d$ & Doppler spreading bandwidth for HF channel model & Hz \\
  $D$ & Algorithmic delay, how much speech we need to buffer before processing starts & seconds \\
  $E_b/N_0$ & Energy per bit on spectral noise density & dimensionless, dB\footnote{1} \\
+ $N_c$ & Number of carriers  \\
+ $N_d$ & Number of diversity Tx signals  \\
  $N_s$ & Number of symbols in a \emph{modem frame}, pilot insertion rate  \\
  $R_b$ & Bit rate & Bits/second \\
  $R_s$ & Symbol rate & symbols/second \\
@@ -304,10 +306,9 @@ The real world impacts of latency can be even more severe.  On poor channels, it
 
 \subsection{Summary of FreeDV modes}
 
-Using the framework developed above and the information in \cite{codec2_waveform_spreadsheet}, we can analyse the existing FreeDV waveforms.
+Using the framework developed above and the information in \cite{codec2_waveform_spreadsheet}, we can analyse the existing FreeDV waveforms (Table \ref{tab:freedv_waveforms}).
 
 \begin{table}[h]
-\label{tab:freedv_wavefoms}
 \centering
 \begin{tabular}{c c c c c c c c}
  \hline
@@ -320,9 +321,8 @@ Using the framework developed above and the information in \cite{codec2_waveform
  \hline
 \end{tabular}
 \caption{Summary of FreeDV waveforms, note the differences in the overheads $L_p$ and $L_{cp}$. $R_s$ and $T_s$ is per-carrier. 700C is a parallel tone modem with no cyclic prefix, the modem frame is comprised of two pilot symbols and 4 data symbols}
+\label{tab:freedv_waveforms}
 \end{table}
-
-TODO: $L_{il}$ estimate using \emph{lin2} modelling below, likely to be greater for 700C/E.  We could also include ${N_c}$, total $R_s$, and SNR estimates.
 
 \subsection{HF Channel Model}
 
@@ -465,7 +465,6 @@ This algorithm is denoted \emph{lin2ls}.  It's BER performance is plotted in Fig
 \end{figure}
 
 \begin{table}[h]
-\label{tab:resampler_summary}
 \centering
 \begin{tabular}{l l l l l l }
  \hline
@@ -477,6 +476,7 @@ This algorithm is denoted \emph{lin2ls}.  It's BER performance is plotted in Fig
  \hline
 \end{tabular}
 \caption{Comparison of equaliser algorithms for $N_s=8$. The last three numbers are implementation loss in dB, smaller is better.  700X has the advantage of low implementation loss across channels with a single waveform, but is 0.5dB poorer than 700D on the (rare) AWGN channel.  The 700E results are an approximation, as that waveform uses $N_s=5$. }
+\label{tab:resampler_summary}
 \end{table}
 
 The new \emph{lin2ls} resampler has the following benefits:
@@ -495,12 +495,12 @@ The algorithm used to combine adjacent carriers (\ref{eq:combine_freq}) is new a
 
 The multipath channel exhibits frequency selective fading.  Spreading bits in a packet across multiple carriers with OFDM helps.  Extending this is frequency diversity, where $n$ copies of the entire OFDM signal signal are transmitted, then recombined at the receiver.  Due to the spectral efficiency of OFDM, it is possible to transmit several copies of a narrow band digital voice waveform within a 2000 Hz bandwidth.
 
-Figure \ref{fig:spectrogram} illustrates an example of $n=2$ diversity over a multipath channel, using a $Nc=8$ carrier waveform waveform similar to 700D.  The original transmit signal has been copied to higher frequencies to produce $Nc=16$ carrier signal of the same total power but with twice the bandwidth.
+Figure \ref{fig:spectrogram} illustrates an example of $Nd=2$ diversity over a multipath channel, using a $Nc=8$ carrier waveform waveform similar to 700D.  The original transmit signal has been copied to higher frequencies to produce $Nc=16$ carrier signal of the same total power but with twice the bandwidth.
 
 Frequency diversity helps, as there are times when one carrier is faded, but it's diversity copy at about 800 Hz offset is not faded.  When recombined we can recover that carrier.  However observing Figure \ref{fig:spectrogram} there are some periods where the entire channel at all frequencies is faded for up to 1 second. This is supported by \ref{fig:ber_packet} which shows large burst of errors during fades. This leads us to the idea of diversity in time, where the bits of packet are spread over a period longer than the duration of a fade, lowering the average bit error rate of that packet. Once the BER is reduced beneath a threshold, the FEC code can correct all errors in the packet, and we can recover intelligible speech. The trade off is latency, which makes fast turn around PTT speech difficult.
 
 \begin{figure}[H]
-\caption{Spectrogram of 15 seconds of $n=2$ diversity signal over a MPP channel. At some points in time the signal is faded at all frequencies, so frequency diversity cannot help.}
+\caption{Spectrogram of 20 seconds of $Nd=2$ diversity signal over a MPP channel. At some points in time the signal is faded at all frequencies, so frequency diversity cannot help.}
 \label{fig:spectrogram}
 \begin{center}
 \input spectrogram.tex
@@ -515,13 +515,15 @@ Frequency diversity helps, as there are times when one carrier is faded, but it'
 \end{center}
 \end{figure}
 
-Figures \ref{fig:div_ber_curves} and \ref{fig:div_per_curves} show the results of frequency and time domain ($D=1.6$ and $D=3.2$ second packet) diversity on BER and PER.  The simulations were run for 300 seconds, which should give reasonable results down to a BER of $10^{-2}$ \cite{itu1487}. Care needs to be taken with HF simulation models such as \cite{itu1487} that have fixed delay, as it is possible for the resulting notches in the spectrum to be the same separation as a diversity carrier pair - a situation unlikely in a real world channel.
+Figures \ref{fig:div_ber_curves} and \ref{fig:div_per_curves} show the results of frequency and time domain ($D=1.6$ and $D=3.2$ second packet) diversity on BER and PER.  The simulations were run for 300 seconds, which should give reasonable results down to a BER of $10^{-2}$ \cite{itu1487}. Care needs to be taken with HF simulation models such as \cite{itu1487} that have fixed delay, as it is possible for the resulting notches in the spectrum to be the same separation as a diversity carrier pair - a situation unlikely in a real world channel.  The last few points plotted on the 1.6 and 3.2s curves had less than 10 packet errors so have a large margin of error.
 
 Maximum Ratio Combining (MRC) is used for recombination, simulations indicate this is about 0.5dB better than Equal Gain Combining (EGC). As per Section \ref{sec:latency} an algorithmic delay of $D$ seconds implies a perceived latency of $2D$ seconds, so with $D=3.2$, the user would experience a latency greater than 6.4 seconds, making PTT speech awkward.  Such latencies may be useful for an emergency voice mode of last resort. Smaller $D$ algorithmic delays can also be used, and will still have some benefit.
 
-The waveform simulated is comparable to 700D, the \emph{mean12} curve is the expected performance from FreeDV 700D.  The combination of frequency and time domain interleaving gives impressive gains in PER performance, up to a total of 5dB with $D=3.2$, and 2.5dB with $n=2$ frequency diversity alone.  With a more realistic $D<1$ second and frequency diversity, a 3dB improvement over 700D should be possible.
+The waveform simulated is comparable to 700D, the \emph{mean12} curve is the expected performance from FreeDV 700D.  The combination of frequency and time domain interleaving gives impressive gains in PER performance, up to a total of 5dB with $D=3.2$, and 3dB with $Nd=2$ frequency diversity alone.  With a more realistic $D<1$ second and frequency diversity, a 4dB improvement over 700D should be possible.
 
 Figure \ref{fig:snr_per_curves} shows the PER results of the C implementation of 700D, compared to the Octave simulations of the proposed waveforms, expressed against SNR.  It should be noted that the C implementation also includes timing and frequency offset estimation which are non ideal and will have small losses.  The proposed waveforms have been adjusted to include the same $L_p$, $L_{cp}$ and a 1dB loss for PAPR compression, to make the comparison with 700D realistic.
+
+Table \ref{tab:multipath_thresh_snr} summarises the performance improvements over 700D.
 
 \begin{table}[h]
 \centering
@@ -530,18 +532,19 @@ Figure \ref{fig:snr_per_curves} shows the PER results of the C implementation of
  Waveform & Freq Div $n$ & Alg Dly $D$ (s) & Thresh SNR (dB) & $\Delta$ 700D (dB) \\
  \hline
  700D C impl & 1 & 0.16 & 5.8 & 0.0 \\ 
- lin2s  & 1 & 0.16 & 5.2 & 0.6 \\
- div2 MRC & 2 & 0.16 & 3.2 & 2.6 \\ 
- div2 MRC 1.8s & 2 & 1.60 & 1.8 & 4.0 \\ 
- div2 MRC 3.6s & 2 & 3.20 & 1.0 & 4.8 \\ 
+ lin2s  & 1 & 0.16 & 4.8 & 1.0 \\
+ div2 MRC & 2 & 0.16 & 2.7 & 3.1 \\ 
+ div2 MRC 1.8s & 2 & 1.60 & 1.2 & 4.2 \\ 
+ div2 MRC 3.6s & 2 & 3.20 & 0.8 & 5.0 \\ 
  \hline
 \end{tabular}
 \caption{Threshold SNR of proposed multipath waveforms on MPP Channel}
+\label{tab:multipath_thresh_snr}
 \end{table}
 
 Additional notes and further work:
 \begin{enumerate}
-\item The $n=2$ diversity waveforms may suffer an additional PAPR loss due to the large number of carriers. PAPR compression with these waveforms should be simulated.
+\item The $N_d=2$ diversity waveforms may suffer an additional PAPR loss due to the large number of carriers. PAPR compression with these waveforms should be simulated.
 \item The longer $D$ waveforms allow the use of longer FEC codes which will provide an additional boost to SNR performance.
 \item An alternative to frequency domain diversity is a low rate FEC code applied across a large number of carriers spanning a wide bandwidth.  This has not been simulated to date.  An advantage of the diversity approach is we can selectively decode just one of the diversity copies - this can be used to decode speech in high SNR, but crowed band conditions where one of the diversity copies is impacted by strong co-channel interference. 
 \item Diversity works well when the symbols being combined are uncorrelated.  Another approach is to send a low $D$ waveform on one diversity channel, and a high $D$ copy on another (or a low $D$ waveform packet delayed by $D_2>1$ seconds).  For high SNR channels the benefits of low $D$ PTT speech could be enjoyed.  For poor channels, the high latency copy can be combined for improved performance at the expense of longer latency. This idea exploits the fact that when $D_2>D_{thresh}$, error bursts are uncorrelated in time, as shown in Figure \ref{fig:ber_packet}.  The performance would be 3dB less than 700D when just using the low diversity channel, due to the power split between the two channels.
@@ -550,7 +553,7 @@ Additional notes and further work:
 \end{enumerate}
 
 \begin{figure}[H]
-\caption{$n=2$ diversity simulation BER results. The 1.6 and 3.2 second curves simulate long delay $D$ (long FEC codewords). Note there is no effect on BER with large $D$ as these curves are the average BER over the entire simulation, they do not model the non-uniform distribution of errors over time on multipath channels as show in Figure \ref{fig:ber_packet}.}
+\caption{$Nd=2$ diversity simulation BER results. The 1.6 and 3.2 second curves simulate long delay $D$ (long FEC codewords). Note there is no effect on BER with large $D$ as these curves are the average BER over the entire simulation, they do not model the non-uniform distribution of errors over time on multipath channels as show in Figure \ref{fig:ber_packet}.}
 \label{fig:div_ber_curves}
 \begin{center}
 \input equaliser_div_ber.tex
@@ -558,7 +561,7 @@ Additional notes and further work:
 \end{figure}
 
 \begin{figure}[H]
-\caption{$n=2$ diversity simulation PER results. A packet error is declared if the BER inside the packet exceeds 0.1 (approximating the performance of a rate 0.5 LDPC code). The packet length is 0.16s unless indicated in the legend. This metric better represents the effects of a non-uniform distribution of errors.}
+\caption{$Nd=2$ diversity simulation PER results. A packet error is declared if the BER inside the packet exceeds 0.1 (approximating the performance of a rate 0.5 LDPC code). The packet length is 0.16s unless indicated in the legend. This metric better represents the effects of a non-uniform distribution of errors.}
 \label{fig:div_per_curves}
 \begin{center}
 \input equaliser_div_per.tex
@@ -566,7 +569,7 @@ Additional notes and further work:
 \end{figure}
 
 \begin{figure}[H]
-\caption{$n=2$ diversity simulation PER results, mapped to a SNR axis and compared to 700D. 700E (not shown) is about 2dB worse than 700D on the MPP channel. The red oval is where a voice link becomes possible.}
+\caption{$Nd=2$ diversity simulation PER results, mapped to a SNR axis and compared to 700D. 700E (not shown) is about 2dB worse than 700D on the MPP channel. The red oval is where a voice link becomes possible.}
 \label{fig:snr_per_curves}
 \begin{center}
 \input snr_per.tex

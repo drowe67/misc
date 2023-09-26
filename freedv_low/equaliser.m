@@ -95,13 +95,21 @@ function sim_out = ber_test(sim_in)
       Winv(:,c) = exp(j*(0:M-1)*w(c));
     end
     
-    nbitsvec = sim_in.nbits;
-    nframes_max = floor(max(nbitsvec)/nbitsperframe) + Npad;
-    nsymb_max = nframes_max*Ns;
-    nsam_max = (M+Ncp)*nsymb_max;
-    
+    % integer number of "modem" frames
+    nbits= sim_in.nbits;
+    assert(length(nbits) == 1);
+    nframes = floor(nbits/nbitsperframe) + Npad;
+    nsymb = nframes*Ns;
+    nsam = (M+Ncp)*nsymb;
+    if verbose == 2
+      printf("nframes: %d\n", nframes);
+      printf("nsymb..: %d\n", nsymb);
+      printf("Seconds: %f\n", nsymb*Ts);
+    end
+   
     % init HF model
 
+    printf("Generating HF model spreading samples...\n")
     hf_en = 0;
     if strcmp(ch,"mpp") || strcmp(ch,"mpd")
       hf_en = 1;
@@ -114,13 +122,92 @@ function sim_out = ber_test(sim_in)
       end
       path_delay_samples = round(path_delay_s*Fs);
       
-      spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam_max);
-      spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam_max);
+      spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+      spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam);
 
       % normalise power through HF channel
       hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
     end
 
+    % modulator ------------------------
+
+    printf("Modulate to rate Rs OFDM symbols...\n");
+    tx_bits = rand(1,nframes*nbitsperframe) > 0.5; bit = 1;
+    tx_symb = [];
+    for f=1:nframes
+      % set up Nc x Ns array of symbols with pilots
+      atx_symb = zeros(Nc,Ns); 
+      for c=1:Nc
+        atx_symb(c,1) = 1;
+        for s=2:Ns
+          atx_symb(c,s) = qpsk_mod(tx_bits(bit:bit+1)); bit += 2;
+        end
+      end
+      
+      % diversity copy
+      tmp = [];
+      for d=1:Nd;
+        tmp = [tmp; atx_symb];
+      end
+      atx_symb = tmp;
+
+      % add "wingman" pilots for first and last carriers
+      wingman = [1 zeros(1,Ns-1)];
+      atx_symb = [wingman; atx_symb; wingman];
+
+      % normalise power when using diversity
+      atx_symb *= 1/sqrt(Nd);
+      
+      tx_symb = [tx_symb atx_symb];
+    end
+    [r c] = size(tx_symb);
+    assert(c == nsymb);
+    
+    % IDFT to convert to from freq domain rate Rs to time domain rate Fs
+
+    printf("IDFT to time domain...\n");
+    nsam = (M+Ncp)*nsymb;
+    tx = zeros(1,nsam);
+    for s=1:nsymb          
+      st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
+      tx(st+Ncp:en) = Winv*tx_symb(:,s)/M;
+      
+      % cyclic prefix
+      tx(st:st+Ncp-1) = tx(st+M:en);
+    end
+    
+    % channel ---------------------------
+
+    rx = tx;
+    rx *= exp(j*ch_phase);
+    ch_model = ones(Nc*Nd+2, nsymb).*exp(j*ch_phase);
+    
+    if hf_en
+       printf("HF channel simulation...\n");
+
+      % time domain rate Fs HF channel simulation
+
+      x = path_delay_samples;
+      rx_hf = hf_gain*spread1(1:nsam).*rx;
+      rx_hf(x+1:end) += hf_gain*spread2(1:nsam-x).*rx(1:nsam-x);
+      rx = rx_hf;
+      
+      if verbose == 2
+        % frequency domain rate Rs HF simulation for reference.
+        % This is an approximation as spread1 & spread2 are changing
+        % slowly across the symbol
+      
+        for c=1:Nc*Nd+2
+          for s=1:nsymb
+            st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
+            g1 = mean(spread1(st:en)); g2 = mean(spread2(st:en));
+            ch_model(c,s) *= hf_gain*(g1 + exp(-j*path_delay_samples*w(c))*g2);
+          end
+        end
+      end
+    end
+
+    printf("Noise loop and Rx...\n");
     for ne = 1:length(EbNovec)
 
         % work out noise power -------------
@@ -128,97 +215,12 @@ function sim_out = ber_test(sim_in)
         EsNodB = EbNodB + 10*log10(bps);
         EsNo = 10^(EsNodB/10);
         variance = 1/EsNo;
-
-        % integer number of "modem" frames
-        nbits = nbitsvec(ne);
-        nframes = floor(nbits/nbitsperframe) + Npad;
-        nsymb = nframes*Ns;
-        if verbose == 2
-          printf("nframes: %d\n", nframes);
-          printf("nsymb: %d\n", nsymb);
-          printf("Seconds: %f\n", nsymb*Ts);
-        end
-
-        % modulator ------------------------
-
-        tx_bits = rand(1,nframes*nbitsperframe) > 0.5; bit = 1;
-        tx_symb = [];
-        for f=1:nframes
-          % set up Nc x Ns array of symbols with pilots
-          atx_symb = zeros(Nc,Ns); 
-          for c=1:Nc
-            atx_symb(c,1) = 1;
-            for s=2:Ns
-              atx_symb(c,s) = qpsk_mod(tx_bits(bit:bit+1)); bit += 2;
-            end
-          end
-          
-          % diversity copy
-          tmp = [];
-          for d=1:Nd;
-            tmp = [tmp; atx_symb];
-          end
-          atx_symb = tmp;
-
-          % add "wingman" pilots for first and last carriers
-          wingman = [1 zeros(1,Ns-1)];
-          atx_symb = [wingman; atx_symb; wingman];
-
-          % normalise power when using diversity
-          atx_symb *= 1/sqrt(Nd);
-          
-          tx_symb = [tx_symb atx_symb];
-        end
-        [r c] = size(tx_symb);
-        assert(c == nsymb);
-        
-        % IDFT to convert to from freq domain rate Rs to time domain rate Fs
-
-        nsam = (M+Ncp)*nsymb;
-        tx = zeros(1,nsam);
-        for s=1:nsymb          
-          st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
-          tx(st+Ncp:en) = Winv*tx_symb(:,s)/M;
-          
-          % cyclic prefix
-          tx(st:st+Ncp-1) = tx(st+M:en);
-        end
-       
-        % channel ---------------------------
-
-        rx = tx;
-        rx *= exp(j*ch_phase);
-        ch_model = ones(Nc*Nd+2, nsymb).*exp(j*ch_phase);
-        
-        if hf_en
-
-          % time domain rate Fs HF channel simulation
-
-          x = path_delay_samples;
-          rx_hf = hf_gain*spread1(1:nsam).*rx;
-          rx_hf(x+1:end) += hf_gain*spread2(1:nsam-x).*rx(1:nsam-x);
-          rx = rx_hf;
-          
-          if verbose == 2
-            % frequency domain rate Rs HF simulation for reference.
-            % This is an approximation as spread1 & spread2 are changing
-            % slowly across the symbol
-          
-            for c=1:Nc*Nd+2
-              for s=1:nsymb
-                st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
-                g1 = mean(spread1(st:en)); g2 = mean(spread2(st:en));
-                ch_model(c,s) *= hf_gain*(g1 + exp(-j*path_delay_samples*w(c))*g2);
-              end
-            end
-          end
-        end
-        
+         
         % variance is noise power, which is divided equally between real and
         % imag components of noise
 
         noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
-        rx += noise;
+        rx_noise = rx + noise;
 
         % DFT to convert from time domain back to rate Rs freq domain
         % We assume "genie" timing, set just after cyclic prefix        
@@ -226,7 +228,7 @@ function sim_out = ber_test(sim_in)
         rx_symb = ones(Nc*Nd+2,nsymb);
         for s=1:nsymb
           st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
-          rx_symb(:,s) = Wfwd*rot90(rx(st+Ncp:en),3);
+          rx_symb(:,s) = Wfwd*rot90(rx_noise(st+Ncp:en),3);
         end
         
         % equaliser ------------------------------------------
@@ -390,7 +392,7 @@ function sim_out = ber_test(sim_in)
         if verbose == 2
           figure(6);
           Tpacket=Ts*Ns*nbitsperpacket/nbitsperframe;
-          plot((0:npackets-1)*Tpacket,berperpacket);
+          stem((0:npackets-1)*Tpacket,berperpacket);
           axis([0 npackets*Tpacket 0 0.2]); xlabel('Time (s)'); ylabel('BER/packet'); grid;
           if isfield(sim_in,"epslatex")
               fn = "ber_packet.tex";
@@ -491,7 +493,7 @@ function run_curves(itut_runtime=0,epslatex=0)
     % AWGN -----------------------------
 
     awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
-    sim_in.nbits  = min(max_nbits, floor(500 ./ awgn_theory));
+    sim_in.nbits  = max_nbits;
 
     sim_in.pilot_freq_weights = [1 1 1];
     sim_in.resampler = "mean4"; awgn_sim_mean12 = ber_test(sim_in);
@@ -514,7 +516,7 @@ function run_curves(itut_runtime=0,epslatex=0)
     Fd_min = 1; run_time_s = 3000/Fd_min; Rb = 100;
     % default 0.1*run_time_s actually gives results close to theory
     if itut_runtime==0, run_time_s /= 10; end % default 0.1*run_time_s
-    hf_sim_in.nbits(1:length(hf_sim_in.EbNovec)) = floor(run_time_s*Rb);
+    hf_sim_in.nbits = floor(run_time_s*Rb);
 
     hf_sim = ber_test(hf_sim_in);
     hf_sim_in.ideal_phase = 0;
@@ -589,7 +591,7 @@ end
 %   octave> equaliser; run_curves_diversity()
 
 function run_curves_diversity(runtime_scale=0.1,epslatex=0)
-    max_nbits = 1E5;
+    max_nbits = 1E4;
     sim_in.verbose = 1;
     sim_in.EbNovec = 0:10;
     sim_in.ch = "awgn";
@@ -602,7 +604,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     % AWGN -----------------------------
 
     awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
-    sim_in.nbits = min(max_nbits, floor(100 ./ awgn_theory));
+    sim_in.nbits = max_nbits;
 
     awgn_sim_lin2ls = ber_test(sim_in);
     
@@ -620,7 +622,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     % sometimes useful to run quickly to test code
     % default 0.1*run_time_s actually gives results close to theory
     run_time_s *= runtime_scale;
-    hf_sim_in.nbits(1:length(hf_sim_in.EbNovec)) = floor(run_time_s*Rb);
+    hf_sim_in.nbits = floor(run_time_s*Rb);
     printf("runtime (s): %f\n", run_time_s);
     
     hf_sim_in.ideal_phase = 0; 
@@ -658,7 +660,7 @@ function run_curves_diversity(runtime_scale=0.1,epslatex=0)
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc.bervec,'co-;MPP div2 MRC;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_1800.bervec,'kx-;MPP sim div2 MRC 1.6s;')
     semilogy(hf_sim_in.EbNovec, hf_sim_div2_mrc_3600.bervec,'ox-;MPP sim div2 MRC 3.2s;')
-    draw_ellipse(5, 0.1 , 5, 0.02, 0, 'r--;operating point;'); 
+    draw_ellipse(5, 0.1 , 5, 0.02, 0, 'r--;link closes;'); 
 
     hold off; xlabel('Eb/No (dB)'); ylabel('BER'); grid("minor");
     legend('boxoff'); legend('location','southwest');
@@ -740,7 +742,8 @@ function plot_curves_snr(epslatex=0)
     semilogy(x700d_mpp(:,1), x700d_mpp(:,2)+1E-12,'b+-;MPP 700D;')
     semilogy(snrvec, hf_sim_lin2ls.bervec,'g+-;MPP lin2ls;')
     semilogy(snrvec, hf_sim_div2_mrc.bervec,'co-;MPP div2 MRC;')
-   
+    draw_ellipse(5, 0.1 , 5, 0.02, 0, 'r--;link closes;');
+
     hold off; xlabel('SNR (dB)'); ylabel('UBER'); grid("minor");
     legend('boxoff'); legend('location','southwest');
     axis([min(snrvec) max(snrvec) 1E-3 0.5])

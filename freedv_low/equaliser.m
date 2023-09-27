@@ -330,11 +330,11 @@ function sim_out = ber_test(sim_in)
         if verbose == 2
             figure(3); clf;
             c = 2;
-            if isfield(sim_in,"epslatex")
+            if isfield(sim_in,"epslatex_interp")
                 % just real part for Latex plot
                 [textfontsize linewidth] = set_fonts(20);
                 hold on;
-                plot(rx_symb_t,real(ch_model(c,:)),'b;channel Hn;');
+                plot(rx_symb_t,real(ch_model(c,:)),'b;channel H;');
                 plot(rx_pilots_t, real(rx_pilots(c,:)),'ro;pilots;');
                 plot(rx_symb_t,real(rx_ch(c,:)),'r-;lin2 channel est;');
                 hold off; axis([0 Ts*(nsymb-1) -2 2]); xlabel('time (s)'); ylabel('real');
@@ -468,6 +468,8 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.nbitsperframe = varargin{i+1}; i++;
       elseif strcmp(varargin{i},"bitsperpacket")
         sim_in.nbitsperpacket = varargin{i+1}; i++;    
+      elseif strcmp(varargin{i},"epslatex_interp")
+        sim_in.epslatex_interp = 1;    
       elseif strcmp(varargin{i},"epslatex")
         sim_in.epslatex = 1;    
       else

@@ -399,16 +399,16 @@ The general strategy is to propose an innovation, and explore with analysis/math
 
 Pilot symbols are used to the estimate the channel, and equalise (correct) the phase of the received symbols.  We require an equalisation system that works with $B_d=2$ Hz Doppler Spread that has a low implementation loss $L_{il}$ on noisy channels, and has a reasonable latency (we can't use symbols far in the future).
 
-If we detect symbols after ISI has settled, the channel for each OFDM carrier resolves to a single complex constant $H_c$. This can be considered a complex random variable with bandwidth $B_d$. 
+If we detect symbols after ISI has settled, the channel for each OFDM carrier resolves to a single complex constant $H(e^{j \omega})$. This can be considered a complex random variable with bandwidth $B_d$. 
 
 Consider the two path time domain channel model (\ref{eq:hf_model_time}). Two additive terms of bandwidth B add linearly, so by linearity the result also has bandwidth B.  The sum is a random modulation of bandwidth $B_d$ about the symbol centre frequency.  The Doppler bandwidth $B_d$ therefore defines the bandwidth required for equalisation. One caveat - if $B_d$ an appreciable fraction of $R_s$ the DFT orthogonality may break down to some extent as energy falls into adjacent DFT bins.
 
-FreeDV 700D samples pilots and hence $H_c$ at $1/(N_sTs)=6.25$ Hz.  As we are sampling a complex signal, this implies a Nyquist bandwidth of 6.25 Hz, which should be adequate to recover $H_c$ which has a maximum $B_d=2$ Hz on the MPD channel. 700D currently uses a block average over a 2D array (4 pilots in time, across 3 carriers in frequency) of 12 pilots, this can be interpreted as a 2D FIR filter with all coefficients $c_i=1/12$. It is effective on MPP channels ($B_d=1$ Hz), but breaks down on MPD channels ($B_d=2$ Hz).  This suggests a resampler with a wider bandwidth might enable a waveform similar to 700D to be used on MPD channels.
+FreeDV 700D samples pilots and hence $H(e^{j \omega})$ at $1/(N_sTs)=6.25$ Hz.  As we are sampling a complex signal, this implies a Nyquist bandwidth of 6.25 Hz, which should be adequate to recover $H(e^{j \omega})$ which has a maximum $B_d=2$ Hz on the MPD channel. 700D currently uses a block average over a 2D array (4 pilots in time, across 3 carriers in frequency) of 12 pilots, this can be interpreted as a 2D FIR filter with all coefficients $c_i=1/12$. It is effective on MPP channels ($B_d=1$ Hz), but breaks down on MPD channels ($B_d=2$ Hz).  This suggests a resampler with a wider bandwidth might enable a waveform similar to 700D to be used on MPD channels.
 
 To explore pilot resampling algorithms, a simulation was written to evaluate candidate algorithms by comparing uncoded BER versus $E_b/N_0$ curves.  One interpretation of resampling 4 pilots in time is a 4 point FIR filter. This was explored, along with the existing \emph{mean12} resampler (700D), and 2 point linear \emph{lin2} resampler (as used in FreeDV 700E). Figure \ref{fig:interpolator} shows the \emph{lin2} resampler in action.
 
 \begin{figure}[h]
-\caption{\emph{lin2} resampler in action for a MPD channel. The blue continuous line is the simulated channel $H_c$ at each symbol, the red dots are the pilot symbols, and the red line the channel estimates from the linearly interpolated pilots.  Just the real part is plotted.}
+\caption{\emph{lin2} resampler in action for a single OFDM carrier on a MPD channel. The blue continuous line is the simulated channel $H(e^{j \omega})$ at each symbol, the red dots are the pilot symbols, and the red line the channel estimates from the linearly interpolated pilots.  Just the real part is plotted.}
 \label{fig:interpolator}
 \begin{center}
 \input interpolator.tex

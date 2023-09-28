@@ -7,6 +7,7 @@
 \usepackage[numbib]{tocbibind}
 \usepackage{hyperref}
 \usepackage{float}
+\usepackage{bm}
 \begin{document}
 
 \title{Low SNR FreeDV Mode}
@@ -546,7 +547,7 @@ Additional notes and further work:
 \begin{enumerate}
 \item The $N_d=2$ diversity waveforms may suffer an additional PAPR loss due to the large number of carriers. PAPR compression with these waveforms should be simulated.
 \item The longer $D$ waveforms allow the use of longer FEC codes which will provide an additional boost to SNR performance.
-\item An alternative to frequency domain diversity is a low rate FEC code applied across a large number of carriers spanning a wide bandwidth.  This has not been simulated to date.  An advantage of the diversity approach is we can selectively decode just one of the diversity copies - this can be used to decode speech in high SNR, but crowed band conditions where one of the diversity copies is impacted by strong co-channel interference. 
+\item An alternative to frequency domain diversity is a low rate FEC code applied across a large number of carriers spanning a wide bandwidth.  This has not been simulated to date.  An advantage of the diversity approach is we can selectively decode just one of the diversity copies - this can be used to decode speech in high SNR, but crowded band conditions where one of the diversity copies is impacted by strong co-channel interference. 
 \item Diversity works well when the symbols being combined are uncorrelated.  Another approach is to send a low $D$ waveform on one diversity channel, and a high $D$ copy on another (or a low $D$ waveform packet delayed by $D_2>1$ seconds).  For high SNR channels the benefits of low $D$ PTT speech could be enjoyed.  For poor channels, the high latency copy can be combined for improved performance at the expense of longer latency. This idea exploits the fact that when $D_2>D_{thresh}$, error bursts are uncorrelated in time, as shown in Figure \ref{fig:ber_packet}.  The performance would be 3dB less than 700D when just using the low diversity channel, due to the power split between the two channels.
 \item These results simulated the use of a FEC code using a bit errors per packet metric.  It would be useful to extend the simulation to run the actual LDPC codes.
 \item To help ensure we are on the right track for a waveform usable on many channels it would be useful to test performance with other channel models such as those found in Appendix B of \cite{etsi201}, and perform controlled Over the Air (OTA) experiments on real channels as early as possible.
@@ -585,13 +586,96 @@ Additional notes and further work:
 \item 700C had just 13ms symbols but dealt with ISI pretty well - this might be worth exploring.
 \end{enumerate}
 
+\subsection{Acquisition}
+
+PTT digital voice systems require fast acquisition - when a station starts transmitting we would like decoded speech to emerge from the receiver within a few 100ms, even on low SNR multipath channels.  Some considerations:
+\begin{enumerate}
+\item A key part of acquisition is coarse timing and frequency offset estimation.  After the signal is acquired, we need to track frequency and timing offsets as they evolve.
+\item Acquisition can be specified as a probability, e.g. 90\% probability of acquisition at the threshold link SNR, with an initial frequency offset of +/- 200 Hz.
+\item False acquisition can occur, for example non-FreeDV signals such as noise, other HF signals, or sine wave "carriers". This can also be specified by a probability requirement. 
+\item A digital voice signal operates in streaming rather than burst mode - a continuous sequence of modems frames is sent by the transmitter until the "over" is complete.  A receiver should be able to acquire the signal at any time.
+\item OFDM carriers are narrow and hence quite sensitive to frequency offset errors, for example a 5\% error of $0.05*Rs=2.5$ Hz is enough to impact performance. This sets a requirement for initial frequency offset estimation and tracking.
+\item Acquisition schemes should be robust to slowly varying multipath channels which may have stationary notches in the spectrum that last for several seconds.  This suggests spreading pilot symbols, carriers, and unique word bits over frequency to avoid frequency selective effects.
+\item LEO channels have rapid rate of change of frequency due to Doppler shift, a challenge for frequency tracking.
+\end{enumerate}
+
+FreeDV 700D uses a correlation algorithm which compares the time domain received $r(n)$ signal to the transmitted pilot symbols $p(n)$.  The correlation from two adjacent modem frames are coherently combined.  The correlation function is maximised over a 2D grid of time and frequency points.  If the maximum exceeds a threshold the state machine enters a trial sync phase where acquisition is checked by demodulating a unique word present in every modem frame.
+
+The time domain pilot signal is the IDFT of the frequency domain pilots for each carrier $P_c$:
+\begin{equation}
+p(n) = \sum^{c=N_c}_{c=1} P_c e^{j \omega_c n } \quad n=0,...M-1
+\end{equation}
+where $M=FsT^\prime_s$ is the number of samples in one symbol (excluding cyclic prefix). For the simulation work above $P_c=1$ for convenience, however other values are possible, for example FreeDV 700D uses a random sequence of BPSK symbols $P_c= \pm 1$.
+
+The correlation algorithm can be derived from a least squared error formation.  Consider the total squared error between the time domain pilot signal $p(n)$ and the ideal received pilot sequence $p^\prime(n)$:
+\begin{equation}
+\begin{split}
+E &= \sum^{M-1}_{n=0} | p(n) - p^\prime(n) |^2 \\
+E &= \sum^{M-1}_{n=0} | p(n) - gr(n+N_t)|^2
+\end{split}
+\end{equation}
+where $r(n)$ is the received off air samples at the current time offset $N_{t}$, and $g$ is a complex scalar gain that models level and phase variations.  Expressing $p(n)$ and $r(n+N_t))$ as column vectors:
+\begin{equation}
+\begin{split}
+E &= (\bm{p}-g\bm{r})^H (\bm{p}-g\bm{r}) \\
+  &= \bm{p}^H\bm{p} - 2g\bm{r}^H \bm{p} + g^2\bm{r}^H\bm{r}
+\end{split}
+\end{equation}
+where $\bm{a}^H = \bm{\overline{a}}^T$, the Hermitian (conjugate transpose) operator. Differentiating $E$ and solving for $g$ gives us:
+\begin{equation}
+\label{eq:acq_corr}
+\begin{split}
+g &= \frac{\bm{r}^H \bm{p}}{\bm{r}^H\bm{r}} \\
+E &= \bm{p}^H\bm{p} - \frac{(\bm{r}^H \bm{p})^2}{\bm{r}^H\bm{r}} \\
+E &= \bm{p}^H\bm{p} - C_t \\
+C_t &= \frac{(\bm{r}^H \bm{p})^2}{\bm{r}^H\bm{r}} \\
+\sqrt{C_t} &= \frac{\bm{r}^H \bm{p}}{\sqrt{\bm{r}^H\bm{r}}}
+\end{split}
+\end{equation}
+where $C_t$ is the correlation between the received signal at time $N_t$ (in samples) and the known transmitted pilot signal. Minimising E is equivalent to maximising the correlation $C_t$ or equivalently $\sqrt{C_t}$. Typically $C_t$ is sampled on a grid of $N_t$ as $r(n)$ are received and $N_t$ advances.  When $C_t$ exceeds a threshold, we consider the current $N_t$ as a candidate coarse time offset for further processing.
+
+A common acquisition strategy is to add one or more non-data pilot carriers to aid frequency offset estimation. These carriers consume power and carry no payload data so increase the threshold SNR required for a voice link. Consider the effect of $E_b$ when adding an additional carrier:
+\begin{equation}
+\begin{split}
+E_b &= \frac{ST_s}{N_c} \\
+E^\prime_b &= \frac{S^\prime T_s}{N_c+1}
+\end{split}
+\end{equation}
+Where $E_b$ is the energy per bit with $N_c$ data carriers and $E^\prime_b$ is the energy per bit after an additional pilot carrier has been added.  To maintain the link at the same BER:
+\begin{equation}
+\begin{split}
+E^\prime_b &= E_b \\
+\frac{S T_s}{N_c} &= \frac{S^\prime T_s} {N_c+1} \\
+\frac{S^\prime}{S} &= \frac{S (N_c+1)}{N} \\
+SNR^\prime &= SNR + 10log_{10}\left(\frac{N_c+1}{N_c}\right)  \\
+SNR^\prime &= SNR + L_{pc}  \quad [\si{dB}] \\
+L_{pc} &= 10log_{10}\left(\frac{N_c+1}{N_c}\right) 
+\end{split}
+\end{equation}
+where $L_{pc}$ is the link degradation in dB for adding a single pilot carrier.  For example given a 16 carrier waveform, $L_{pc}=10log_{10}(17/16)=0.26 \si{dB}$, which is quite modest for the potential gains in acquisition performance.  A pilot carrier is also likely to show up visibly on a real time waterfall and provide a useful manual tuning aid.
+
+TODO: 
+\begin{enumerate}
+\item Derive correlation approach as MMSE.  Show issue with combining $C_p$ from adjacent carriers. Can we establish reason it breaks down at +/- 25 Hz?  Are there any cycles at $T_f$?  Review blog posts.
+\item Include frequency offset in $E$ and $C_p$, explain how that can be includes as function that we sample.
+\item Can we come up with an expression for the $C_t$ threshold?
+\item Can we come up for an expression for probability of error?
+\item Simply optimise what we have, make it work at a wider range.
+\item Simulation framework to test current performance, measure probability of sync and probability of failure.  Why do we need UW?  Lets drill into that.
+\item Other methods (multiple by time shifted version) once we have a framework.
+\item With a wider $Nd=2$ signal, we might get better results.  We could also consider different pilots for each copy, as they aren't used for combining.
+\item There may be a good way to select an appropriate sequence for pilots to maximise the probability of detection.
+\item Consider an "end of over frame", to signal a clean end of over and squelch.
+\item Algorithm idea. Pilots can be considered a set of QPSK symbols, e.g. if $N_c=16$ we have 32 bits. We could equalise then measure BER and use this as metric for sync.  It also gives a us a tractable probability of error, and an easy way to combine with adjacent pilots.
+\end{enumerate}
+
 \subsection{Timing estimation}
 
 TODO: make sure the current algorithm is doing sensible things on real world HF channels with complex impulse responses and large delay spreads.
 
-\subsection{Acquisition}
+\subsection{PAPR reduction}
 
-TODO: Develop a wide range frequency offset estimator (+/- 200Hz) and way to track frequency drift.  Measure and plot implementation loss. Can it work on GEO and LEO channels? Sensitivity of Doppler spread, freq offset errors with reduced $R_s$. Can we use othogonality property to track freq offset, e.g. iterative adjustments of offset to peak OFDM carriers?
+TODO: expressions for PAPR reduction, model for improved SNR at Rx.
 
 \section{Further Work}
 

@@ -1,7 +1,7 @@
 % equaliser.m
 % David Rowe Aug 2023
 %
-% Prototyping equaliser improvements.  The equaliser uses pilot symbols to estimate the channel
+% Prototyping equaliser and multipath improvements.  The equaliser uses pilot symbols to estimate the channel
 % and apply corrections to (equalise) received data symbols.  
 
 1;

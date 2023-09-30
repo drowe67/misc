@@ -46,8 +46,8 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
  GEO & Geosynchronous satellite channel, AWGN but high phase noise and large freq offset \\
  OTA & Over The Air \\
  PTT & Push To Talk - voice communications where only one person is transmitting at any one time.  Common in two way radio but not mobile telephones  \\
- MPP & Multipath Poor channel, 1 Hz Doppler spread, 2ms delay spread, typical for US and Australian interstate propogation \\
- MPD & Multipath Disturbed channel, 2 Hz Doppler spread, 4ms delay spread, typical for UK Winter NVIS propogation \\
+ MPP & Multipath Poor channel, 1 Hz Doppler spread, 2ms delay spread, typical for US and Australian interstate propagation \\
+ MPD & Multipath Disturbed channel, 2 Hz Doppler spread, 4ms delay spread, typical for UK Winter NVIS propagation \\
  \hline
 \end{tabular}
 \caption{Glossary of Acronyms}
@@ -73,6 +73,7 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
  $S$ & Signal Power & Watts \\
  $N$ & Noise Power & Watts \\
  $N_c$ & Number of carriers in an OFDM waveform \\
+ $\omega_c$ & Angular frequency of OFDM carrier $c$ & rads/second \\ 
  \hline
 \end{tabular}
 \caption{Glossary of Symbols}
@@ -114,7 +115,7 @@ SNR = 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\rig
 \end{equation}
 where $L_p$ is the loss from power allocated to pilot symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
 
-To combat intersymbol interference and Doppler Spread on HF multipath channels, it is convenient to use parallel tone or OFDM modems. The signal is divided into $N_c$ carriers, each carrying $R_b/N_c$ bits/s.  Due to the spectral efficiency of OFDM, the same bit rate, symbol rate, and occupied bandwidth is required for any $N_c$.  For example:
+To combat intersymbol interference and frequency selective fading on HF multipath channels, it is convenient to use parallel tone or OFDM modems. The signal is divided into $N_c$ carriers, each carrying $R_b/N_c$ bits/s.  Due to the spectral efficiency of OFDM, the same bit rate, symbol rate, and occupied bandwidth is required for any $N_c$.  For example:
 \begin{enumerate}
 \item A QPSK signal of $R_s=1000$ symbols/s and $R_b=2R_s=2000$ bits/s occupies $B=1000$ Hz (central lobe).
 \item An OFDM signal of $N_c=20$ carriers each at $R_s=50$ symbol/s gives us a total $R_b=2N_cR_s=2000$ bits/s and occupies a RF bandwidth of $B=N_cR_s=1000$ Hz.
@@ -607,15 +608,16 @@ p(n) = \sum^{c=N_c}_{c=1} P_c e^{j \omega_c n } \quad n=0,...M-1
 \end{equation}
 where $M=FsT^\prime_s$ is the number of samples in one symbol (excluding cyclic prefix). For the simulation work above $P_c=1$ for convenience, however other values are possible, for example FreeDV 700D uses a random sequence of BPSK symbols $P_c= \pm 1$.
 
-The correlation algorithm can be derived from a least squared error formation.  Consider the total squared error between the time domain pilot signal $p(n)$ and the ideal received pilot sequence $p^\prime(n)$:
+The correlation algorithm can be derived from a least squared error formulation.  Consider the total squared error between the time domain pilot signal $p(n)$ and the ideal received pilot sequence $p^\prime(n)$:
 \begin{equation}
 \begin{split}
 E &= \sum^{M-1}_{n=0} | p(n) - p^\prime(n) |^2 \\
 E &= \sum^{M-1}_{n=0} | p(n) - gr(n+N_t)|^2
 \end{split}
 \end{equation}
-where $r(n)$ is the received off air samples at the current time offset $N_{t}$, and $g$ is a complex scalar gain that models level and phase variations.  Expressing $p(n)$ and $r(n+N_t))$ as column vectors:
+where $r(n)$ is the received off air samples at the current time offset $N_{t}$, and $g$ is a complex scalar gain that models level and phase variations.  $E$ will be mimimised when the received signal is a close match to the pilot sequence. Expressing $p(n)$ and $r(n+N_t)$ as column vectors:
 \begin{equation}
+\label{eq:acq_e}
 \begin{split}
 E &= (\bm{p}-g\bm{r})^H (\bm{p}-g\bm{r}) \\
   &= \bm{p}^H\bm{p} - 2g\bm{r}^H \bm{p} + g^2\bm{r}^H\bm{r}
@@ -623,18 +625,21 @@ E &= (\bm{p}-g\bm{r})^H (\bm{p}-g\bm{r}) \\
 \end{equation}
 where $\bm{a}^H = \bm{\overline{a}}^T$, the Hermitian (conjugate transpose) operator. Differentiating $E$ and solving for $g$ gives us:
 \begin{equation}
+g = \frac{\bm{r}^H \bm{p}}{\bm{r}^H\bm{r}}
+\end{equation}
+Substituting back into (\ref{eq:acq_e}):
+\begin{equation}
 \label{eq:acq_corr}
 \begin{split}
-g &= \frac{\bm{r}^H \bm{p}}{\bm{r}^H\bm{r}} \\
 E &= \bm{p}^H\bm{p} - \frac{(\bm{r}^H \bm{p})^2}{\bm{r}^H\bm{r}} \\
 E &= \bm{p}^H\bm{p} - C_t \\
 C_t &= \frac{(\bm{r}^H \bm{p})^2}{\bm{r}^H\bm{r}} \\
 \sqrt{C_t} &= \frac{\bm{r}^H \bm{p}}{\sqrt{\bm{r}^H\bm{r}}}
 \end{split}
 \end{equation}
-where $C_t$ is the correlation between the received signal at time $N_t$ (in samples) and the known transmitted pilot signal. Minimising E is equivalent to maximising the correlation $C_t$ or equivalently $\sqrt{C_t}$. Typically $C_t$ is sampled on a grid of $N_t$ as $r(n)$ are received and $N_t$ advances.  When $C_t$ exceeds a threshold, we consider the current $N_t$ as a candidate coarse time offset for further processing.
+where $C_t$ is the correlation between the received signal at time $N_t$ (in samples) and the known transmitted pilot signal. Minimising E is equivalent to maximising the correlation $C_t$ or equivalently $\sqrt{C_t}$. Typically $C_t$ is sampled on a grid of $N_t$ values.  When $C_t$ exceeds a threshold, we consider the current $N_t$ as a candidate coarse time offset for further processing.
 
-A common acquisition strategy is to add one or more non-data pilot carriers to aid frequency offset estimation. These carriers consume power and carry no payload data so increase the threshold SNR required for a voice link. Consider the effect of $E_b$ when adding an additional carrier:
+A common acquisition strategy is to add one or more pilot carriers to aid frequency offset estimation. These carriers consume power and carry no payload data so an increase in the threshold SNR is required to maintain the voice link. Consider the effect on $E_b$ when adding an additional carrier:
 \begin{equation}
 \begin{split}
 E_b &= \frac{ST_s}{N_c} \\
@@ -652,7 +657,7 @@ SNR^\prime &= SNR + L_{pc}  \quad [\si{dB}] \\
 L_{pc} &= 10log_{10}\left(\frac{N_c+1}{N_c}\right) 
 \end{split}
 \end{equation}
-where $L_{pc}$ is the link degradation in dB for adding a single pilot carrier.  For example given a 16 carrier waveform, $L_{pc}=10log_{10}(17/16)=0.26 \si{dB}$, which is quite modest for the potential gains in acquisition performance.  A pilot carrier is also likely to show up visibly on a real time waterfall and provide a useful manual tuning aid.
+where $L_{pc}$ is the loss in dB for adding a single pilot carrier.  For example given a 16 carrier waveform, $L_{pc}=10log_{10}(17/16)=0.26 \si{dB}$, which is quite modest for the potential gains in acquisition performance.  A pilot carrier will also be visible on a real time waterfall and provide a useful manual tuning aid.
 
 TODO: 
 \begin{enumerate}
@@ -661,10 +666,12 @@ TODO:
 \item Can we come up with an expression for the $C_t$ threshold?
 \item Can we come up for an expression for probability of error?
 \item Simply optimise what we have, make it work at a wider range.
+\item even if cost function is non-linear, can we differentiate it and solve iteratively?
+\item Can phase shift between successive pilots be used for fine freq estimation/refinement?
 \item Simulation framework to test current performance, measure probability of sync and probability of failure.  Why do we need UW?  Lets drill into that.
 \item Other methods (multiple by time shifted version) once we have a framework.
 \item With a wider $Nd=2$ signal, we might get better results.  We could also consider different pilots for each copy, as they aren't used for combining.
-\item There may be a good way to select an appropriate sequence for pilots to maximise the probability of detection.
+\item There may be a good way to select an appropriate sequence for pilots to maximise the probability of detection, and mimimise PAPR.
 \item Consider an "end of over frame", to signal a clean end of over and squelch.
 \item Algorithm idea. Pilots can be considered a set of QPSK symbols, e.g. if $N_c=16$ we have 32 bits. We could equalise then measure BER and use this as metric for sync.  It also gives a us a tractable probability of error, and an easy way to combine with adjacent pilots.
 \end{enumerate}

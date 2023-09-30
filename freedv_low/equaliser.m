@@ -1,8 +1,7 @@
 % equaliser.m
 % David Rowe Aug 2023
 %
-% Prototyping equaliser and multipath improvements.  The equaliser uses pilot symbols to estimate the channel
-% and apply corrections to (equalise) received data symbols.  
+% Prototyping equaliser and multipath improvements for WP4000 Low SNR study. 
 
 1;
 pkg load signal;
@@ -19,118 +18,7 @@ function draw_ellipse(x1,y1,a,b,angle, leg)
   plot(x, y, leg);
 end
 
-% Rate Rs modem simulation model -------------------------------------------------------
-
-function sim_out = ber_test(sim_in)
-    rand('seed',1);
-    randn('seed',1);
-
-    bps     = 2;         % two bits/symbol for QPSK
-    Rs      = 50;        % symbol rate (needed for HF model)
-    Ts      = 1/Rs;
-    Ns      = 8;         % one pilot every Ns symbols
-    Npad    = 3;         % extra frames at end to deal with interpolator edges
-    Fs      = 8000;      % sample rate
-    Nd      = 1;         % number of diversity channels
-    div_Hz  = 1000;      % freq offset of diversity carriers
-    nbitsperframe = 224; % bits in a modem frame
-    M       = Fs/Rs;     % oversamplerate, number of samples/symbol
-    Tcp     = 0.004;     % length of cyclic prefix
-    Ncp     = Tcp*Fs;
-    
-    assert(floor(M) == M);
-    assert(floor(Ncp) == Ncp);
-    
-    verbose = sim_in.verbose;
-    EbNovec = sim_in.EbNovec;
-    ch      = sim_in.ch;
-
-    ch_phase = 0;
-    if isfield(sim_in,"ch_phase")
-      ch_phase = sim_in.ch_phase;
-    end
-    pilot_freq_weights = [0 1 0];
-    if isfield(sim_in,"pilot_freq_weights")
-      pilot_freq_weights = sim_in.pilot_freq_weights;
-    end
-    combining = "ecg";
-    if isfield(sim_in,"Nd")
-      Nd = sim_in.Nd;
-    end
-    if isfield(sim_in,"combining")
-      combining = sim_in.combining;
-    end
-    if isfield(sim_in,"nbitsperframe")
-       nbitsperframe = sim_in.nbitsperframe;
-    end
-    nbitsperpacket = nbitsperframe;
-    if isfield(sim_in,"nbitsperpacket")
-       nbitsperpacket = sim_in.nbitsperpacket;
-    end
-  
-    % A few sums to set up the packet.  Using our OFDM nomenclature, we have one
-    % "modem frame" for the packet, so Np=1, Nbitspermodemframe == Nbitsperpacket, and
-    % there is just one modem frame for the FEC codeword.  This is common for 
-    % digital voice modes.  In this simulation we assume all payload data symbols
-    % are used for payload data (no text or unique word symbols).
-
-    nsymbolsperframe = nbitsperframe/bps;
-    nsymbolsperframepercarrier = Ns-1;
-    Nc = nsymbolsperframe/nsymbolsperframepercarrier;
-    % make sure we have an integer number of carriers
-    assert(floor (Nc) == Nc);
-    if verbose == 2
-      printf("nbitsperframe: %d\n", nbitsperframe);
-      printf("nsymbolsperframe: %d\n",nsymbolsperframe);
-      printf("Nc: %d\n", Nc);
-      printf("nbitsperpacket: %d\n", nbitsperpacket);
-    end
-    
-    % carrier frequencies, start at 400Hz
-    w = 2*pi*(400 + (0:Nc*Nd+1)*Rs)/Fs;
-    W = zeros(Nc*Nd,M);
-    Wi = zeros(M,Nc*Nd);
-    for c=1:Nc*Nd+2
-      Wfwd(c,:) = exp(-j*(0:M-1)*w(c));
-      Winv(:,c) = exp(j*(0:M-1)*w(c));
-    end
-    
-    % integer number of "modem" frames
-    nbits= sim_in.nbits;
-    assert(length(nbits) == 1);
-    nframes = floor(nbits/nbitsperframe) + Npad;
-    nsymb = nframes*Ns;
-    nsam = (M+Ncp)*nsymb;
-    if verbose == 2
-      printf("nframes: %d\n", nframes);
-      printf("nsymb..: %d\n", nsymb);
-      printf("Seconds: %f\n", nsymb*(Ts+Tcp));
-    end
-   
-    % init HF model
-
-    printf("Generating HF model spreading samples...\n")
-    hf_en = 0;
-    if strcmp(ch,"mpp") || strcmp(ch,"mpd")
-      hf_en = 1;
-      % some typical values
-
-      if strcmp(ch,"mpp")
-        dopplerSpreadHz = 1.0; path_delay_s = 2E-3;
-      else
-        dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
-      end
-      path_delay_samples = round(path_delay_s*Fs);
-      
-      spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam);
-      spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam);
-
-      % normalise power through HF channel
-      hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
-    end
-
-    % modulator ------------------------
-
+function [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb)
     printf("Modulate to rate Rs OFDM symbols...\n");
     tx_bits = rand(1,nframes*nbitsperframe) > 0.5; bit = 1;
     tx_symb = [];
@@ -175,6 +63,40 @@ function sim_out = ber_test(sim_in)
       % cyclic prefix
       tx(st:st+Ncp-1) = tx(st+M:en);
     end
+endfunction
+
+% Rate Rs modem simulation model -------------------------------------------------------
+
+function sim_out = ber_test(sim_in)
+    rand('seed',1);
+    randn('seed',1);
+
+    load_const;
+
+    % init HF model
+
+    printf("Generating HF model spreading samples...\n")
+    hf_en = 0;
+    if strcmp(ch,"mpp") || strcmp(ch,"mpd")
+      hf_en = 1;
+      % some typical values
+
+      if strcmp(ch,"mpp")
+        dopplerSpreadHz = 1.0; path_delay_s = 2E-3;
+      else
+        dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
+      end
+      path_delay_samples = round(path_delay_s*Fs);
+      
+      spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+      spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+
+      % normalise power through HF channel
+      hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
+    end
+
+    % modulator -------------------------
+    [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
     
     % channel ---------------------------
 

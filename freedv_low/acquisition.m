@@ -29,18 +29,18 @@ function acq_test(sim_in)
     % correlate at various time offsets
 
     Ct = zeros(1,nsymb); 
-    p = zeros(M,1); p(:,1) = tx(Ncp:Ncp+M-1); assert(length(p) == M);
-    p'*p
+    p = zeros(M,1); p(:,1) = tx(Ncp+1:Ncp+M); assert(length(p) == M);
     r = zeros(M,1);
-    for s=1:1
-      st = (s-1)*(M+Ncp)+1; en = st+M+Ncp-1;
+    for s=1:nsymb
+      st = (s-1)*(M+Ncp)+1;
+      en = st+M+Ncp-1;
       r(:,1) = rx_noise(st+Ncp:en);
-      Ct(s) = r'*p;
-      r(1:4)
-      p(1:4)
+      Ct(s) = (r'*p)/sqrt(r'*r);
     end
-    Ct(1)
-    figure(1); clf; plot(Ct,'+');
+ 
+    figure(1); clf; plot(Ct,'+'); mx = 1.1*max(abs(Ct)); axis([-mx mx -mx mx]);
+    figure(2); clf; plot(abs(Ct));
+    figure(3); clf; hist(abs(Ct),20);
 
 endfunction
 

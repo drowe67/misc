@@ -93,44 +93,34 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
 endfunction
 
 
- function threshold_demo(nbits = 1000, ch='awgn',EbNodB=100, varargin)
+ function threshold_demo(epslatex=0)
     sim_in.verbose     = 1;
-    sim_in.nbits       = nbits;
+    sim_in.nbits       = 1E4;
     sim_in.EbNovec     = [0 10 100];
-    sim_in.ch          = ch;
+    sim_in.ch          = 'awgn';
     sim_in.resampler   = "lin2";
     sim_in.ls_pilots   = 1;
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
   
-    i = 1;
-    while i <= length(varargin)
-      varargin{i}
-      if strcmp(varargin{i},"ch_phase")
-        sim_in.ch_phase = varargin{i+1}; i++;
-      elseif strcmp(varargin{i},"combining")
-        sim_in.combining = varargin{i+1}; i++;
-      elseif strcmp(varargin{i},"resampler")
-        sim_in.resampler = varargin{i+1}; i++;
-      elseif strcmp(varargin{i},"Nd")
-        sim_in.Nd = varargin{i+1}; i++;
-      elseif strcmp(varargin{i},"bitsperframe")
-        sim_in.nbitsperframe = varargin{i+1}; i++;
-      elseif strcmp(varargin{i},"bitsperpacket")
-        sim_in.nbitsperpacket = varargin{i+1}; i++;    
-      elseif strcmp(varargin{i},"epslatex_interp")
-        sim_in.epslatex_interp = 1;    
-      elseif strcmp(varargin{i},"epslatex")
-        sim_in.epslatex = 1;    
-      else
-        printf("\nERROR unknown argument: %s\n", varargin{i});
-        return;
-      end
-      i++; 
+    sim_out = acq_test(sim_in);
+    if epslatex
+        [textfontsize linewidth] = set_fonts();
     end
 
-    sim_out = acq_test(sim_in);
-    size(sim_out.Ct)
+    figure(1); clf;
+    subplot(211);
+    plot(sim_out.Ct(1,:),'b+;Eb/No 0 dB;');
+    axis([-0.5 1 -0.5 0.5]); legend('boxoff');
+    subplot(212);
+    plot(sim_out.Ct(2,:),'g+;Eb/No 10 dB;');
+    axis([-0.5 1 -0.5 0.5]); legend('boxoff');
+    if epslatex
+        fn = "acq_ct_scatter.tex";
+        print(fn,"-depslatex","-S300,300");
+        printf("printing... %s\n", fn);
+        restore_fonts(textfontsize,linewidth);
+    end
 endfunction
 
 

@@ -7,9 +7,9 @@
 
 function [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb)
     printf("Modulate to rate Rs OFDM symbols...\n");
-    tx_bits = rand(1,nframes*nbitsperframe) > 0.5; bit = 1;
     tx_symb = [];
     for f=1:nframes
+      tx_bits = rand(1,nframes*nbitsperframe) > 0.5; bit = 1;
       % set up Nc x Ns array of symbols with pilots
       atx_symb = zeros(Nc,Ns); 
       for c=1:Nc

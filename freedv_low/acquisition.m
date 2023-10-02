@@ -16,37 +16,48 @@ function sim_out = acq_test(sim_in)
     sim_out.Ct = [];
 
     [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
-    
+ 
     for ne = 1:length(EbNovec)
         rx = tx;
         
-         % work out noise power -------------
+        % work out noise power -------------
         EbNodB = sim_in.EbNovec(ne);
         EsNodB = EbNodB + 10*log10(bps);
         EsNo = 10^(EsNodB/10);
         variance = 1/EsNo;
         noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
         rx_noise = rx + noise;
-    
+        sigma = std(rx_noise)
+        sqrt(variance*0.5/M)
         % correlate at various time offsets
 
         % set up pilot samples, scale sucn that Ct_max = 1
         p = zeros(M,1); p(:,1) = tx(Ncp+1:Ncp+M); assert(length(p) == M);
         Ct_max = 1; p_scale = Ct_max*sqrt(p'*p)/(p'*p); p *= p_scale;
 
-        Ct = zeros(1,nsymb); 
+        Ct = zeros(1,nsymb); Ct2 = zeros(1,nsymb); 
         r = zeros(M,1);
         for s=1:nsymb
             st = (s-1)*(M+Ncp)+1;
             en = st+M+Ncp-1;
             r(:,1) = rx_noise(st+Ncp:en);
             Ct(s) = r'*p/sqrt(r'*r);
+            Ct2(s) = r'*p;
         end
     
         if verbose == 2
             figure(1); clf; plot(Ct,'+'); mx = 1.2; axis([-mx mx -mx mx]);
             figure(2); clf; plot(abs(Ct)); axis([0 length(Ct) 0 mx])
             figure(3); clf; hist(abs(Ct),20);
+            figure(4); clf; plot(Ct2,'+'); %mx = 1.2; axis([-mx mx -mx mx]);
+            hold on;
+            circle = exp(j*(0:0.001*2*pi:2*pi));
+            plot(sigma*circle);
+            p=1E-7; Cthresh = sigma*sqrt(-log(p));
+            plot(Cthresh*circle);
+            
+            hold off;
+
         end
 
         sim_out.Ct = [sim_out.Ct; Ct];

@@ -593,14 +593,14 @@ PTT digital voice systems require fast acquisition - when a station starts trans
 \begin{enumerate}
 \item A key part of acquisition is coarse timing and frequency offset estimation.  After the signal is acquired, we need to track frequency and timing offsets as they evolve.
 \item Acquisition can be specified as a probability, e.g. 90\% probability of acquisition at the threshold link SNR, with an initial frequency offset of +/- 200 Hz.
-\item False acquisition can occur, for example non-FreeDV signals such as noise, other HF signals, or sine wave "carriers". This can also be specified by a probability requirement. 
-\item A digital voice signal operates in streaming rather than burst mode - a continuous sequence of modems frames is sent by the transmitter until the "over" is complete.  A receiver should be able to acquire the signal at any time.
-\item OFDM carriers are narrow and hence quite sensitive to frequency offset errors, for example a 5\% error of $0.05*Rs=2.5$ Hz is enough to impact performance. This sets a requirement for initial frequency offset estimation and tracking.
+\item False acquisition can occur, for example non-FreeDV signals such as noise, other HF signals, or sine wave "carriers". This can also be specified in terms of probability, e.g. no more than 1 false acquisition every 60 seconds on AWGN noise. 
+\item A digital voice signal operates in streaming rather than burst mode - a continuous sequence of modem frames is sent by the transmitter until the "over" is complete.  A receiver should be able to acquire the signal at any time, and not be dependant on training sequences at the start of transmission.
+\item OFDM carriers are narrow and hence quite sensitive to frequency offset errors, for example a 5\% error of $0.05Rs=2.5$ Hz is enough to impact performance. This sets a requirement for initial frequency offset estimation and tracking.
 \item Acquisition schemes should be robust to slowly varying multipath channels which may have stationary notches in the spectrum that last for several seconds.  This suggests spreading pilot symbols, carriers, and unique word bits over frequency to avoid frequency selective effects.
 \item LEO channels have rapid rate of change of frequency due to Doppler shift, a challenge for frequency tracking.
 \end{enumerate}
 
-FreeDV 700D uses a correlation algorithm which compares the time domain received $r(n)$ signal to the transmitted pilot symbols $p(n)$.  The correlation from two adjacent modem frames are coherently combined.  The correlation function is maximised over a 2D grid of time and frequency points.  If the maximum exceeds a threshold the state machine enters a trial sync phase where acquisition is checked by demodulating a unique word present in every modem frame.
+The FreeDV OFDM waveforms such as 700D/E uses a correlation algorithm which compares the time domain received $r(n)$ signal to the transmitted pilot symbols $p(n)$.  The correlation from two adjacent modem frames are combined.  The correlation function is maximised over a 2D grid of time and frequency points.  If the maximum exceeds a threshold the state machine enters a trial sync phase where acquisition is checked by demodulating a unique word present in every modem frame.
 
 The time domain pilot signal is the IDFT of the frequency domain pilots for each carrier $P_c$:
 \begin{equation}
@@ -646,7 +646,7 @@ C_{tmax} &= \frac{g\bm{p}^H \bm{p}}{\sqrt{g\bm{p}^Hg\bm{p}}} \\
 C_{tmax} &= \frac{\bm{p}^H \bm{p}}{\sqrt{\bm{p}^H\bm{p}}}
 \end{split}
 \end{equation}
-By scaling $\bm{p}$ we can set $C_{tmax}$ (e.g. $C_{tmax}=1$). Consider a prototype pilot vector $\bm{\hat{p}}$ such that:
+By scaling $\bm{p}$ we can set $C_{tmax}$ to a convenient value (e.g. $C_{tmax}=1$). Consider a prototype pilot vector $\bm{\hat{p}}$ such that:
 \begin{equation}
 \begin{split}
 \bm{p} &= s\bm{\hat{p}} \\
@@ -656,17 +656,55 @@ s &= C_{tmax}\frac{\sqrt{\bm{\hat{p}}^H\bm{\hat{p}}}}{\bm{\hat{p}}^H \bm{\hat{p}
 \end{equation}
 where $s$ is a scale factor chosen to achieve our desired $C_{tmax}$.
 
-Figure \ref{fig:acq_ct_scatter} illustrates an issue with the use of a fixed threshold currently used in FreeDV 700D/E and OFDM data modes.  An improvement would be a threshold that changes dynamically based on the noise power.
-
+Figure \ref{fig:acq_ct_scatter} illustrates an issue with the use of a fixed threshold.  Consider the denominator of (\ref{eq:acq_corr}) when we have a received signal $\bm{y}$ in presence of channel noise $\bm{n}$:
+\begin{equation}
+\begin{split}
+\bm{r} &= \bm{y}+\bm{n} \\
+\bm{r}^H\bm{r} &= \bm{y}^H\bm{y} + 2\bm{y}^H\bm{n} + \bm{n}^H\bm{n}
+\end{split}
+\end{equation}
+The first term is the signal power and the last term is the noise power. The second term is a small contributor as $\bm{y}$ and $\bm{n}$ are uncorrelated so the dot product terms cancel. With a high SNR the first term dominates, normalising $C_t$ as desired. As the SNR drops the last term becomes significant, reducing $|C_{tmax}|$ as SNR reduces.  From these observations we can see that an improvement would be a threshold that changes dynamically based on the noise power. Curiously, the variance of $C_t$ is still quite large even with small amounts of channel noise, due to random matches in the transmitted data symbols with $p(n)$. 
 
 \begin{figure}[H]
-\caption{Plot of $C_t$ sampled once a symbol over 50 modem frames. The $\bm{r}^H\bm{r}$ normalising term on the denominator of (\ref{eq:acq_corr}) reduces $|C_{tmax}|$ in the presence of noise. Thus a fixed threshold (as presently used in 700D/E) will be problematic.}
+\caption{Scatter plot of $C_t$ sampled once a symbol over 50 modem frames, for low and high $E_b/N_0$. The $\sqrt{\bm{r}^H\bm{r}}$ normalising term on the denominator of (\ref{eq:acq_corr}) reduces $|C_{tmax}|$ in the presence of noise. Note there is no fixed threshold (e.g. 0.3 or 0.6) that would work in both cases. Thus a fixed threshold (as presently used in 700D/E) will be problematic.}
 \label{fig:acq_ct_scatter}
 \begin{center}
 \input acq_ct_scatter.tex
 \end{center}
 \end{figure}
 
+Consider the numerator of $|C_t|$ (\ref{eq:acq_corr}) when only noise with variance $N_0$ is present:
+\begin{equation}
+D_t = \bm{r}^H\bm{p} = \bm{n}^H\bm{p}
+\end{equation}
+
+For a typical sequence of pilots with equal amplitudes $Pc=\pm1$ the variance of $D_t$ will be the same as the variance of $\bm{n}$.  The magnitude of a complex Gaussian noise signal will have a Rayleigh distribution \cite{rayleigh} with CDF:
+\begin{equation}
+CDF(x) = 1 - e^{-x^2/(2 \sigma_r^2)}
+\end{equation}
+$CDF(x)$ is the probability of any sample of the random variable being less than $x$.  The probability of any sample exceeding $D_t$ is therefore $1-CDF(|D_t|)$:
+\begin{equation}
+\label{eq:prob_thresh}
+\begin{split}
+P_a &= P(|D_t| > D_{thresh}) \\
+    &= 1 - CDF(|D_t|) \\
+    &= e^{-\frac{|D_t|^2}{N_0}}
+\end{split}
+\end{equation}
+
+We can therefore set a threshold probability and solve for $|D_{thresh}|$:
+\begin{equation}
+|D_{thresh}| = N_0 \sqrt{-ln(P_{thresh})}
+\end{equation}
+When a signal is present the distribution will no longer be Rayleigh.  In fact the variance of $D_t$ will be quite large due to partial correlation matches with payload data symbols. However in this case $|D_{tmax}|$ will be considerably larger due to strong correlation peaks with $p(n)$, and will comfortably exceed any threshold calculated from noise only.
+
+The new acquisition algorithm is therefore:
+\begin{enumerate}
+\item Set a threshold $P_{thresh}$ small enough so that $D_{tmax}>D_{thresh}$ is unlikely on noise only.
+\item Estimate the noise power $N_0$ over a window of one modem frame $T_f$ seconds.
+\item Find the peak $D_{tmax}$ over the window of $T_f$ seconds and calculate the $P_a$ using (\ref{eq:prob_thresh}).
+\item If $P_a<P_{thresh}$ we have found a candidate modem frame.
+\end{enumerate}
 
 
 \subsection {Pilot Carriers}
@@ -691,6 +729,7 @@ L_{pc} &= 10log_{10}\left(\frac{N_c+1}{N_c}\right)
 \end{equation}
 where $L_{pc}$ is the loss in dB for adding a single pilot carrier.  For example given a 16 carrier waveform, $L_{pc}=10log_{10}(17/16)=0.26 \si{dB}$, which is quite modest for the potential gains in acquisition performance.  A pilot carrier will also be visible on a real time waterfall and provide a useful manual tuning aid.
 
+
 TODO: 
 \begin{enumerate}
 \item Derive correlation approach as MMSE.  Show issue with combining $C_p$ from adjacent carriers. Can we establish reason it breaks down at +/- 25 Hz?  Are there any cycles at $T_f$?  Review blog posts.
@@ -706,6 +745,9 @@ TODO:
 \item There may be a good way to select an appropriate sequence for pilots to maximise the probability of detection, and mimimise PAPR.
 \item Consider an "end of over frame", to signal a clean end of over and squelch.
 \item Algorithm idea. Pilots can be considered a set of QPSK symbols, e.g. if $N_c=16$ we have 32 bits. We could equalise then measure BER and use this as metric for sync.  It also gives a us a tractable probability of error, and an easy way to combine with adjacent pilots.
+\item test with impulse noise and sinusoids
+\item plot Rayleigh on top of histogram
+\item req: we want acquisition to work a few dB lower than FEC.
 \end{enumerate}
 
 \subsection{Timing estimation}

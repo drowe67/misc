@@ -65,3 +65,14 @@ function restore_fonts(textfontsize,linewidth)
     set(0, "defaultaxesfontsize", textfontsize);
     set(0, "defaultlinelinewidth", linewidth);
 end
+
+function draw_ellipse(x1,y1,a,b,angle, leg)
+
+  % Generate points on the ellipse
+  theta = linspace(0, 2*pi, 100);  % Angle values
+  x = x1 + a * cos(theta) * cos(angle) - b * sin(theta) * sin(angle);
+  y = y1 + a * cos(theta) * sin(angle) + b * sin(theta) * cos(angle);
+
+  % Plot the ellipse
+  plot(x, y, leg);
+end

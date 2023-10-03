@@ -673,39 +673,33 @@ The first term is the signal power and the last term is the noise power. The sec
 \end{center}
 \end{figure}
 
-Consider the numerator of $|C_t|$ (\ref{eq:acq_corr}) when only noise with variance $N_0$ is present:
+Consider the numerator of $|C_t|$ (\ref{eq:acq_corr}) when only noise $\bm{n}$ with variance $\sigma^2$ is present:
 \begin{equation}
 D_t = \bm{r}^H\bm{p} = \bm{n}^H\bm{p}
 \end{equation}
 
-For a typical sequence of pilots with equal amplitudes $Pc=\pm1$ the variance of $D_t$ will be the same as the variance of $\bm{n}$.  The magnitude of a complex Gaussian noise signal will have a Rayleigh distribution \cite{rayleigh} with CDF:
+For a typical sequence of pilots with equal amplitudes $P_c=\pm1$ the variance of $D_t$ will be the same as the variance of $\bm{n}$.  The magnitude of a complex Gaussian noise signal has a Rayleigh distribution \cite{rayleigh} with PDF:
 \begin{equation}
-CDF(x) = 1 - e^{-x^2/(2 \sigma_r^2)}
+PDF(x) = \frac{x}{\sigma^2}e^{-x^2/(2 \sigma_r^2)}
 \end{equation}
-$CDF(x)$ is the probability of any sample of the random variable being less than $x$.  The probability of any sample exceeding $D_t$ is therefore $1-CDF(|D_t|)$:
+where $\sigma_r$ is the Rayleigh scale parameter.  In our case we have spread the noise power $\sigma^2$ between two orthogonal channels such that $\sigma_r = \sigma/\sqrt{2}$. The probability of any sample $|D_t|$ is therefore:
 \begin{equation}
 \label{eq:prob_thresh}
 \begin{split}
-P_a &= P(|D_t| > D_{thresh}) \\
-    &= 1 - CDF(|D_t|) \\
-    &= e^{-\frac{|D_t|^2}{N_0}}
+P_t &= PDF(|D_t|) \\
+    &= \frac{|D_t|}{\sigma^2}e^{-|D(t)|^2/\sigma^2}
 \end{split}
 \end{equation}
 
-We can therefore set a threshold probability and solve for $|D_{thresh}|$:
-\begin{equation}
-|D_{thresh}| = N_0 \sqrt{-ln(P_{thresh})}
-\end{equation}
-When a signal is present the distribution will no longer be Rayleigh.  In fact the variance of $D_t$ will be quite large due to partial correlation matches with payload data symbols. However in this case $|D_{tmax}|$ will be considerably larger due to strong correlation peaks with $p(n)$, and will comfortably exceed any threshold calculated from noise only.
+Note that small values of $P_t$ are unlikely with noise alone. If $P_t < P_{thresh}$ (where $P_{thresh}$ is small) we can therefore conclude that $p(n)$ has been detected.  When a signal is present the distribution will no longer be Rayleigh.  In fact the variance of $|D_t|$ will be somewhat larger than the noise alone case due to partial correlation matches with payload data symbols. However $|D_{tmax}|$ exhibits strong correlation peaks with $p(n)$, so comfortably exceeds any threshold calculated from the noise only model.
 
 The new acquisition algorithm is therefore:
 \begin{enumerate}
-\item Set a threshold $P_{thresh}$ small enough so that $D_{tmax}>D_{thresh}$ is unlikely on noise only.
-\item Estimate the noise power $N_0$ over a window of one modem frame $T_f$ seconds.
-\item Find the peak $D_{tmax}$ over the window of $T_f$ seconds and calculate the $P_a$ using (\ref{eq:prob_thresh}).
-\item If $P_a<P_{thresh}$ we have found a candidate modem frame.
+\item Using simulation results set a threshold $P_{thresh}$ such that $P_t >> P_{thresh}$ with noise alone but $P_t < P_{thresh}$ when signal is present for $E_b/N_0 > 0$ dB.
+\item Estimate the noise power $\sigma^2=Var(r(n))$ over a window of one modem frame $T_f$ seconds. This will be an approximation, as $\bm{r}$ includes noise and wanted signal.
+\item Find the peak $D_{tmax}$ over the window of $T_f$ seconds and calculate $P_{tmax}$ using (\ref{eq:prob_thresh}).
+\item If $P_{tmax} < P_{thresh}$ we have found a candidate $p(n)$ sequence and the start of a modem frame.
 \end{enumerate}
-
 
 \subsection {Pilot Carriers}
 

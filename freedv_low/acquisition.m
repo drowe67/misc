@@ -27,37 +27,51 @@ function sim_out = acq_test(sim_in)
         variance = 1/EsNo;
         noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
         rx_noise = rx + noise;
-        sigma = std(rx_noise)
-        sqrt(variance*0.5/M)
+
         % correlate at various time offsets
 
         % set up pilot samples, scale sucn that Ct_max = 1
         p = zeros(M,1); p(:,1) = tx(Ncp+1:Ncp+M); assert(length(p) == M);
         Ct_max = 1; p_scale = Ct_max*sqrt(p'*p)/(p'*p); p *= p_scale;
 
-        Ct = zeros(1,nsymb); Ct2 = zeros(1,nsymb); 
+        Ct = zeros(1,nsymb); Dt = zeros(1,nsymb); 
         r = zeros(M,1);
         for s=1:nsymb
             st = (s-1)*(M+Ncp)+1;
             en = st+M+Ncp-1;
             r(:,1) = rx_noise(st+Ncp:en);
             Ct(s) = r'*p/sqrt(r'*r);
-            Ct2(s) = r'*p;
+            Dt(s) = r'*p;
         end
-    
-        if verbose == 2
-            figure(1); clf; plot(Ct,'+'); mx = 1.2; axis([-mx mx -mx mx]);
-            figure(2); clf; plot(abs(Ct)); axis([0 length(Ct) 0 mx])
-            figure(3); clf; hist(abs(Ct),20);
-            figure(4); clf; plot(Ct2,'+'); %mx = 1.2; axis([-mx mx -mx mx]);
-            hold on;
-            circle = exp(j*(0:0.001*2*pi:2*pi));
-            plot(sigma*circle);
-            p=1E-7; Cthresh = sigma*sqrt(-log(p));
-            plot(Cthresh*circle);
-            
-            hold off;
 
+        sigma_est = std(Dt)
+        % remove outliers
+        Dt_prime = Dt(find(Dt < 2*sigma_est));
+        sigma_est = std(Dt_prime)
+        sigma = sqrt(variance/M);
+        if verbose == 2
+          printf("sigma noise: %f sigma_est: %f\n", sigma, sigma_est);
+        end
+   
+        if verbose == 2
+            % 700D/E Ct algorithm (fixed thresh)
+            figure(1); clf; plot(Ct,'+'); mx = 1.2; axis([-mx mx -mx mx]);
+            figure(2); clf; plot(abs(Ct)); axis([0 length(Ct) 0 mx]);
+
+            % Prototype Dt algorithm (variable threshold)
+            figure(3); clf;
+            [h x]=hist(abs(Dt),20);
+            plot(x,h/trapz(x,h),'b;histogram Dt;'); 
+            sigma_r = sigma_est/sqrt(2);
+            p = (x./(sigma_r*sigma_r)).*exp(-(x.^2)/(2*sigma_r*sigma_r));
+            hold on; plot(x,p,'g;Rayleigh PDF;'); hold off;
+
+            figure(4); clf; plot(Dt,'+');
+            circle = exp(j*(0:0.001*2*pi:2*pi));
+            if isfield(sim_in,"Pthresh")
+                Dthresh = sigma_est*sqrt(-log(sim_in.Pthresh))
+                hold on; plot(Dthresh*circle); hold off;
+            end
         end
 
         sim_out.Ct = [sim_out.Ct; Ct];
@@ -73,7 +87,7 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.ls_pilots   = 1;
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
-  
+    
     i = 1;
     while i <= length(varargin)
       varargin{i}
@@ -93,6 +107,8 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.epslatex_interp = 1;    
       elseif strcmp(varargin{i},"epslatex")
         sim_in.epslatex = 1;    
+      elseif strcmp(varargin{i},"Pthresh")
+        sim_in.Pthresh = varargin{i+1}; i++;    
       else
         printf("\nERROR unknown argument: %s\n", varargin{i});
         return;
@@ -104,7 +120,12 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
 endfunction
 
 
- function threshold_demo(epslatex=0)
+% Demo of potential issue with fixed threshold based 700D/E correlation algorithm
+% 
+% usage: 
+%   octave:3> acquisition; threshold_700d_demo()
+
+function threshold_700d_demo(epslatex=0)
     sim_in.verbose     = 1;
     sim_in.nbits       = 1E4;
     sim_in.EbNovec     = [0 10 100];
@@ -134,5 +155,19 @@ endfunction
     end
 endfunction
 
+function test_rayleigh
+  N = 1E6;
+  % total power in noise is sigma_n^2
+  sigma_n = 0.5*sqrt(2);
+  noise = (sigma_n/sqrt(2))*(randn(1,N) + j*randn(1,N));
+  [h x] = hist(abs(noise),50);
+  sigma = sigma_n/sqrt(2);
+  p = (x./(sigma*sigma)).*exp(-(x.^2)/(2*sigma*sigma));
+  figure(1); clf;
+  plot(x,h/trapz(x,h),'b;histogram;');
+  hold on;
+  plot(x,p,'g;pdf;');
+  hold off; grid;
+end
 
  

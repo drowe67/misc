@@ -391,13 +391,13 @@ y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j (\omega (n-dF_s) + \phi_2)} \
 \end{equation}
 Thus if we start detecting $y(n)$ after the longest delay term $dF_s$ we can recover the transmitted PSK symbol without ISI, and equalise it by estimating a single complex coefficient $H(e^{j \omega})$.  In practice detection means integration over a complete symbol $T_s$, therefore the symbol $e^{j \omega n + \phi_n}$ must be transmitted for $d+T^\prime_s=T_{cp}+T^\prime_s$ seconds, with the cyclic prefix length $T_{cp} \ge d$.
 
-\section{Waveform Improvements}
+\subsection{Waveform Improvements}
 
-In this section waveform improvements are presented.
+In the following sections waveform improvements are presented.
 
 The general strategy is to propose an innovation, and explore with analysis/maths and Octave simulation. To simulate performance with voice codec, we use a threshold of PER=0.1, BER=0.01 as the threshold for establishing a voice link.
 
-\subsection{Equalisation}
+\section{Equalisation}
 
 Pilot symbols are used to the estimate the channel, and equalise (correct) the phase of the received symbols.  We require an equalisation system that works with $B_d=2$ Hz Doppler Spread that has a low implementation loss $L_{il}$ on noisy channels, and has a reasonable latency (we can't use symbols far in the future).
 
@@ -493,13 +493,13 @@ The new \emph{lin2ls} resampler has the following benefits:
 
 The algorithm used to combine adjacent carriers (\ref{eq:combine_freq}) is new and makes an assumption around the estimate of $d$, so it should be carefully tested OTA on real world channels using objective, controlled tests.
 
-\subsection{Multipath}
+\section{Multipath}
 
 The multipath channel exhibits frequency selective fading.  Spreading bits in a packet across multiple carriers with OFDM helps.  Extending this is frequency diversity, where $n$ copies of the entire OFDM signal signal are transmitted, then recombined at the receiver.  Due to the spectral efficiency of OFDM, it is possible to transmit several copies of a narrow band digital voice waveform within a 2000 Hz bandwidth.
 
 Figure \ref{fig:spectrogram} illustrates an example of $Nd=2$ diversity over a multipath channel, using a $Nc=8$ carrier waveform waveform similar to 700D.  The original transmit signal has been copied to higher frequencies to produce $Nc=16$ carrier signal of the same total power but with twice the bandwidth.
 
-Frequency diversity helps, as there are times when one carrier is faded, but it's diversity copy at about 800 Hz offset is not faded.  When recombined we can recover that carrier.  However observing Figure \ref{fig:spectrogram} there are some periods where the entire channel at all frequencies is faded for up to 1 second. This is supported by \ref{fig:ber_packet} which shows large burst of errors during fades. This leads us to the idea of diversity in time, where the bits of packet are spread over a period longer than the duration of a fade, lowering the average bit error rate of that packet. Once the BER is reduced beneath a threshold, the FEC code can correct all errors in the packet, and we can recover intelligible speech. The trade off is latency, which makes fast turn around PTT speech difficult.
+Frequency diversity helps, as there are times when one carrier is faded, but it's diversity copy at about 800 Hz offset is not faded.  When recombined we can recover that carrier.  However observing Figure \ref{fig:spectrogram} there are some periods where the entire channel at all frequencies is faded for up to 1 second. This is supported by Figure \ref{fig:ber_packet} which shows large burst of errors during fades. This leads us to the idea of diversity in time, where the bits of packet are spread over a period longer than the duration of a fade, lowering the average bit error rate of that packet. Once the BER is reduced beneath a threshold, the FEC code can correct all errors in the packet, and we can recover intelligible speech. The trade off is latency, which makes fast turn around PTT speech difficult.
 
 \begin{figure}[H]
 \caption{Spectrogram of 20 seconds of $Nd=2$ diversity signal over a MPP channel. At some points in time the signal is faded at all frequencies, so frequency diversity cannot help.}
@@ -578,7 +578,7 @@ Additional notes and further work:
 \end{center}
 \end{figure}
 
-\subsection{Delay Spread (ISI)}
+\section{Delay Spread (ISI)}
 
 \begin{enumerate}
 \item We need a CP long enough to handle MPD (4ms plus guard)
@@ -587,7 +587,7 @@ Additional notes and further work:
 \item 700C had just 13ms symbols but dealt with ISI pretty well - this might be worth exploring.
 \end{enumerate}
 
-\subsection{Acquisition}
+\section{Acquisition}
 
 PTT digital voice systems require fast acquisition - when a station starts transmitting we would like decoded speech to emerge from the receiver within a few 100ms, even on low SNR multipath channels.  Some considerations:
 \begin{enumerate}
@@ -600,10 +600,13 @@ PTT digital voice systems require fast acquisition - when a station starts trans
 \item LEO channels have rapid rate of change of frequency due to Doppler shift, a challenge for frequency tracking.
 \end{enumerate}
 
+\subsection{Coarse Timing Estimation}
+
 The FreeDV OFDM waveforms such as 700D/E uses a correlation algorithm which compares the time domain received $r(n)$ signal to the transmitted pilot symbols $p(n)$.  The correlation from two adjacent modem frames are combined.  The correlation function is maximised over a 2D grid of time and frequency points.  If the maximum exceeds a threshold the state machine enters a trial sync phase where acquisition is checked by demodulating a unique word present in every modem frame.
 
 The time domain pilot signal is the IDFT of the frequency domain pilots for each carrier $P_c$:
 \begin{equation}
+\label{eq:pilot_time}
 p(n) = \sum^{c=N_c}_{c=1} P_c e^{j \omega_c n } \quad n=0,...M-1
 \end{equation}
 where $M=FsT^\prime_s$ is the number of samples in one symbol (excluding cyclic prefix). For the simulation work above $P_c=1$ for convenience, however other values are possible, for example FreeDV 700D uses a random sequence of BPSK symbols $P_c= \pm 1$.
@@ -697,18 +700,108 @@ D_{thresh}= \sigma\sqrt{-ln(P_{thresh})}
 \end{equation}
 using a sufficiently low probability $P_{thresh}$. Now if $D_t > D_{thresh}$, we can conclude that $p(n)$ has been detected.  
 
-When a signal is present the distribution will no longer be Rayleigh.  In fact the variance of $|D_t|$ will be somewhat larger than the noise alone case due to partial correlation matches with payload data symbols. However $|D_t|$ exhibits strong correlation peaks with $p(n)$, so comfortably exceeds any threshold calculated from the noise only model.
+When a signal is present the distribution of $|D_t|$ will no longer be Rayleigh due to the correlation peaks with $p(n)$. Figure \ref{fig:acq_dt_hist} is a histogram of $|D_t|$, the RHS hump in the histogram is due to the correlation peaks.  This is even more obvious in the scatter plot of $D_t$ (Figure \ref{fig:acq_dt_scatter}). It was found that by removing the outliers in a set of $D_t$ samples and recalculating the standard deviation, a good fit can be found with the Rayleigh distribution (green in Figure \ref{fig:acq_dt_hist}).  The outlier removal algorithm is:
+\begin{equation}
+\label{eq:prob_thresh}
+\begin{split}
+\sigma &= Std(D_t) \\
+D^\prime_t &= D_t < 2\sigma \\
+\sigma^\prime &= Std(D^\prime_t)
+\end{split}
+\end{equation}
+Any outlier greater than $2\sigma$ is removed from the set used to calculate the standard deviation, and $\sigma^\prime$ is used to calculate $D_{thresh}$. Note the variance of $D_t$ with signal present is larger than the variance with noise alone, due to random correlations of the modem signal with $p(n)$. The circle in Figure \ref{fig:acq_dt_scatter} shows the threshold calculated for this example.
+
+\begin{figure}[H]
+\caption{Histogram of $D_t$ sampled once a symbol over 450 modem frames, for $E_b/N_0=0$ dB.  After removing the outliers due to strong correlation with $p(n)$ on the RHS, the LHS of the histogram is a good fit to the Rayleigh PDF.}
+\label{fig:acq_dt_hist}
+\begin{center}
+\input acq_dt_hist.tex
+\end{center}
+\end{figure}
+
+\begin{figure}[H]
+\caption{Scatter plot of $D_t$ on the complex plane from the same simulation as Figure \ref{fig:acq_dt_hist}. The circle is $D_{thresh}$ from (\ref{eq:corr_prob}) using $\sigma^\prime$ and $P_{thresh}=10^{-3}$.}
+\label{fig:acq_dt_scatter}
+\begin{center}
+\input acq_dt_scatter.tex
+\end{center}
+\end{figure}
 
 The new acquisition algorithm is therefore:
 \begin{enumerate}
-\item Using simulation results set a threshold $P_{thresh}$ such that $D_t < D_{thresh}$ with noise alone but $D_t < D_{thresh}$ when signal is present for $E_b/N_0 > 0$ dB.
-\item At run time, estimate the noise power $\sigma^2=Var(r(n))$ over a window of one modem frame $T_f$ seconds. This will be an approximation, as $\bm{r}$ includes noise and wanted signal.
-\item Find the peak $D_{tmax}$ over the window of $T_f$ seconds.
-\item Calculate $D_{thresh}$ using (\ref{eq:corr_prob}).  Note that unlike the existing 700D/E acquisition algorithm $D_{thresh}$ is dynamic, and based on current the variance of the received signal.
+\item Using simulation results set a threshold $P_{thresh}$ such that $D_t < D_{thresh}$ with noise alone but $D_t > D_{thresh}$ when signal is present for $E_b/N_0 > 0$ dB.
+\item At run time, extract a $T_f$ long window of samples (one modem frame).
+\item Calculate a set of $D_t$ values over the window.
+\item Find the peak $D_{tmax}$ over the set of $D_t$ samples.
+\item Estimate the standard deviation $\sigma$, then remove outliers to obtain $\sigma^\prime$.
+\item Calculate $D_{thresh}$ using (\ref{eq:corr_prob}).
 \item If $D_{tmax} > D_{thresh}$ we have found a candidate $p(n)$ sequence and the start of a modem frame.
 \end{enumerate}
+Note that unlike the existing 700D/E acquisition algorithm $D_{thresh}$ is dynamic, and based on the standard deviation of the received signal.
 
-\subsection {Pilot Carriers}
+\subsection{Coarse Frequency Estimation}
+
+Consider $D_t$ as a function of frequency offset $\omega$:
+\begin{equation}
+\label{eq:dt_freq}
+\begin{split}
+r(n) &= ge^{j \omega n}p(n) \\
+D_t  &= \bm{r}^H\bm{p} \\
+D_t  &= \sum_{n=0}^{M-1}r^*(n)p(n) \\
+     &= \sum_{n=0}^{M-1}ge^{-j \omega n}p^*(n)p(n) 
+\end{split}
+\end{equation}
+where the complex gain $g$ accounts for the magnitude and phase shift of the channel and $p^*(n)$ is the conjugate of $p(n)$.  Substituting the expression for $p(n)$ from (\ref{eq:pilot_time}):
+\begin{equation}
+\begin{split}
+D_t &= g\sum_{n=0}^{M-1}e^{-j \omega n} \sum_{c=1}^{N_c}P^*_c e^{-j \omega_c n} \sum_{d=1}^{N_c}P_d e^{j \omega_d n} \\
+D_t &= g \sum_{c=1}^{N_c} \sum_{d=1}^{N_c}P^*_c P_d\sum_{n=0}^{M-1}e^{j (\omega_d - \omega_c - \omega) n}
+\end{split}
+\end{equation}
+Noting $\omega_x = 2 \pi x R_s/F_s = 2 \pi x/M$:
+\begin{equation}
+\begin{split}
+D_t &= g \sum_{c=1}^{N_c} \sum_{d=1}^{N_c}P^*_c P_d\sum_{n=0}^{M-1}e^{j 2 \pi q n/M} \\
+  q &= d - c - \frac{M \omega}{ 2 \pi}
+\end{split}
+\end{equation}
+Consider the ideal case where $\omega=0$, and $q = d-c$ is an integer. Using the identity for the sum of a geometric series:
+\begin{equation}
+\label{eq:geo_sum}
+\sum_{n=0}^{M-1} r^n = 
+\begin{cases}
+  \frac{1-r^M}{1-r} & r \ne 1 \\
+   M                & r = 1 
+\end{cases}   
+\end{equation}
+\begin{equation}
+D_t = g \sum_{c=1}^{N_c} \sum_{d=1}^{N_c}P^*_c P_d \frac{1 - e^{j 2 \pi q }}{ 1 - e^{j 2 \pi q/M}}
+\end{equation}
+For all integer $q \ne 0$ the numerator $1 - e^{j 2 \pi q} = 0$ and the denominator is non-zero, thus all terms in the summation apart from $d=c$ are zero. When $q = 0$ we use the  $r=1$ (limit) clause in (\ref{eq:geo_sum}):
+\begin{equation}
+D_t = g \sum_{c=1}^{N_c} |P_c|^2 M
+\end{equation}
+If we use BPSK pilots $P_c = \pm 1$:
+\begin{equation}
+D_t = g N_c M
+\end{equation}
+For the case where $\omega \ne 0$, analysis is more difficult.  However we can observe that the numerator $1 - e^{j 2 \pi q}$ will pass through local maxima and minima at multiples of $\omega = 2 \pi / M$, i.e. multiples of one carrier spacing $R_s$. As $|\omega|$ increases, $q \ne 0$ when $d-c=0$, so the denominator $1 - e^{j 2 \pi q}$ will be larger than 0 in the limiting case, gradually reducing the peak of the local maxima.  
+
+Thus $D_t$ will have a global maxima at $\omega=0$, and some local minima and maxima separated by $Rs$. The local maxima makes an iterative solution based on gradient descent problematic.
+Instead, consider adding a frequency correction term $\hat{\omega}$ to $r(n)$ from (\ref{eq:dt_freq}):
+\begin{equation}
+\begin{split}
+\label{eq:corr_freq}
+\hat{r}(n) &= e^{j -\hat{\omega} n}r(n) \\
+\hat{D}_t &= \sum_{n=0}^{M-1} e^{j \hat{\omega} n} r^*(n) p(n) \\
+    &= \sum_{n=0}^{M-1} g e^{-j (\omega - \hat{\omega} ) n} p^*(n)p(n) 
+\end{split}
+\end{equation}
+When $\hat{\omega} = \omega$, the two frequency shift terms will cancel out and we will be left with the ideal  case, maximising $\hat{D}_t$. The frequency offset can therefore be found by sampling (\ref{eq:corr_freq}) on a sufficiently fine grid of $\hat{\omega}$.  
+
+Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels.
+
+\subsection{Pilot Carriers}
 
 A common acquisition strategy is to add one or more pilot carriers to aid frequency offset estimation. These carriers consume power and carry no payload data so an increase in the threshold SNR is required to maintain the voice link. Consider the effect on $E_b$ when adding an additional carrier:
 \begin{equation}
@@ -731,14 +824,16 @@ L_{pc} &= 10log_{10}\left(\frac{N_c+1}{N_c}\right)
 where $L_{pc}$ is the loss in dB for adding a single pilot carrier.  For example given a 16 carrier waveform, $L_{pc}=10log_{10}(17/16)=0.26 \si{dB}$, which is quite modest for the potential gains in acquisition performance.  A pilot carrier will also be visible on a real time waterfall and provide a useful manual tuning aid.
 
 
-TODO: 
+\subsection{Acquisition TODO}
+
 \begin{enumerate}
+\item Determine dimensions of time/freq sampling grid, for example is $D_t$ is maximised despite +/-200 Hz offset, ie do we need to sample it at every time instant and every freq instant, or can we just scan time first.
 \item Derive correlation approach as MMSE.  Show issue with combining $C_p$ from adjacent carriers. Can we establish reason it breaks down at +/- 25 Hz?  Are there any cycles at $T_f$?  Review blog posts.
-\item Include frequency offset in $E$ and $C_p$, explain how that can be includes as function that we sample.
+\item Include frequency offset in $E$ and $C_p$, explain how that can be included as function that we sample.
 \item Can we come up with an expression for the $C_t$ threshold?
 \item Can we come up for an expression for probability of error?
 \item Simply optimise what we have, make it work at a wider range.
-\item even if cost function is non-linear, can we differentiate it and solve iteratively?
+\item Even if cost function with freq offset is non-linear, can we differentiate it and solve iteratively?
 \item Can phase shift between successive pilots be used for fine freq estimation/refinement?
 \item Simulation framework to test current performance, measure probability of sync and probability of failure.  Why do we need UW?  Lets drill into that.
 \item Other methods (multiple by time shifted version) once we have a framework.
@@ -771,7 +866,8 @@ This section presents topics useful to explore in future.
 \item Table of FreeDV waveforms and values, plugged into formula, effect of increasing pilot symbol rate.
 \item Where we can gain, diversity, PAPR reduction, reduced overheads for fast fading and ISI (discuss)
 \item Wades MAP techniques (ref).  This has a lot of promise, need an effective way to simulate and establish benefit with a modest amount of work.  Can we combine MAP with extra bits for FEC?  Index optimisation also a simple approach.
-\item Equalisation (\ref{eq:combine_freq}). Literature search, I'm sure this nothing new. Determine if (\ref{eq:combine_freq}) is a reasonable approximation for real HF channels - we have derived it from a simulation model.  From VK5DSP review Sep 2023: Compare variance of $\overline{H(e^{j \omega_c})}$ to $H(e^{j \omega_c})$. Consider extending (\ref{eq:combine_freq}) to more carriers, it is essentially estimating the entire channel.  Consider different estimators to MMSE, e.g. BLE. Consider modulating pilots as a side data channel or to aid frequency offset estimation.
+\item Equalisation (\ref{eq:combine_freq}). Literature search, I'm sure this nothing new. Determine if (\ref{eq:combine_freq}) is a reasonable approximation for real HF channels - we have derived it from a simulation model.  From VK5DSP review Sep 2023: Compare variance of $\overline{H(e^{j \omega_c})}$ to $H(e^{j \omega_c})$. Consider extending (\ref{eq:combine_freq}) to more carriers, it is essentially estimating the entire channel.  Consider different estimators to MMSE, e.g. BLE. Consider modulating pilots as a side data channel or to aid frequency offset estimation. 
+\item Equalisation: Consider combining decision directed approaches with pilots to improve estimates (McKillim et al).
 \end{itemize} 
 
 \nocite{*}

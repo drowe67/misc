@@ -13,7 +13,15 @@ function sim_out = acq_test(sim_in)
     randn('seed',1);
 
     load_const;
-    sim_out.Ct = [];
+    sim_out.Ct = []; sim_out.Dt = [];
+    Pthresh = 1E-3;
+    if isfield(sim_in,"Pthresh")
+       Pthresh = sim_in.Pthresh;
+    end
+    epslatex = 0;
+    if isfield(sim_in,"epslatex")
+      epslatex = sim_in.epslatex;
+    end
 
     [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
  
@@ -44,13 +52,17 @@ function sim_out = acq_test(sim_in)
             Dt(s) = r'*p;
         end
 
-        sigma_est = std(Dt)
+        sigma_est = std(Dt);
         % remove outliers
         Dt_prime = Dt(find(Dt < 2*sigma_est));
-        sigma_est = std(Dt_prime)
+        sigma_prime_est = std(Dt_prime);
+
+        % Determine threshold
+        Dthresh = sigma_prime_est*sqrt(-log(Pthresh));
+
         sigma = sqrt(variance/M);
         if verbose == 2
-          printf("sigma noise: %f sigma_est: %f\n", sigma, sigma_est);
+          printf("signal_noise: %f sigma_est: %f sigma_prime_est: %f\n", sigma, sigma_est,sigma_prime_est);
         end
    
         if verbose == 2
@@ -58,23 +70,57 @@ function sim_out = acq_test(sim_in)
             figure(1); clf; plot(Ct,'+'); mx = 1.2; axis([-mx mx -mx mx]);
             figure(2); clf; plot(abs(Ct)); axis([0 length(Ct) 0 mx]);
 
+            if epslatex
+              [textfontsize linewidth] = set_fonts();
+            end
+
             % Prototype Dt algorithm (variable threshold)
             figure(3); clf;
             [h x]=hist(abs(Dt),20);
-            plot(x,h/trapz(x,h),'b;histogram Dt;'); 
-            sigma_r = sigma_est/sqrt(2);
+            plot(x,h/trapz(x,h),'b;Histogram $|D_t|$;'); 
+            sigma_r = sigma_prime_est/sqrt(2);
             p = (x./(sigma_r*sigma_r)).*exp(-(x.^2)/(2*sigma_r*sigma_r));
             hold on; plot(x,p,'g;Rayleigh PDF;'); hold off;
+            legend('boxoff');
+            if epslatex
+              fn = "acq_dt_hist.tex";
+              print(fn,"-depslatex","-S300,250");
+              printf("printing... %s\n", fn);
+            end
 
             figure(4); clf; plot(Dt,'+');
-            circle = exp(j*(0:0.001*2*pi:2*pi));
             if isfield(sim_in,"Pthresh")
-                Dthresh = sigma_est*sqrt(-log(sim_in.Pthresh))
-                hold on; plot(Dthresh*circle); hold off;
+              circle = exp(j*(0:0.001*2*pi:2*pi));
+              hold on; plot(Dthresh*circle); hold off;
+            end
+            
+            if epslatex
+              fn = "acq_dt_scatter.tex";
+              print(fn,"-depslatex","-S300,250");
+              printf("printing... %s\n", fn);
+              restore_fonts(textfontsize,linewidth);
             end
         end
 
-        sim_out.Ct = [sim_out.Ct; Ct];
+        % count successful acquisitions
+        Ncorrect = 0; Nfalse = 0;
+        for s=1:nsymb
+          if abs(Dt(s)) > Dthresh
+            if mod(s,Ns) == 1
+              Ncorrect++;
+            else
+              Nfalse++;
+            end
+          end
+        end
+        if verbose == 1
+           printf("EbNodB: %5.0f Pcorrect: %4.3f Pfalse: %4.3f\n", EbNodB, Ncorrect/nframes, Nfalse/nframes);
+        end
+        sim_out.Pcorrect(ne) = Ncorrect/nframes;
+        sim_out.Pfalse(ne) = Nfalse/nframes;
+        if ne == 1
+          sim_out.Ct = [sim_out.Ct; Ct];
+        end
     end
 endfunction
 
@@ -103,8 +149,6 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.nbitsperframe = varargin{i+1}; i++;
       elseif strcmp(varargin{i},"bitsperpacket")
         sim_in.nbitsperpacket = varargin{i+1}; i++;    
-      elseif strcmp(varargin{i},"epslatex_interp")
-        sim_in.epslatex_interp = 1;    
       elseif strcmp(varargin{i},"epslatex")
         sim_in.epslatex = 1;    
       elseif strcmp(varargin{i},"Pthresh")
@@ -170,4 +214,16 @@ function test_rayleigh
   hold off; grid;
 end
 
- 
+function test_cases(nbits=1E5,ch='awgn',epslatex=0)
+    sim_in.verbose     = 1;
+    sim_in.nbits       = nbits;
+    sim_in.EbNovec     = [-100 0 10 100];
+    sim_in.ch          = ch;
+    sim_in.resampler   = "lin2";
+    sim_in.ls_pilots   = 1;
+    sim_in.Nd          = 1;
+    sim_in.combining   = 'mrc';
+    sim_in.epslatex    = epslatex;
+
+    acq_test(sim_in);
+endfunction

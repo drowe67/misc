@@ -775,6 +775,7 @@ Consider the ideal case where $\omega=0$, and $q = d-c$ is an integer. Using the
 \end{cases}   
 \end{equation}
 \begin{equation}
+\label{eq:dt_closed}
 D_t = g \sum_{c=1}^{N_c} \sum_{d=1}^{N_c}P^*_c P_d \frac{1 - e^{j 2 \pi q }}{ 1 - e^{j 2 \pi q/M}}
 \end{equation}
 For all integer $q \ne 0$ the numerator $1 - e^{j 2 \pi q} = 0$ and the denominator is non-zero, thus all terms in the summation apart from $d=c$ are zero. When $q = 0$ we use the  $r=1$ (limit) clause in (\ref{eq:geo_sum}):
@@ -785,19 +786,42 @@ If we use BPSK pilots $P_c = \pm 1$:
 \begin{equation}
 D_t = g N_c M
 \end{equation}
-For the case where $\omega \ne 0$, analysis is more difficult.  However we can observe that the numerator $1 - e^{j 2 \pi q}$ will pass through local maxima and minima at multiples of $\omega = 2 \pi / M$, i.e. multiples of one carrier spacing $R_s$. As $|\omega|$ increases, $q \ne 0$ when $d-c=0$, so the denominator $1 - e^{j 2 \pi q}$ will be larger than 0 in the limiting case, gradually reducing the peak of the local maxima.  
+For the case where $\omega \ne 0$, the inner term of \ref{eq:dt_closed} can be shown to be a phase shifted $sinc(x)=sin(x)/x$ function:
+\begin{equation}
+\begin{split}
+X(q) &= \frac{1 - e^{j 2 \pi q }}{ 1 - e^{j 2 \pi q/M}} \\
+X(q)\frac{e^{-j \pi q}}{e^{-j \pi q / M}} &= \frac{1 - e^{j 2 \pi q }}{ 1 - e^{j 2 \pi q/M}} \frac{e^{-j \pi q}}{e^{-j \pi q / M}} \\
+X(q) e^{-j(M+1) \pi q / M } &= \frac{e^{-j \pi q} - e^{j \pi q}}{e^{-j \pi q/M} - e^{j \pi q/M}}  \\
+X(q) &= e^{j(M+1) \pi q / M } \frac{sin(\pi q)}{sin(\pi q/M)}
+\end{split}
+\end{equation}
+For the small values of $\pi q/M$ we are concerned with $sin(\pi q/M) \approx \pi q/M$:
+\begin{equation}
+\begin{split}
+X(q) &\approx M e^{j(M+1) \pi q / M } sinc(\pi q) \\
+D_t  &\approx gM \sum_{c=1}^{N_c} \sum_{d=1}^{N_c}P^*_c P_d e^{j(M+1) \pi q / M } sinc(\pi q)
+\end{split}
+\end{equation}
+Unfortunately $sinc(x)$ is even so for $w \ne 0$ there no cancellation of the $d \ne c$ terms.  The magnitude of $D_t$ as $\omega$ (and hence $q$) varies is therefore highly dependant on the values chosen for $P_c$.  Figure \ref{fig:acq_dt_q} is a an example when $Pc$ is a set of Barker codes.  This gives a sharp response when $\omega=0$, which is a useful property for accurate frequency offset estimation in the presence of noise and channel distortions such as multipath. For 700D we simply chose random $P_c$ values without consideration of their correlation properties, so employing a Barker sequence for the pilots $P_c$ should improve frequency offset estimation performance.
 
-Thus $D_t$ will have a global maxima at $\omega=0$, and some local minima and maxima separated by $Rs$. The local maxima makes an iterative solution based on gradient descent problematic.
-Instead, consider adding a frequency correction term $\hat{\omega}$ to $r(n)$ from (\ref{eq:dt_freq}):
+\begin{figure}[H]
+\caption{$|Dt|$ as a function of frequency offset in multiples of $R_s$.  Our requirement is $\pm 200$ Hz or $\pm 4R_s$ (assuming $R_s \approx 50$ Hz) .  $P_c$ is a 13 point Barker sequence, chosen for it's correlation properties.}
+\label{fig:acq_dt_q}
+\begin{center}
+\input acq_dt_q.tex
+\end{center}
+\end{figure}
+
+The frequency offset can be estimated by adding a frequency correction term $\hat{\omega}$ to $r(n)$ from (\ref{eq:dt_freq}):
 \begin{equation}
 \begin{split}
 \label{eq:corr_freq}
-\hat{r}(n) &= e^{j -\hat{\omega} n}r(n) \\
+\hat{r}(n) &= e^{-j \hat{\omega} n}r(n) \\
 \hat{D}_t &= \sum_{n=0}^{M-1} e^{j \hat{\omega} n} r^*(n) p(n) \\
     &= \sum_{n=0}^{M-1} g e^{-j (\omega - \hat{\omega} ) n} p^*(n)p(n) 
 \end{split}
 \end{equation}
-When $\hat{\omega} = \omega$, the two frequency shift terms will cancel out and we will be left with the ideal  case, maximising $\hat{D}_t$. The frequency offset can therefore be found by sampling (\ref{eq:corr_freq}) on a sufficiently fine grid of $\hat{\omega}$.  
+When $\hat{\omega} = \omega$, the two frequency shift terms will cancel out and we will be left with the ideal  case, maximising $\hat{D}_t$. The frequency offset can therefore be found by sampling (\ref{eq:corr_freq}) on a sufficiently fine grid of $\hat{\omega}$.  Figure \ref{fig:acq_dt_q} suggests sampling $\hat{D}_t$ with $0.5R_s$ Hz steps would be sufficient to bracket the maxima.  
 
 Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels.
 

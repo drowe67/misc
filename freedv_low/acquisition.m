@@ -227,3 +227,58 @@ function test_cases(nbits=1E5,ch='awgn',epslatex=0)
 
     acq_test(sim_in);
 endfunction
+
+% just inner term of Dt summation
+function sweep_q_inner
+  Fs=8000; Rs=50; M=Fs/Rs;
+  log_q = []; log_Dt = [];
+  n = 0:M-1;
+  for q=-5:0.1:5
+    Dt = sum(exp(j*2*pi*q*n/M));
+    log_q = [log_q q];
+    log_Dt = [log_Dt Dt];
+  end
+  figure(1); clf; plot(log_q,abs(log_Dt));
+  hold on;
+  Dt_sinc = M*sinc(log_q);
+  plot(log_q, abs(Dt_sinc));
+  hold off;
+endfunction
+
+% with outer terms, PcPd terms don't cancel except at omega=0,
+% the actual reinforce which makes it better athan 
+function sweep_q(epslatex=0)
+  Fs=8000; Rs=50; M=Fs/Rs;
+  Nc = 13; 
+  P = 1-2*(rand(1,Nc) > 0.5);
+  %P = ones(1,Nc);
+  % length 13 barker code
+  P=[1 1 1 1 1 -1 -1 1 1 -1 1 -1 1];
+  log_q = []; log_Dt = [];
+  n = 0:M-1;
+  for f=-5*Rs:0.1*Rs:5*Rs
+    Dt = 0;
+    for c=1:Nc
+      for d=1:Nc
+        omega = 2*pi*f/Fs;
+        q = d - c - M*omega/(2*pi);
+        Dt += P(c)*P(d)*sum(exp(j*2*pi*q*n/M));
+      end
+    end
+    log_q = [log_q q];
+    log_Dt = [log_Dt Dt];
+  end
+  if epslatex
+      [textfontsize linewidth] = set_fonts();
+  end
+  figure(1); clf; plot(log_q,abs(log_Dt)/(M*Nc));
+  xlabel('Freq Offset ($R_s$)'); ylabel('$|D_t|$');
+  axis([-5 5 0 1]); grid;
+  if epslatex
+      fn = "acq_dt_q.tex";
+      print(fn,"-depslatex","-S300,250");
+      printf("printing... %s\n", fn);
+      restore_fonts(textfontsize,linewidth);
+  end
+  endfunction
+

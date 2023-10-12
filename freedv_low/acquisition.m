@@ -49,7 +49,7 @@ function sim_out = acq_test_Ct(sim_in)
           % 700D/E Ct algorithm (fixed thresh)
           figure(1); clf; plot(Ct,'+'); mx = 1.2; axis([-mx mx -mx mx]);
           figure(2); clf; plot(abs(Ct)); axis([0 length(Ct) 0 mx]);
-        end
+      end
 
       sim_out.Ct = [sim_out.Ct; Ct];
     end
@@ -96,8 +96,9 @@ function sim_out = acq_test(sim_in)
   randn('seed',1);
 
   load_const;
-  sim_out.Ct = []; sim_out.Dt = [];
   Pthresh = 1E-3;
+  timeStep = 0.5;
+  freqStep = 0.5;
   if isfield(sim_in,"Pthresh")
       Pthresh = sim_in.Pthresh;
   end
@@ -107,6 +108,13 @@ function sim_out = acq_test(sim_in)
   end
 
   [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
+  timeOffset = M*0.75;
+  tx = [zeros(1,timeOffset) tx];
+  nsam = length(tx);
+
+  % set up pilot samples, scale such that Ct_max = 1
+  p = zeros(M,1); p(:,1) = tx(Ncp+1:Ncp+M); assert(length(p) == M);
+  Dt_max = 1; p_scale = Dt_max*sqrt(p'*p)/(p'*p); p *= p_scale;
 
   for ne = 1:length(EbNovec)
     rx = tx;
@@ -119,19 +127,23 @@ function sim_out = acq_test(sim_in)
     noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
     rx_noise = rx + noise;
 
-    % correlate at various time offsets
-
-    % set up pilot samples, scale such that Ct_max = 1
-    p = zeros(M,1); p(:,1) = tx(Ncp+1:Ncp+M); assert(length(p) == M);
-    Dt_max = 1; p_scale = Dt_max*sqrt(p'*p)/(p'*p); p *= p_scale;
-
-    Dt = zeros(1,nsymb); 
+    % Sample Dt on grid of time and freq steps
+   
+    nFreqSteps = length(-4:freqStep:4)
+    nTimeSteps = nsymb/timeStep
+    Dt = zeros(nFreqSteps,nTimeSteps);
     r = zeros(M,1);
-    for s=1:nsymb
+    for s=1:timeStep:nsymb
       st = (s-1)*(M+Ncp)+1;
       en = st+M+Ncp-1;
-      r(:,1) = rx_noise(st+Ncp:en);
-      Dt(s) = r'*p;
+      for f_Rs=-4:freqStep:4;
+        f_Hz = f_Rs*Rs;
+        omega_hat = 2*pi*f_Hz/Fs;
+        r(:,1) = exp(-j*omega_hat*(0:M-1)).*rx_noise(st+Ncp:en);
+        f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
+        t_ind = s/timeStep;
+        Dt(f_ind,t_ind) = r'*p;
+      end
     end
 
     sigma_est = std(Dt);
@@ -152,21 +164,22 @@ function sim_out = acq_test(sim_in)
         [textfontsize linewidth] = set_fonts();
       end
 
-      % Prototype Dt algorithm (variable threshold)
+      % Dt algorithm (variable threshold)
       figure(1); clf;
-      [h x]=hist(abs(Dt),20);
+      [h x]=hist(abs(Dt(:)),20);
       plot(x,h/trapz(x,h),'b;Histogram $|D_t|$;'); 
       sigma_r = sigma_prime_est/sqrt(2);
       p = (x./(sigma_r*sigma_r)).*exp(-(x.^2)/(2*sigma_r*sigma_r));
       hold on; plot(x,p,'g;Rayleigh PDF;'); hold off;
       legend('boxoff');
+
       if epslatex
         fn = "acq_dt_hist.tex";
         print(fn,"-depslatex","-S300,250");
         printf("printing... %s\n", fn);
       end
 
-      figure(2); clf; plot(Dt,'+');
+      figure(2); clf; plot(Dt(:),'+');
       if isfield(sim_in,"Pthresh")
         circle = exp(j*(0:0.001*2*pi:2*pi));
         hold on; plot(Dthresh*circle); hold off;
@@ -178,12 +191,16 @@ function sim_out = acq_test(sim_in)
         printf("printing... %s\n", fn);
         restore_fonts(textfontsize,linewidth);
       end
+
+      figure(3);
+      mesh(abs(Dt));
     end
 
     % count successful acquisitions
     Ncorrect = 0; Nfalse = 0;
-    for s=1:nsymb
-      if abs(Dt(s)) > Dthresh
+    for s=1:timeStep:nsymb
+      ind = s/timeStep;
+      if abs(Dt(ind)) > Dthresh
         if mod(s,Ns) == 1
           Ncorrect++;
         else
@@ -191,7 +208,7 @@ function sim_out = acq_test(sim_in)
         end
       end
     end
-    if verbose == 1
+    if verbose >= 1
         printf("EbNodB: %5.0f Pcorrect: %4.3f Pfalse: %4.3f\n", EbNodB, Ncorrect/nframes, Nfalse/nframes);
     end
     sim_out.Pcorrect(ne) = Ncorrect/nframes;

@@ -28,6 +28,15 @@ It is acceptable for performance to gradually decrease as the multipath channel 
 
 This document explores ways we can improve the existing OFDM modem waveforms in order to meet these requirements.
 
+\subsection{Summary of Improvements}
+
+Compared to existing FreeDV 700D/700E algorithms:
+\begin{enumerate}
+\item New equalisation algorithm that performs well on a range of AWGN and multipath channels, removing the need for modes.
+\item Diversity in frequency and possibly time providing around 3dB improvement on multipath channels.  
+\item Dynamic threshold and pilot symbol selection for more robust acquisition. 
+\end{enumerate}
+
 \clearpage
 
 \subsection{Glossary}
@@ -805,7 +814,7 @@ D_t  &\approx gM \sum_{c=1}^{N_c} \sum_{d=1}^{N_c}P^*_c P_d e^{j(M+1) \pi q / M 
 Unfortunately $sinc(x)$ is even so for $w \ne 0$ there no cancellation of the $d \ne c$ terms.  The magnitude of $D_t$ as $\omega$ (and hence $q$) varies is therefore highly dependant on the values chosen for $P_c$.  Figure \ref{fig:acq_dt_q} is a an example when $Pc$ is a set of Barker codes.  This gives a sharp response when $\omega=0$, which is a useful property for accurate frequency offset estimation in the presence of noise and channel distortions such as multipath. For 700D we simply chose random $P_c$ values without consideration of their correlation properties, so employing a Barker sequence for the pilots $P_c$ should improve frequency offset estimation performance.
 
 \begin{figure}[H]
-\caption{$|Dt|$ as a function of frequency offset in multiples of $R_s$.  Our requirement is $\pm 200$ Hz or $\pm 4R_s$ (assuming $R_s \approx 50$ Hz) .  $P_c$ is a 13 point Barker sequence, chosen for it's correlation properties.}
+\caption{$|Dt|$ as a function of frequency offset in multiples of $R_s$.  There is ideal time alignment and no noise. Our requirement is $\pm 200$ Hz or $\pm 4R_s$ (assuming $R_s \approx 50$ Hz). $P_c$ is a 13 point Barker sequence, chosen for it's correlation properties.}
 \label{fig:acq_dt_q}
 \begin{center}
 \input acq_dt_q.tex

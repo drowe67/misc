@@ -97,8 +97,9 @@ function sim_out = acq_test(sim_in)
 
   load_const;
   Pthresh = 1E-3;
-  timeStep = 0.5;
-  freqStep = 0.5;
+  t_thresh = 0.1;
+  timeStep = 0.25;
+  freqStep = 0.25;
   if isfield(sim_in,"Pthresh")
       Pthresh = sim_in.Pthresh;
   end
@@ -108,16 +109,26 @@ function sim_out = acq_test(sim_in)
   end
 
   [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
-  timeOffset = M*0.75;
-  tx = [zeros(1,timeOffset) tx];
-  nsam = length(tx);
+  [spread1 spread2 hf_gain hf_en path_delay_samples] = gen_hf(ch,Fs,nsam);
+  rx = tx;
+  if hf_en
+    printf("HF channel simulation...\n");
+    x = path_delay_samples;
+    rx_hf = hf_gain*spread1(1:nsam).*rx;
+    rx_hf(x+1:end) += hf_gain*spread2(1:nsam-x).*rx(1:nsam-x);
+    rx = rx_hf;
+  end
+
+  % TODO: adjust success criteria if we introduce time offset
+  %timeOffset = M*0;
+  %tx = [zeros(1,timeOffset) tx];
+  %nsam = length(tx);
 
   % set up pilot samples, scale such that Ct_max = 1
   p = zeros(M,1); p(:,1) = tx(Ncp+1:Ncp+M); assert(length(p) == M);
   Dt_max = 1; p_scale = Dt_max*sqrt(p'*p)/(p'*p); p *= p_scale;
 
   for ne = 1:length(EbNovec)
-    rx = tx;
     
     % work out noise power -------------
     EbNodB = sim_in.EbNovec(ne);
@@ -146,9 +157,9 @@ function sim_out = acq_test(sim_in)
       end
     end
 
-    sigma_est = std(Dt);
+    sigma_est = std(Dt(:));
     % remove outliers
-    Dt_prime = Dt(find(Dt < 2*sigma_est));
+    Dt_prime = Dt(find(Dt(:) < 2*sigma_est));
     sigma_prime_est = std(Dt_prime);
 
     % Determine threshold
@@ -198,10 +209,24 @@ function sim_out = acq_test(sim_in)
 
     % count successful acquisitions
     Ncorrect = 0; Nfalse = 0;
-    for s=1:timeStep:nsymb
-      ind = s/timeStep;
-      if abs(Dt(ind)) > Dthresh
-        if mod(s,Ns) == 1
+    for s=1:Ns:nsymb
+
+      % Search for maxima over time and freq samples for this modem frame
+      Dtmax = 0;
+      for t_syms=s:timeStep:s+Ns-1
+        for f_Rs=-4:freqStep:4;
+          t_ind = t_syms/timeStep;
+          f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
+          if abs(Dt(f_ind,t_ind)) > Dtmax
+            Dtmax = abs(Dt(f_ind,t_ind));
+            t_max = t_syms;
+            f_max = f_Rs;
+          end
+        end
+      end
+      if Dtmax > Dthresh
+        % t_thresh in symbols, we expect t_max= 1, Ns+1, 2*Ns+1,...
+        if abs(t_max-s) < t_thresh
           Ncorrect++;
         else
           Nfalse++;
@@ -223,7 +248,7 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.ch          = ch;
     sim_in.resampler   = "lin2";
     sim_in.ls_pilots   = 1;
-    sim_in.Nd          = 1;
+    sim_in.Nd          = 2;
     sim_in.combining   = 'mrc';
     
     i = 1;
@@ -300,13 +325,10 @@ endfunction
 
 % with outer terms, PcPd terms don't cancel except at omega=0,
 % the actual reinforce which makes it better athan 
-function sweep_q(epslatex=0)
+function sweep_q(Nc=16, epslatex=0)
   Fs=8000; Rs=50; M=Fs/Rs;
-  Nc = 13; 
-  P = 1-2*(rand(1,Nc) > 0.5);
-  %P = ones(1,Nc);
-  % length 13 barker code
-  P=[1 1 1 1 1 -1 -1 1 1 -1 1 -1 1];
+  P = barker_pilots(Nc); 
+  
   log_q = []; log_Dt = [];
   n = 0:M-1;
   for f=-5*Rs:0.1*Rs:5*Rs

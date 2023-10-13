@@ -5,15 +5,28 @@
 
 1;
 
+% Generate pilots using Barker codes which have good correlation properties
+function P = barker_pilots(Nc)
+  % Barker codes
+  P_barker_8  = [1 1 1 -1 -1 1 -1];
+  P_barker_13 = [1 1 1 1 1 -1 -1 1 1 -1 1 -1 1];
+  % repeating length 8 Barker code works OK for Nc=8 and Nc=16
+  P= zeros(1,Nc);
+  for i=1:Nc
+    P(i) = P_barker_8(mod(i,length(P_barker_8))+1);
+  end
+endfunction
+
 function [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb)
     printf("Modulate to rate Rs OFDM symbols...\n");
+    P = barker_pilots(Nc); 
     tx_symb = [];
     for f=1:nframes
       tx_bits = rand(1,nframes*nbitsperframe) > 0.5; bit = 1;
       % set up Nc x Ns array of symbols with pilots
       atx_symb = zeros(Nc,Ns); 
       for c=1:Nc
-        atx_symb(c,1) = 1;
+        atx_symb(c,1) = P;
         for s=2:Ns
           atx_symb(c,s) = qpsk_mod(tx_bits(bit:bit+1)); bit += 2;
         end
@@ -50,6 +63,30 @@ function [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes
       % cyclic prefix
       tx(st:st+Ncp-1) = tx(st+M:en);
     end
+endfunction
+
+
+% init HF model
+function [spread1 spread2 hf_gain hf_en path_delay_samples] = gen_hf(ch,Fs,nsam)
+  printf("Generating HF model spreading samples...\n")
+  hf_en = 0; spread1 = []; spread2 = []; hf_gain = 0; path_delay_samples = 0;
+  if strcmp(ch,"mpp") || strcmp(ch,"mpd")
+    hf_en = 1;
+    % some typical values
+
+    if strcmp(ch,"mpp")
+      dopplerSpreadHz = 1.0; path_delay_s = 2E-3;
+    else
+      dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
+    end
+    path_delay_samples = round(path_delay_s*Fs);
+    
+    spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+    spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+
+    % normalise power through HF channel
+    hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
+  end
 endfunction
 
 function [textfontsize linewidth] = set_fonts(font_size=12)

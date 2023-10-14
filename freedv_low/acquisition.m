@@ -4,7 +4,7 @@
 % Prototyping acquisition improvements for WP4000 Low SNR study. 
 
 1;
-pkg load signal;
+pkg load signal statistics;
 qpsk;
 ofdm_lib;
 
@@ -262,12 +262,13 @@ function sim_out = acq_test(sim_in)
         printf("printing... %s\n", fn);
       end
 
-      figure(2); clf; plot(Dt(:),'+');
+      figure(2); clf;
+      plot(Dt(:),'+');
       if isfield(sim_in,"Pthresh")
-        circle = exp(j*(0:0.001*2*pi:2*pi));
-        hold on; plot(Dthresh*circle); hold off;
+        circle = Dthresh*exp(j*(0:0.001*2*pi:2*pi));
+        hold on; plot(circle); hold off;
       end
-      
+
       if epslatex
         fn = "acq_dt_scatter.tex";
         print(fn,"-depslatex","-S300,250");
@@ -276,12 +277,16 @@ function sim_out = acq_test(sim_in)
       end
 
       figure(3); clf;
-      mesh(abs(Dt)/(Nc+2));
-
+      [nn cc] = hist3([real(Dt(:)) imag(Dt(:))],[25 25]);
+      mesh(cc{1},cc{2},nn)
+      if isfield(sim_in,"Pthresh")
+        circle = Dthresh*exp(j*(0:0.001*2*pi:2*pi));
+        hold on; plot3(real(circle),imag(circle),0.1*max(nn(:))*ones(1,length(circle)),'r','linewidth',3); hold off;
+      end
+      
       figure(4); clf; plot_specgram(real(rx_noise),Fs,0,2500);
 
       figure(5); clf; 
-      
       subplot(211); stem(t_max_log*(Ts+Tcp),Dtmax_log/(Nc+2));
       hold on; plot([1 nsymb*(Ts+Tcp)],[Dthresh Dthresh]/(Nc+2),'r--'); hold off;
       ylabel('$|D_{tmax}|$'); axis([1 nsymb*(Ts+Tcp) 0 2]);

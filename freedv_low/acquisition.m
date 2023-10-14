@@ -97,10 +97,12 @@ function sim_out = acq_test(sim_in)
 
   load_const;
   Pthresh = 1E-3;
-  t_thresh = 1;
-  f_thresh = 0.5
+  fmin_Rs = floor(-200/Rs);
+  fmax_Rs = ceil(200/Rs);
+  t_tol_syms = 1;
+  f_tol_Rs = 0.5
   timeStep = 2^(-5);
-  freqStep = 0.25;
+  freqStep = 0.5;
   if isfield(sim_in,"Pthresh")
       Pthresh = sim_in.Pthresh;
   end
@@ -145,20 +147,31 @@ function sim_out = acq_test(sim_in)
     rx_noise = rx + noise;
 
     % Sample Dt on grid of time and freq steps
+    % TODO: random freq offsets
    
-    nFreqSteps = length(-4:freqStep:4);
+    nFreqSteps = length(fmin_Rs:freqStep:fmax_Rs);
     nTimeSteps = nsymb/timeStep;
+  
     Dt = zeros(nFreqSteps,nTimeSteps);
+    f_offset_log =zeros(1,nTimeSteps);
     r = zeros(M,1);
     for s=1:timeStep:nsymb
+
       st = (s-1)*(M+Ncp)+1;
       en = st+M+Ncp-1;
       t_ind = s/timeStep;
 
-      for f_Rs=-4:freqStep:4;
+      % change freq offset every modem frame
+      if mod(s,Ns) == 1
+        f_offset_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs);
+        omega = 2*pi*f_offset_Rs*Rs/Fs;
+      end
+      f_offset_log(t_ind) = f_offset_Rs;
+
+      for f_Rs=fmin_Rs:freqStep:fmax_Rs;
         f_Hz = f_Rs*Rs;
         omega_hat = 2*pi*f_Hz/Fs;
-        r(:,1) = exp(-j*omega_hat*(0:M-1)).*rx_noise(st+Ncp:en);
+        r(:,1) = exp(j*(omega-omega_hat)*(0:M-1)).*rx_noise(st+Ncp:en);
         f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
         Dt(f_ind,t_ind) = r'*p;
       end
@@ -166,6 +179,9 @@ function sim_out = acq_test(sim_in)
 
     % count successful acquisitions
     Ncorrect = 0; Nfalse = 0;
+    Dtmax_log = [];
+    t_max_log = [];
+    f_max_log = [];
     for s=1:Ns:nsymb
 
       % threshold estimation for this modem frame
@@ -188,7 +204,7 @@ function sim_out = acq_test(sim_in)
       % Search for maxima over time and freq samples for this modem frame
       Dtmax = 0;
       for t_syms=s:timeStep:s+Ns-1
-        for f_Rs=-4:freqStep:4;
+        for f_Rs=fmin_Rs:freqStep:fmax_Rs;
           t_ind = t_syms/timeStep;
           f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
           if abs(Dt(f_ind,t_ind)) > Dtmax
@@ -199,18 +215,22 @@ function sim_out = acq_test(sim_in)
         end
       end
       if verbose == 2
-        printf("s: %4d t_max: %6.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", s, t_max, f_max, Dtmax, Dthresh);
+        printf("s: %4d t_max: %6.2f f_off: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", s, 
+               t_max, f_offset_log(s/timeStep), f_max, Dtmax, Dthresh);
       end
 
       if Dtmax > Dthresh
         % t_thresh in symbols, we expect t_max= 1, Ns+1, 2*Ns+1,...
-        % TODO: freq offsets
-        if abs(t_max-s) < t_thresh
+        if (abs(t_max-s) < t_tol_syms) && (abs(f_max-f_offset_log(s/timeStep)) < f_tol_Rs)
           Ncorrect++;
         else
           Nfalse++;
         end
       end
+
+      Dtmax_log = [Dtmax_log Dtmax];
+      t_max_log = [t_max_log t_max];
+      f_max_log = [f_max_log f_max-f_offset_log(s/timeStep)];
     end
     if verbose >= 1
         printf("EbNodB: %5.0f Pcorrect: %4.3f Pfalse: %4.3f\n", EbNodB, Ncorrect/nframes, Nfalse/nframes);
@@ -223,7 +243,8 @@ function sim_out = acq_test(sim_in)
         [textfontsize linewidth] = set_fonts();
       end
 
-      % Dt algorithm (variable threshold)
+      % Plot PDFs - note sigma will only be of last modem frame, so YMMV with non-stationary
+      % channels like MPP
       figure(1); clf;
       [h x]=hist(abs(Dt(:)),20);
       plot(x,h/trapz(x,h),'b;Histogram $|D_t|$;'); 
@@ -258,6 +279,14 @@ function sim_out = acq_test(sim_in)
       mesh(abs(Dt)/(Nc+2));
 
       figure(4); clf; plot_specgram(real(rx_noise),Fs,0,2500);
+
+      figure(5); clf; 
+      
+      subplot(211); stem(t_max_log*(Ts+Tcp),Dtmax_log/(Nc+2));
+      hold on; plot([1 nsymb*(Ts+Tcp)],[Dthresh Dthresh]/(Nc+2),'r--'); hold off;
+      ylabel('$|D_{tmax}|$'); axis([1 nsymb*(Ts+Tcp) 0 2]);
+      subplot(212); plot(t_max_log*(Ts+Tcp),f_max_log); ylabel('$\Delta$ Freq (Rs)');
+      xlabel('Time(s)'); axis([1 nsymb*(Ts+Tcp) fmin_Rs fmax_Rs]);
     end
 
   end

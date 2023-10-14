@@ -143,35 +143,76 @@ function sim_out = acq_test(sim_in)
 
     % Sample Dt on grid of time and freq steps
    
-    nFreqSteps = length(-4:freqStep:4)
-    nTimeSteps = nsymb/timeStep
+    nFreqSteps = length(-4:freqStep:4);
+    nTimeSteps = nsymb/timeStep;
     Dt = zeros(nFreqSteps,nTimeSteps);
     r = zeros(M,1);
     for s=1:timeStep:nsymb
       st = (s-1)*(M+Ncp)+1;
       en = st+M+Ncp-1;
+      t_ind = s/timeStep;
       for f_Rs=-4:freqStep:4;
         f_Hz = f_Rs*Rs;
         omega_hat = 2*pi*f_Hz/Fs;
         r(:,1) = exp(-j*omega_hat*(0:M-1)).*rx_noise(st+Ncp:en);
         f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
-        t_ind = s/timeStep;
         Dt(f_ind,t_ind) = r'*p;
       end
     end
 
-    sigma_est = std(Dt(:));
-    % remove outliers
-    Dt_prime = Dt(find(Dt(:) < 2*sigma_est));
-    sigma_prime_est = std(Dt_prime);
+    % count successful acquisitions
+    Ncorrect = 0; Nfalse = 0;
+    for s=1:Ns:nsymb
 
-    % Determine threshold
-    Dthresh = sigma_prime_est*sqrt(-log(Pthresh));
+      % threshold estimation for this modem frame
+      st_ind = s/timeStep;
+      en_ind = (s+Ns-1)/timeStep - 1;
+      Dt_col = reshape(Dt(:,st_ind:en_ind),nFreqSteps*(Ns-1)/timeStep,1);
+      sigma_est = std(Dt_col);
+      % remove outliers
+      Dt_prime = Dt(find(Dt_col < 2*sigma_est));
+      sigma_prime_est = std(Dt_prime);
 
-    sigma = sqrt(variance/M);
-    if verbose == 2
-      printf("signal_noise: %f sigma_est: %f sigma_prime_est: %f\n", sigma, sigma_est,sigma_prime_est);
+      % Determine threshold
+      Dthresh = sigma_prime_est*sqrt(-log(Pthresh));
+
+      sigma = sqrt(variance/M);
+      if verbose == 3
+        printf("signal_noise: %f sigma_est: %f sigma_prime_est: %f\n", sigma, sigma_est,sigma_prime_est);
+      end
+
+      % Search for maxima over time and freq samples for this modem frame
+      Dtmax = 0;
+      for t_syms=s:timeStep:s+Ns-1
+        for f_Rs=-4:freqStep:4;
+          t_ind = t_syms/timeStep;
+          f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
+          if abs(Dt(f_ind,t_ind)) > Dtmax
+            Dtmax = abs(Dt(f_ind,t_ind));
+            t_max = t_syms;
+            f_max = f_Rs;
+          end
+        end
+      end
+      if verbose == 2
+        printf("s: %3d t_max: %6.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f\n", s, t_max, f_max, Dtmax, Dthresh);
+      end
+
+      if Dtmax > Dthresh
+        % t_thresh in symbols, we expect t_max= 1, Ns+1, 2*Ns+1,...
+        % TODO: freq offsets
+        if abs(t_max-s) < t_thresh
+          Ncorrect++;
+        else
+          Nfalse++;
+        end
+      end
     end
+    if verbose >= 1
+        printf("EbNodB: %5.0f Pcorrect: %4.3f Pfalse: %4.3f\n", EbNodB, Ncorrect/nframes, Nfalse/nframes);
+    end
+    sim_out.Pcorrect(ne) = Ncorrect/nframes;
+    sim_out.Pfalse(ne) = Nfalse/nframes;
 
     if verbose == 2
       if epslatex
@@ -212,38 +253,6 @@ function sim_out = acq_test(sim_in)
       figure(4); clf; plot_specgram(real(rx_noise),Fs,0,2500);
     end
 
-    % count successful acquisitions
-    Ncorrect = 0; Nfalse = 0;
-    for s=1:Ns:nsymb
-
-      % Search for maxima over time and freq samples for this modem frame
-      Dtmax = 0;
-      for t_syms=s:timeStep:s+Ns-1
-        for f_Rs=-4:freqStep:4;
-          t_ind = t_syms/timeStep;
-          f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
-          if abs(Dt(f_ind,t_ind)) > Dtmax
-            Dtmax = abs(Dt(f_ind,t_ind));
-            t_max = t_syms;
-            f_max = f_Rs;
-          end
-        end
-      end
-      if Dtmax > Dthresh
-        % t_thresh in symbols, we expect t_max= 1, Ns+1, 2*Ns+1,...
-        % TODO: freq offsets
-        if abs(t_max-s) < t_thresh
-          Ncorrect++;
-        else
-          Nfalse++;
-        end
-      end
-    end
-    if verbose >= 1
-        printf("EbNodB: %5.0f Pcorrect: %4.3f Pfalse: %4.3f\n", EbNodB, Ncorrect/nframes, Nfalse/nframes);
-    end
-    sim_out.Pcorrect(ne) = Ncorrect/nframes;
-    sim_out.Pfalse(ne) = Nfalse/nframes;
   end
 endfunction
 
@@ -256,7 +265,8 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.ls_pilots   = 1;
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
-    
+    sim_in.Pthresh     = 1E-3;
+
     i = 1;
     while i <= length(varargin)
        if strcmp(varargin{i},"ch_phase")

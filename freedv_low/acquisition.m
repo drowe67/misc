@@ -108,7 +108,7 @@ function sim_out = acq_test(sim_in)
     epslatex = sim_in.epslatex;
   end
 
-  [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
+  [tx_bits tx P] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
   [spread1 spread2 hf_gain hf_en path_delay_samples] = gen_hf(ch,Fs,nsam);
   rx = tx;
   if hf_en
@@ -124,10 +124,13 @@ function sim_out = acq_test(sim_in)
   %tx = [zeros(1,timeOffset) tx];
   %nsam = length(tx);
 
-  % set up pilot samples, scale such that Ct_max = 1
-  p = zeros(M,1); p(:,1) = tx(Ncp+1:Ncp+M); assert(length(p) == M);
-  Dt_max = 1; p_scale = Dt_max*sqrt(p'*p)/(p'*p); p *= p_scale;
-
+  % set up pilot samples, scale such that Dt_max = 1
+  assert(Nd == 1); % TODO handle diversity
+  p=zeros(M,1);
+  for c=1:Nc+2
+    p += P(c)*exp(j*w(c)*(0:M-1)).';
+  end
+  
   for ne = 1:length(EbNovec)
     
     % work out noise power -------------
@@ -203,8 +206,10 @@ function sim_out = acq_test(sim_in)
         restore_fonts(textfontsize,linewidth);
       end
 
-      figure(3);
-      mesh(abs(Dt));
+      figure(3); clf;
+      mesh(abs(Dt)/(Nc+2));
+
+      figure(4); clf; plot_specgram(real(rx_noise),Fs,0,2500);
     end
 
     % count successful acquisitions
@@ -226,6 +231,7 @@ function sim_out = acq_test(sim_in)
       end
       if Dtmax > Dthresh
         % t_thresh in symbols, we expect t_max= 1, Ns+1, 2*Ns+1,...
+        % TODO: freq offsets
         if abs(t_max-s) < t_thresh
           Ncorrect++;
         else
@@ -248,13 +254,12 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.ch          = ch;
     sim_in.resampler   = "lin2";
     sim_in.ls_pilots   = 1;
-    sim_in.Nd          = 2;
+    sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
     
     i = 1;
     while i <= length(varargin)
-      varargin{i}
-      if strcmp(varargin{i},"ch_phase")
+       if strcmp(varargin{i},"ch_phase")
         sim_in.ch_phase = varargin{i+1}; i++;
       elseif strcmp(varargin{i},"Nd")
         sim_in.Nd = varargin{i+1}; i++;

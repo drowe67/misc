@@ -17,16 +17,16 @@ function P = barker_pilots(Nc)
   end
 endfunction
 
-function [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb)
+function [tx_bits tx P] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb)
     printf("Modulate to rate Rs OFDM symbols...\n");
-    P = barker_pilots(Nc); 
+    P = barker_pilots(Nc+2); 
     tx_symb = [];
     for f=1:nframes
       tx_bits = rand(1,nframes*nbitsperframe) > 0.5; bit = 1;
       % set up Nc x Ns array of symbols with pilots
       atx_symb = zeros(Nc,Ns); 
       for c=1:Nc
-        atx_symb(c,1) = P;
+        atx_symb(c,1) = P(c+1);
         for s=2:Ns
           atx_symb(c,s) = qpsk_mod(tx_bits(bit:bit+1)); bit += 2;
         end
@@ -40,8 +40,9 @@ function [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes
       atx_symb = tmp;
 
       % add "wingman" pilots for first and last carriers
-      wingman = [1 zeros(1,Ns-1)];
-      atx_symb = [wingman; atx_symb; wingman];
+      wingman_first = [P(1) zeros(1,Ns-1)];
+      wingman_last  = [P(Nc+1) zeros(1,Ns-1)];
+      atx_symb = [wingman_first; atx_symb; wingman_last];
 
       % normalise power when using diversity
       atx_symb *= 1/sqrt(Nd);

@@ -97,8 +97,9 @@ function sim_out = acq_test(sim_in)
 
   load_const;
   Pthresh = 1E-3;
-  t_thresh = 0.1;
-  timeStep = 0.25;
+  t_thresh = 1;
+  f_thresh = 0.5
+  timeStep = 2^(-5);
   freqStep = 0.25;
   if isfield(sim_in,"Pthresh")
       Pthresh = sim_in.Pthresh;
@@ -109,8 +110,15 @@ function sim_out = acq_test(sim_in)
   end
 
   [tx_bits tx P] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
+
+  % TODO: adjust success criteria if we introduce time offset
+  timeOffsetSamples = M*sim_in.timeOffsetSymbols;
+  tx = [zeros(1,timeOffsetSamples) tx];
+  nsam = length(tx);
+
   [spread1 spread2 hf_gain hf_en path_delay_samples] = gen_hf(ch,Fs,nsam);
-  rx = tx;
+
+  rx = tx .* exp(j*ch_phase);
   if hf_en
     printf("HF channel simulation...\n");
     x = path_delay_samples;
@@ -118,11 +126,6 @@ function sim_out = acq_test(sim_in)
     rx_hf(x+1:end) += hf_gain*spread2(1:nsam-x).*rx(1:nsam-x);
     rx = rx_hf;
   end
-
-  % TODO: adjust success criteria if we introduce time offset
-  %timeOffset = M*0;
-  %tx = [zeros(1,timeOffset) tx];
-  %nsam = length(tx);
 
   % set up pilot samples, scale such that Dt_max = 1
   assert(Nd == 1); % TODO handle diversity
@@ -151,6 +154,7 @@ function sim_out = acq_test(sim_in)
       st = (s-1)*(M+Ncp)+1;
       en = st+M+Ncp-1;
       t_ind = s/timeStep;
+
       for f_Rs=-4:freqStep:4;
         f_Hz = f_Rs*Rs;
         omega_hat = 2*pi*f_Hz/Fs;
@@ -172,7 +176,7 @@ function sim_out = acq_test(sim_in)
       % remove outliers
       Dt_prime = Dt(find(Dt_col < 2*sigma_est));
       sigma_prime_est = std(Dt_prime);
-
+      
       % Determine threshold
       Dthresh = sigma_prime_est*sqrt(-log(Pthresh));
 
@@ -195,7 +199,7 @@ function sim_out = acq_test(sim_in)
         end
       end
       if verbose == 2
-        printf("s: %3d t_max: %6.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f\n", s, t_max, f_max, Dtmax, Dthresh);
+        printf("s: %4d t_max: %6.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", s, t_max, f_max, Dtmax, Dthresh);
       end
 
       if Dtmax > Dthresh
@@ -225,7 +229,10 @@ function sim_out = acq_test(sim_in)
       plot(x,h/trapz(x,h),'b;Histogram $|D_t|$;'); 
       sigma_r = sigma_prime_est/sqrt(2);
       p = (x./(sigma_r*sigma_r)).*exp(-(x.^2)/(2*sigma_r*sigma_r));
-      hold on; plot(x,p,'g;Rayleigh PDF;'); hold off;
+      hold on; 
+      plot(x,p,'g;Rayleigh PDF;'); 
+      plot([Dthresh Dthresh],[0 max(p)*0.5],'r;Dthresh;')
+      hold off;
       legend('boxoff');
 
       if epslatex
@@ -261,15 +268,17 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.nbits       = nbits;
     sim_in.EbNovec     = EbNodB;
     sim_in.ch          = ch;
+    sim_in.ch_phase    = 0;
     sim_in.resampler   = "lin2";
     sim_in.ls_pilots   = 1;
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
     sim_in.Pthresh     = 1E-3;
+    sim_in.timeOffsetSymbols = 0;
 
     i = 1;
     while i <= length(varargin)
-       if strcmp(varargin{i},"ch_phase")
+      if strcmp(varargin{i},"ch_phase")
         sim_in.ch_phase = varargin{i+1}; i++;
       elseif strcmp(varargin{i},"Nd")
         sim_in.Nd = varargin{i+1}; i++;
@@ -281,6 +290,8 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.epslatex = 1;    
       elseif strcmp(varargin{i},"Pthresh")
         sim_in.Pthresh = varargin{i+1}; i++;    
+      elseif strcmp(varargin{i},"timeOffsetSymbols")
+        sim_in.timeOffsetSymbols = varargin{i+1}; i++;    
       else
         printf("\nERROR unknown argument: %s\n", varargin{i});
         return;

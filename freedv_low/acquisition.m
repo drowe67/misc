@@ -100,7 +100,7 @@ function sim_out = acq_test(sim_in)
   fmin_Rs = floor(-200/Rs);
   fmax_Rs = ceil(200/Rs);
   t_tol_syms = 1;
-  f_tol_Rs = 0.5
+  f_tol_Rs = 0.5;
   timeStep = 2^(-5);
   freqStep = 0.5;
   if isfield(sim_in,"Pthresh")
@@ -118,10 +118,11 @@ function sim_out = acq_test(sim_in)
   tx = [zeros(1,timeOffsetSamples) tx];
   nsam = length(tx);
 
-  [spread1 spread2 hf_gain hf_en path_delay_samples] = gen_hf(ch,Fs,nsam);
-
   rx = tx .* exp(j*ch_phase);
-  if hf_en
+  hf_en = 0;
+  if !strcmp(ch,'awgn')
+    hf_en = 1;
+    [spread1 spread2 hf_gain path_delay_samples] = gen_hf(ch,Fs,nsam);
     printf("HF channel simulation...\n");
     x = path_delay_samples;
     rx_hf = hf_gain*spread1(1:nsam).*rx;
@@ -278,10 +279,11 @@ function sim_out = acq_test(sim_in)
 
       figure(3); clf;
       [nn cc] = hist3([real(Dt(:)) imag(Dt(:))],[25 25]);
-      mesh(cc{1},cc{2},nn)
+      mesh(cc{1},cc{2},nn);
+      hidden('off')
       if isfield(sim_in,"Pthresh")
         circle = Dthresh*exp(j*(0:0.001*2*pi:2*pi));
-        hold on; plot3(real(circle),imag(circle),0.1*max(nn(:))*ones(1,length(circle)),'r','linewidth',3); hold off;
+        hold on; plot3(real(circle),imag(circle),zeros(1,length(circle)),'r','linewidth',3); hold off;
       end
       
       figure(4); clf; plot_specgram(real(rx_noise),Fs,0,2500);
@@ -336,7 +338,71 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     acq_test(sim_in);
 endfunction
 
+% usage: acquisition; run_curves(0.1)
+function run_curves(runtime_scale=0,epslatex=0)
+    sim_in.verbose     = 1;
+    sim_in.ch_phase    = 0;
+    sim_in.resampler   = "lin2";
+    sim_in.ls_pilots   = 1;
+    sim_in.Nd          = 1;
+    sim_in.combining   = 'mrc';
+    sim_in.Pthresh     = 1E-3;
+    sim_in.timeOffsetSymbols = 0;
 
+    % run long enough to get sensible results, using rec from ITUT F.1487
+    Fd_min = 1; run_time_s = 3000/Fd_min; Rb = 100;
+    % default 0.1*run_time_s actually gives results close to theory
+    run_time_s *= runtime_scale;
+    sim_in.nbits = floor(run_time_s*Rb);
+    printf("runtime (s): %f\n", run_time_s);
+
+    EbNovec = 0:10; sim_in.EbNovec = EbNovec;
+    sim_in.ch = 'awgn'; awgn = acq_test(sim_in);
+    sim_in.ch = 'mpp'; mpp = acq_test(sim_in);
+    sim_in.ch = 'mpd'; mpd = acq_test(sim_in);
+    sim_in.ch = 'notch'; notch = acq_test(sim_in);
+
+    if epslatex
+      [textfontsize linewidth] = set_fonts();
+    end
+
+    figure(6); clf; hold on;
+    plot(EbNovec,awgn.Pcorrect,'b+-;Pcorrect AWGN;');
+    plot(EbNovec,awgn.Pfalse,'b+-;Pfalse AWGN;');
+    plot(EbNovec,mpp.Pcorrect,'g+-;Pcorrect MPP;');
+    plot(EbNovec,mpp.Pfalse,'g+-;Pfalse MPP;');
+    plot(EbNovec,mpd.Pcorrect,'r+-;Pcorrect MPD;');
+    plot(EbNovec,mpd.Pfalse,'r+-;Pfalse MPD;');
+    plot(EbNovec,notch.Pcorrect,'c+-;Pcorrect Notch;');
+    plot(EbNovec,notch.Pfalse,'c+-;Pfalse Notch;');
+    hold off; axis([min(EbNovec) max(EbNovec) 0 1]); grid;
+    xlabel('Eb/No (dB)'); legend('boxoff'); legend('location','east');
+
+    if epslatex
+      fn = "acq_curves.tex";
+      print(fn,"-depslatex","-S350,250");
+      printf("printing... %s\n", fn);
+      restore_fonts(textfontsize,linewidth);
+    end
+   
+endfunction
+
+% automated spot checks for acquisition (useful ctests in C implementation)
+function test_cases(nbits=1E5,ch='awgn',epslatex=0)
+    sim_in.verbose     = 1;
+    sim_in.nbits       = nbits;
+    sim_in.EbNovec     = [-100 0 10 100];
+    sim_in.ch          = ch;
+    sim_in.resampler   = "lin2";
+    sim_in.ls_pilots   = 1;
+    sim_in.Nd          = 1;
+    sim_in.combining   = 'mrc';
+    sim_in.epslatex    = epslatex;
+
+    acq_test(sim_in);
+endfunction
+
+% checking our scale parameter mapping for Rayleigh
 function test_rayleigh
   N = 1E6;
   % total power in noise is sigma_n^2
@@ -352,21 +418,8 @@ function test_rayleigh
   hold off; grid;
 end
 
-function test_cases(nbits=1E5,ch='awgn',epslatex=0)
-    sim_in.verbose     = 1;
-    sim_in.nbits       = nbits;
-    sim_in.EbNovec     = [-100 0 10 100];
-    sim_in.ch          = ch;
-    sim_in.resampler   = "lin2";
-    sim_in.ls_pilots   = 1;
-    sim_in.Nd          = 1;
-    sim_in.combining   = 'mrc';
-    sim_in.epslatex    = epslatex;
-
-    acq_test(sim_in);
-endfunction
-
-% just inner term of Dt summation
+% Exploring inner term of Dt summation, comparing derived sinc() form to
+% initial form with summation
 function sweep_q_inner
   Fs=8000; Rs=50; M=Fs/Rs;
   log_q = []; log_Dt = [];
@@ -383,8 +436,8 @@ function sweep_q_inner
   hold off;
 endfunction
 
-% with outer terms, PcPd terms don't cancel except at omega=0,
-% the actual reinforce which makes it better athan 
+% Exploring complete expression for Dt, sweeping across freq as a function of q. 
+% Note PcPd terms don't cancel except at omega=0 
 function sweep_q(Nc=16, epslatex=0)
   Fs=8000; Rs=50; M=Fs/Rs;
   P = barker_pilots(Nc); 

@@ -30,11 +30,11 @@ This document explores ways we can improve the existing OFDM modem waveforms in 
 
 \subsection{Summary of Improvements}
 
-Compared to existing FreeDV 700D/700E algorithms:
+Compared to the baseline FreeDV 700D/E waveforms:
 \begin{enumerate}
-\item New equalisation algorithm that performs well on a range of AWGN and multipath channels, removing the need for modes.
-\item Diversity in frequency and possibly time providing around 3dB improvement on multipath channels.  
-\item Dynamic threshold and pilot symbol selection for more robust acquisition. 
+\item New equalisation algorithm that performs well on a range of AWGN and multipath channels, removing the need for modes, and providing several dB improvement for 700E users.
+\item Diversity in frequency and possibly time providing around 3dB improvement over 700D on multipath channels.  
+\item Dynamic threshold and pilot symbol selection for $\pm 200$ Hz acquisition  (four times wider that 700D/E) at lower SNR, simplifying end user tuning.
 \end{enumerate}
 
 \clearpage
@@ -55,6 +55,7 @@ Compared to existing FreeDV 700D/700E algorithms:
  GEO & Geosynchronous satellite channel, AWGN but high phase noise and large freq offset \\
  OTA & Over The Air \\
  PTT & Push To Talk - voice communications where only one person is transmitting at any one time.  Common in two way radio but not mobile telephones  \\
+ MPG & Multipath Good channel, 0.1 Hz Doppler spread, 0.5ms delay spread \\
  MPP & Multipath Poor channel, 1 Hz Doppler spread, 2ms delay spread, typical for US and Australian interstate propagation \\
  MPD & Multipath Disturbed channel, 2 Hz Doppler spread, 4ms delay spread, typical for UK Winter NVIS propagation \\
  \hline
@@ -834,6 +835,20 @@ When $\hat{\omega} = \omega$, the two frequency shift terms will cancel out and 
 
 Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels.
 
+\begin{figure}[H]
+\caption{Probability of acquisition for a range of channels and SNRs for 300 seconds of simulated $N_c=16, N_d=1, 1400$ bits/s signal. Correct acquisition is defined as a timing error of $< \pm R_s$ and frequency error of $< \pm 0.5R_s$.  False acquisition occurs when we exceed the threshold for detection but the estimates are outside the success tolerances.}
+\label{fig:acq_curves}
+\begin{center}
+\input acq_curves.tex
+\end{center}
+\end{figure}
+
+TODO: CPU estimates, especially with +/- 200 Hz frequency offset estimation.
+
+\subsection{Frequency Offset Refinement and Tracking}
+
+TODO
+
 \subsection{Pilot Carriers}
 
 A common acquisition strategy is to add one or more pilot carriers to aid frequency offset estimation. These carriers consume power and carry no payload data so an increase in the threshold SNR is required to maintain the voice link. Consider the effect on $E_b$ when adding an additional carrier:
@@ -856,6 +871,7 @@ L_{pc} &= 10log_{10}\left(\frac{N_c+1}{N_c}\right)
 \end{equation}
 where $L_{pc}$ is the loss in dB for adding a single pilot carrier.  For example given a 16 carrier waveform, $L_{pc}=10log_{10}(17/16)=0.26 \si{dB}$, which is quite modest for the potential gains in acquisition performance.  A pilot carrier will also be visible on a real time waterfall and provide a useful manual tuning aid.
 
+At this stage it does not appear necessary to add pilot carriers to meet our performance goals.
 
 \subsection{Acquisition TODO}
 

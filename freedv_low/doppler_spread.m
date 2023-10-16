@@ -4,8 +4,8 @@
 % Returns gausssian filtered doppler spreading function samples for HF channel
 % modelling.  Used PathSim technical guide as a reference - thanks Moe!
 
-function [spread_FsHz states] = doppler_spread(dopplerSpreadHz, FsHz, Nsam)
-
+function [spread_FsHz states] = doppler_spread(dopplerSpreadHz, FsHz, Nsam, verbose=0)
+  
   % start with low Fs so we can work with a reasonable filter length
 
   sigma = dopplerSpreadHz/2;
@@ -17,8 +17,12 @@ function [spread_FsHz states] = doppler_spread(dopplerSpreadHz, FsHz, Nsam)
     M = floor(M);
     lowFs = FsHz/M;
   end
-  Nsam_low = ceil(Nsam/M);
-  
+  % we need at least 2 samples to use interp1()
+  Nsam_low = max(ceil(Nsam/M),2);
+  if verbose
+    printf("lowFs: %f M: %d Nsam: %d Nsam_low: %d\n", lowFs, M, Nsam, Nsam_low);
+  end
+
   % generate gaussian freq response and design filter
 
   x = 0:lowFs/100:lowFs/2;

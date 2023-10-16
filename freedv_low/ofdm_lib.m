@@ -68,26 +68,27 @@ endfunction
 
 
 % init HF model
-function [spread1 spread2 hf_gain hf_en path_delay_samples] = gen_hf(ch,Fs,nsam)
+function [spread1 spread2 hf_gain path_delay_samples] = gen_hf(ch,Fs,nsam)
   printf("Generating HF model spreading samples...\n")
-  hf_en = 0; spread1 = []; spread2 = []; hf_gain = 0; path_delay_samples = 0;
-  if strcmp(ch,"mpp") || strcmp(ch,"mpd")
-    hf_en = 1;
-    % some typical values
+  assert( strcmp(ch,"mpg") ||strcmp(ch,"mpp") || strcmp(ch,"mpd") );
 
-    if strcmp(ch,"mpp")
-      dopplerSpreadHz = 1.0; path_delay_s = 2E-3;
-    else
-      dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
-    end
-    path_delay_samples = round(path_delay_s*Fs);
-    
-    spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam);
-    spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam);
-
-    % normalise power through HF channel
-    hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
+  if strcmp(ch,"mpg")
+    dopplerSpreadHz = 0.1; path_delay_s = 0.5E-3;
   end
+  if strcmp(ch,"mpp")
+    dopplerSpreadHz = 1.0; path_delay_s = 2E-3;
+  end
+  if strcmp(ch,"mpd")
+    dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
+  end
+  path_delay_samples = round(path_delay_s*Fs);
+  
+  spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+  spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+
+  % normalise power through HF channel
+  hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
+
 endfunction
 
 function [textfontsize linewidth] = set_fonts(font_size=12)

@@ -70,21 +70,36 @@ endfunction
 % init HF model
 function [spread1 spread2 hf_gain path_delay_samples] = gen_hf(ch,Fs,nsam)
   printf("Generating HF model spreading samples...\n")
-  assert( strcmp(ch,"mpg") ||strcmp(ch,"mpp") || strcmp(ch,"mpd") );
+  if strcmp(ch,"mpg") || strcmp(ch,"mpp") || strcmp(ch,"mpd")  
+    if strcmp(ch,"mpg")
+      dopplerSpreadHz = 0.1; path_delay_s = 0.5E-3;
+    end
+    if strcmp(ch,"mpp")
+      dopplerSpreadHz = 1.0; path_delay_s = 2E-3;
+    end
+    if strcmp(ch,"mpd")
+      dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
+    end
+    
+    spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+    spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam);
+  elseif strcmp(ch,"notch")
+    % deep notch that slowly cycles between 500 and 1500 Hz
+    spread1 = ones(1,nsam);
+    path_delay_s = 1E-3;
+    f_low = 500; f_high = 1500;
+    w_low = 2*pi*f_low/Fs; w_high = 2*pi*f_high/Fs;
+    w_mid = (w_low+w_high)/2;
+    w_amp = (w_high - w_low)/2;
+    notch_cycle_s = 60; notch_w = 2*pi/(notch_cycle_s*Fs);
+    w = w_mid + w_amp*cos((1:nsam)*notch_w);
+    spread2 = exp(-j*(pi + w*path_delay_s*Fs));
+  else
+    printf("channel model %s unknown!\n", ch);
+    assert(0);
+  end
 
-  if strcmp(ch,"mpg")
-    dopplerSpreadHz = 0.1; path_delay_s = 0.5E-3;
-  end
-  if strcmp(ch,"mpp")
-    dopplerSpreadHz = 1.0; path_delay_s = 2E-3;
-  end
-  if strcmp(ch,"mpd")
-    dopplerSpreadHz = 2.0; path_delay_s = 4E-3;
-  end
   path_delay_samples = round(path_delay_s*Fs);
-  
-  spread1 = doppler_spread(dopplerSpreadHz, Fs, nsam);
-  spread2 = doppler_spread(dopplerSpreadHz, Fs, nsam);
 
   % normalise power through HF channel
   hf_gain = 1.0/sqrt(var(spread1)+var(spread2));

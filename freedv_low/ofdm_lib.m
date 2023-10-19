@@ -93,6 +93,8 @@ function [spread1 spread2 hf_gain path_delay_samples] = gen_hf(ch,Fs,nsam)
     w_amp = (w_high - w_low)/2;
     notch_cycle_s = 60; notch_w = 2*pi/(notch_cycle_s*Fs);
     w = w_mid + w_amp*cos((1:nsam)*notch_w);
+    % we use H(e^(jw)) = G1 + G2exp^(jwdFs)
+    % set G1=1, |G2|=1, and find arg(G2) for H(e^(jw)) = 0
     spread2 = exp(-j*(pi + w*path_delay_s*Fs));
   else
     printf("channel model %s unknown!\n", ch);

@@ -99,6 +99,7 @@ function sim_out = acq_test(sim_in)
   Pthresh = 1E-3;
   fmin_Rs = floor(-200/Rs);
   fmax_Rs = ceil(200/Rs);
+  
   t_tol_syms = 1;
   f_tol_Rs = 0.5;
   timeStep = 2^(-5);
@@ -111,10 +112,16 @@ function sim_out = acq_test(sim_in)
     epslatex = sim_in.epslatex;
   end
 
+  nFreqSteps = length(fmin_Rs:freqStep:fmax_Rs)
+  nTimeSteps = nsymb/timeStep
+ 
   [tx_bits tx P] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
 
   % TODO: adjust success criteria if we introduce time offset
-  timeOffsetSamples = M*sim_in.timeOffsetSymbols;
+  timeOffsetSamples = 0;
+  if isfield(sim_in,"timeOffsetSymbols")
+    timeOffsetSamples = M*sim_in.timeOffsetSymbols;
+  end
   tx = [zeros(1,timeOffsetSamples) tx];
   nsam = length(tx);
 
@@ -148,11 +155,7 @@ function sim_out = acq_test(sim_in)
     rx_noise = rx + noise;
 
     % Sample Dt on grid of time and freq steps
-    % TODO: random freq offsets
    
-    nFreqSteps = length(fmin_Rs:freqStep:fmax_Rs);
-    nTimeSteps = nsymb/timeStep;
-  
     Dt = zeros(nFreqSteps,nTimeSteps);
     f_offset_log =zeros(1,nTimeSteps);
     r = zeros(M,1);
@@ -160,7 +163,7 @@ function sim_out = acq_test(sim_in)
 
       st = (s-1)*(M+Ncp)+1;
       en = st+M+Ncp-1;
-      t_ind = s/timeStep;
+      t_ind = s/timeStep-1/timeStep+1; % as s starts at 1, annoying Octave off by 1 issues :(
 
       % change freq offset every modem frame
       if mod(s,Ns) == 1
@@ -179,34 +182,32 @@ function sim_out = acq_test(sim_in)
     end
 
     % count successful acquisitions
-    Ncorrect = 0; Nfalse = 0;
+    Ncorrect = 0; Nfalse = 0; Ndetect = 0;
     Dtmax_log = [];
     t_max_log = [];
     f_max_log = [];
     for s=1:Ns:nsymb
 
       % threshold estimation for this modem frame
-      st_ind = s/timeStep;
-      en_ind = (s+Ns-1)/timeStep - 1;
-      Dt_col = reshape(Dt(:,st_ind:en_ind),nFreqSteps*(Ns-1)/timeStep,1);
+      st_ind = s/timeStep - 1/timeStep + 1;
+      en_ind = st_ind + Ns/timeStep - 1;
+      Dt_col = reshape(Dt(:,st_ind:en_ind),nFreqSteps*Ns/timeStep,1);
+
       sigma_est = std(Dt_col);
-      % remove outliers
-      Dt_prime = Dt(find(Dt_col < 2*sigma_est));
-      sigma_prime_est = std(Dt_prime);
-      
+ 
       % Determine threshold
-      Dthresh = sigma_prime_est*sqrt(-log(Pthresh));
+      Dthresh = sigma_est*sqrt(-log(Pthresh));
 
       sigma = sqrt(variance/M);
       if verbose == 3
-        printf("signal_noise: %f sigma_est: %f sigma_prime_est: %f\n", sigma, sigma_est,sigma_prime_est);
+        printf("signal_noise: %f sigma_est: %fn", sigma, sigma_est);
       end
 
       % Search for maxima over time and freq samples for this modem frame
       Dtmax = 0;
-      for t_syms=s:timeStep:s+Ns-1
+      for t_syms=s:timeStep:s+Ns-timeStep
         for f_Rs=fmin_Rs:freqStep:fmax_Rs;
-          t_ind = t_syms/timeStep;
+          t_ind = t_syms/timeStep-1/timeStep+1;
           f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
           if abs(Dt(f_ind,t_ind)) > Dtmax
             Dtmax = abs(Dt(f_ind,t_ind));
@@ -215,12 +216,14 @@ function sim_out = acq_test(sim_in)
           end
         end
       end
+      
       if verbose == 2
         printf("s: %4d t_max: %6.2f f_off: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", s, 
                t_max, f_offset_log(s/timeStep), f_max, Dtmax, Dthresh);
       end
 
       if Dtmax > Dthresh
+        Ndetect++;
         % t_thresh in symbols, we expect t_max= 1, Ns+1, 2*Ns+1,...
         if (abs(t_max-s) < t_tol_syms) && (abs(f_max-f_offset_log(s/timeStep)) < f_tol_Rs)
           Ncorrect++;
@@ -233,11 +236,20 @@ function sim_out = acq_test(sim_in)
       t_max_log = [t_max_log t_max];
       f_max_log = [f_max_log f_max-f_offset_log(s/timeStep)];
     end
+
+    Det_per_sec = Ndetect/(nsymb*(Ts+Tcp));
     if verbose >= 1
-        printf("EbNodB: %5.0f Pcorrect: %4.3f Pfalse: %4.3f\n", EbNodB, Ncorrect/nframes, Nfalse/nframes);
+        printf("EbNodB: %5.0f Nframes: %d Ndetect: %d Pcorrect: %4.3f Pfalse: %4.3f Det/s: %4.3f\n", EbNodB, nframes, Ndetect, Ncorrect/nframes, Nfalse/nframes, Det_per_sec);
+        % prob of 1 or more detections per second if we just have noise at the input
+        nTimeStepPerFrame = Ns/timeStep
+        nSamplesPerModemFrame = nFreqSteps*nTimeStepPerFrame
+        PdetectPerModemFrame = 1 - binopdf(0,nSamplesPerModemFrame,Pthresh);
+        ModemFramesPerSec = 1/((Ts+Tcp)*Ns);
+        printf("PdetectPerModemFrame: %f Expected detections/s on noise only: %f\n", PdetectPerModemFrame, PdetectPerModemFrame*ModemFramesPerSec);
     end
     sim_out.Pcorrect(ne) = Ncorrect/nframes;
     sim_out.Pfalse(ne) = Nfalse/nframes;
+    sim_out.Det_per_sec = Det_per_sec;
 
     if verbose == 2
       if epslatex
@@ -249,7 +261,7 @@ function sim_out = acq_test(sim_in)
       figure(1); clf;
       [h x]=hist(abs(Dt(:)),20);
       plot(x,h/trapz(x,h),'b;Histogram $|D_t|$;'); 
-      sigma_r = sigma_prime_est/sqrt(2);
+      sigma_r = sigma_est/sqrt(2);
       p = (x./(sigma_r*sigma_r)).*exp(-(x.^2)/(2*sigma_r*sigma_r));
       hold on; 
       plot(x,p,'g;Rayleigh PDF;'); 
@@ -291,7 +303,8 @@ function sim_out = acq_test(sim_in)
       figure(5); clf; 
       subplot(211); stem(t_max_log*(Ts+Tcp),Dtmax_log/(Nc+2));
       hold on; plot([1 nsymb*(Ts+Tcp)],[Dthresh Dthresh]/(Nc+2),'r--'); hold off;
-      ylabel('$|D_{tmax}|$'); axis([1 nsymb*(Ts+Tcp) 0 2]);
+
+      ylabel('$|D_{tmax}|$'); axis([1 nsymb*(Ts+Tcp) 0 max(Dtmax_log/(Nc+2))]);
       subplot(212); plot(t_max_log*(Ts+Tcp),f_max_log); ylabel('$\Delta$ Freq (Rs)');
       xlabel('Time(s)'); axis([1 nsymb*(Ts+Tcp) fmin_Rs fmax_Rs]);
     end
@@ -299,6 +312,9 @@ function sim_out = acq_test(sim_in)
   end
 endfunction
 
+% run test with a single EbNo point, lots of plots.  Useful for development/debug
+% usage: 
+%  acquisition; run_single(nbits=1E4,ch='mpp')
 function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.verbose     = 2;
     sim_in.nbits       = nbits;
@@ -387,19 +403,27 @@ function run_curves(runtime_scale=0,epslatex=0)
    
 endfunction
 
-% automated spot checks for acquisition (useful ctests in C implementation)
-function test_cases(nbits=1E5,ch='awgn',epslatex=0)
+% automated spot checks for acquisition (candidates for ctests in C implementation)
+function spot_checks(nbits=1E5)
     sim_in.verbose     = 1;
     sim_in.nbits       = nbits;
-    sim_in.EbNovec     = [-100 0 10 100];
-    sim_in.ch          = ch;
     sim_in.resampler   = "lin2";
     sim_in.ls_pilots   = 1;
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
-    sim_in.epslatex    = epslatex;
+ 
+    sim_in.ch = 'awgn'; sim_in.EbNovec = 2;  sim_out = acq_test(sim_in);
+    printf("AWGN Pcorrect: %4.2f Pfalse: %4.2f", sim_out.Pcorrect, sim_out.Pfalse);  
+    if sim_out.Pcorrect > 0.95, printf(" [PASS]\n"); else printf(" [FAIL]\n"); end
 
-    acq_test(sim_in);
+    sim_in.ch = 'mpp'; sim_in.EbNovec = 7; sim_out = acq_test(sim_in);
+    printf("MPP Pcorrect: %4.2f Pfalse: %4.2f", sim_out.Pcorrect, sim_out.Pfalse);  
+    if sim_out.Pcorrect > 0.75, printf(" PASS]\n"); else printf(" [FAIL]\n"); end
+ 
+    sim_in.ch = 'awgn'; sim_in.EbNovec = -100;  sim_out = acq_test(sim_in);
+    printf("Noise only Pcorrect: %4.2f Pfalse: %4.2f", sim_out.Pcorrect, sim_out.Pfalse);  
+    if sim_out.Pfalse < 0.05, printf(" [PASS]\n"); else printf(" FAIL]\n"); end
+
 endfunction
 
 % checking our scale parameter mapping for Rayleigh

@@ -240,15 +240,14 @@ function sim_out = acq_test(sim_in)
     % mean time between detections (either true of false), for noise only case Tdet = Tnoise
     Tdet = (nsymb*(Ts+Tcp))/Ndetect;
     if verbose >= 1
-        printf("EbNodB: %5.0f Nframes: %d Ndetect: %d Pcorrect: %4.3f Pfalse: %4.3f Tdet/Tnoise: %4.3f\n", 
-                EbNodB, nframes, Ndetect, Ncorrect/nframes, Nfalse/nframes, Tdet);
-        % prob of 1 or more detections per second if we just have noise at the input
-        nTimeStepPerFrame = Ns/timeStep
+        nTimeStepPerFrame = Ns/timeStep;
         nSamplesPerModemFrame = nFreqSteps*nTimeStepPerFrame;
+        % prob of 1 or more detections per second if we just have noise at the input
         PnoisePerFrame = 1 - binopdf(0,nSamplesPerModemFrame,Pthresh);
         Tf = (Ts+Tcp)*Ns;
-        printf("Pnoise per frame: %f Tnoise (theory): %f\n", PnoisePerFrame, Tf/PnoisePerFrame);
-    end
+        printf("EbNodB: %4.0f Nframes: %d Ndetect: %4d Pcorrect: %4.3f Pfalse: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f\n", 
+                EbNodB, nframes, Ndetect, Ncorrect/nframes, Nfalse/nframes, Tdet, PnoisePerFrame, Tf/PnoisePerFrame);
+     end
 
     sim_out.Pcorrect(ne) = Ncorrect/nframes;
     sim_out.Pfalse(ne) = Nfalse/nframes;
@@ -328,7 +327,7 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.ls_pilots   = 1;
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
-    sim_in.Pthresh     = 1E-3;
+    sim_in.Pthresh     = 3E-5;
     sim_in.timeOffsetSymbols = 0;
 
     i = 1;
@@ -365,7 +364,7 @@ function run_curves(runtime_scale=0,epslatex=0)
     sim_in.ls_pilots   = 1;
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
-    sim_in.Pthresh     = 1E-3;
+    sim_in.Pthresh     = 3E-5;
     sim_in.timeOffsetSymbols = 0;
 
     % run long enough to get sensible results, using rec from ITUT F.1487

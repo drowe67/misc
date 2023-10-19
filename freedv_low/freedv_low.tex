@@ -812,32 +812,6 @@ The frequency offset can be estimated by adding a frequency correction term $\ha
 \end{equation}
 When $\hat{\omega} = \omega$, the two frequency shift terms will cancel out and we will be left with the ideal  case, maximising $\hat{D}_t$. The frequency offset can therefore be found by sampling (\ref{eq:corr_freq}) on a sufficiently fine grid of $\hat{\omega}$.  Figure \ref{fig:acq_dt_q} suggests sampling $\hat{D}_t$ with $0.5R_s$ Hz steps would be sufficient to bracket the maxima.  
 
-\subsection{Acquisition Algorithm}
-
-The new acquisition algorithm is therefore:
-\begin{enumerate}
-\item Using simulation results set a threshold $P_{thresh}$ such that $D_t < D_{thresh}$ with noise alone but $D_t > D_{thresh}$ when signal is present for $E_b/N_0 > 0$ dB.
-\item At run time, extract a $T_f$ long window of samples (one modem frame).
-\item Calculate a set of $D_t$ values over the window on a grid of time and frequency offsets.
-\item Find the peak $D_{tmax}$ over the set of $D_t$ samples.
-\item Estimate the standard deviation $\sigma$ over the set of $D_t$ samples.
-\item Calculate $D_{thresh}$ using (\ref{eq:corr_prob}).
-\item If $D_{tmax} > D_{thresh}$ we have found a candidate $p(n)$ sequence and the start of a modem frame.
-\end{enumerate}
-Note that unlike the existing 700D/E acquisition algorithm $D_{thresh}$ is dynamic, and based on the standard deviation of the received signal.
-
-Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels.
-
-Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm over a range of channels.
-
-\begin{figure}[H]
-\caption{Probability of acquisition for a range of channels and SNRs for 300 seconds of simulated $N_c=16, N_d=1, 1400$ bits/s signal. Correct acquisition is defined as a timing error of $< \pm R_s$ and frequency error of $< \pm 0.5R_s$.  False acquisition occurs when $D_{tmax} > D_{thresh}$ but the estimates are outside the success tolerances.}
-\label{fig:acq_curves}
-\begin{center}
-\input acq_curves.tex
-\end{center}
-\end{figure}
-
 \subsection{False Acquisition on Noise}
 
 Consider a noise only signal being fed to acquisition system.  We desire a low probability of false detection, to avoid background noise "breaking squelch".  This can be conveniently defined in the mean time between false detections on noise $T_{noise}$ (units s).  Now a false detection occurs if one of more samples of $D_t$ over a modem frame exceeds $D_{thresh}$, which has a probability of $P_{thresh}$ (\ref{eq:prob_thresh}).  We sample $D_t$ on a grid of $N$ time and $M$ frequency points or $N_g=NM$ samples in total. The Binomial distribution can be used to compute the probability of an event occurring $x$ times from $n$ trials, if each event has probability $p$:
@@ -865,23 +839,51 @@ Table \ref{tab:noise_false_comparsion} presents typical simulation results.  Thi
 
 \begin{table}[h]
 \centering
-\begin{tabular}{c c c c}
+\begin{tabular}{r c c c}
  \hline
  $P_{thresh}$ & $P_{noise}$ theory & $T_{noise}$ theory & $T_{noise}$ simulated \\
  \hline
- $10^{-4}$ & 0.352 & 0.54 & 0.70 \\
- $10^{-5}$ & 0.043 & 4.51 & 5.75 \\
+ $\num{e-4}$ & 0.352 & 0.54 & 0.70 \\
+ $\num{3e-5}$ & 0.122 & 1.57 & 1.96 \\
+ $\num{e-5}$ & 0.043 & 4.51 & 5.75 \\
  \hline
 \end{tabular}
 \caption{Comparison of the time between false acquisition events with a noise only signal (in seconds), for an 86 second (449 frame) simulation. The difference can be explained by the approximate fit of $D_t$ to the Rayleigh distribution, as shown in Figure \ref{fig:acq_dt_hist}.}
 \label{tab:noise_false_comparsion}
 \end{table}
 
+\subsection{Acquisition Algorithm}
+
+The new acquisition algorithm is therefore:
+\begin{enumerate}
+\item Using simulation results set a threshold $P_{thresh}$ such that $D_t < D_{thresh}$ with noise alone but $D_t > D_{thresh}$ when signal is present for $E_b/N_0 > 0$ dB.
+\item At run time, extract a $T_f$ long window of samples (one modem frame).
+\item Calculate a set of $D_t$ values over the window on a grid of time and frequency offsets.
+\item Find the peak $D_{tmax}$ over the set of $D_t$ samples.
+\item Estimate the standard deviation $\sigma$ over the set of $D_t$ samples.
+\item Calculate $D_{thresh}$ using (\ref{eq:corr_prob}).
+\item If $D_{tmax} > D_{thresh}$ we have found a candidate $p(n)$ sequence and the start of a modem frame. Proceed to post processing.
+\end{enumerate}
+Note that unlike the existing 700D/E acquisition algorithm $D_{thresh}$ is dynamic, and based on the standard deviation of the received signal.
+
+Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels.
+
+Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm over a range of channels.
+
+\begin{figure}[H]
+\caption{Probability of acquisition for a range of channels and SNRs for 300 seconds of simulated $N_c=16, N_d=1, 1400$ bits/s signal, $P_{thresh}=\num{3e-5}$. Correct acquisition is defined as a timing error of $< \pm R_s$ and frequency error of $< \pm 0.5R_s$.  False acquisition occurs when $D_{tmax} > D_{thresh}$ but the estimates are outside the success tolerances  In this case we rely on post processing to reject the acquisition attempt.}
+\label{fig:acq_curves}
+\begin{center}
+\input acq_curves.tex
+\end{center}
+\end{figure}
+
 \subsection{CPU estimates}
 
 TODO 
 
 Estimate MIP with +/- 200 Hz frequency offset estimation. Compare to 700D.  Suggestions for strategies.
+Compare to load when demodulating
 
 \subsection{Frequency Offset Refinement and Tracking}
 

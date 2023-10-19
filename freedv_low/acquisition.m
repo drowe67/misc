@@ -99,7 +99,8 @@ function sim_out = acq_test(sim_in)
   Pthresh = 1E-3;
   fmin_Rs = floor(-200/Rs);
   fmax_Rs = ceil(200/Rs);
-  
+  %fmin_Rs = fmax_Rs = 0;
+
   t_tol_syms = 1;
   f_tol_Rs = 0.5;
   timeStep = 2^(-5);
@@ -117,6 +118,7 @@ function sim_out = acq_test(sim_in)
  
   [tx_bits tx P] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
 
+  % Fixed timing offset applied to entire simulation
   % TODO: adjust success criteria if we introduce time offset
   timeOffsetSamples = 0;
   if isfield(sim_in,"timeOffsetSymbols")
@@ -157,7 +159,7 @@ function sim_out = acq_test(sim_in)
     % Sample Dt on grid of time and freq steps
    
     Dt = zeros(nFreqSteps,nTimeSteps);
-    f_offset_log =zeros(1,nTimeSteps);
+    f_target_log =zeros(1,nTimeSteps); t_target_log =zeros(1,nTimeSteps);
     r = zeros(M,1);
     for s=1:timeStep:nsymb
 
@@ -165,12 +167,22 @@ function sim_out = acq_test(sim_in)
       en = st+M+Ncp-1;
       t_ind = s/timeStep-1/timeStep+1; % as s starts at 1, annoying Octave off by 1 issues :(
 
-      % change freq offset every modem frame
+      % change target freq offset every modem frame
       if mod(s,Ns) == 1
-        f_offset_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs);
-        omega = 2*pi*f_offset_Rs*Rs/Fs;
+        f_target_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs);
+        omega = 2*pi*f_target_Rs*Rs/Fs;
       end
-      f_offset_log(t_ind) = f_offset_Rs;
+      f_target_log(t_ind) = f_target_Rs;
+
+      % change target timing offset +/-Rs/2 for every frame
+      if mod(s,Ns) == 1
+        t_offset_Rs = 0.5 - rand(1,1);
+        t_offset_ind = round(t_offset_Rs*M);
+      end
+      t_target_log(t_ind) = s;
+      %if (s != 1) && (s != nsymb)
+      %  st += t_offset_ind; en += t_offset_ind;
+      %end
 
       for f_Rs=fmin_Rs:freqStep:fmax_Rs;
         f_Hz = f_Rs*Rs;
@@ -218,14 +230,14 @@ function sim_out = acq_test(sim_in)
       end
       
       if verbose == 2
-        printf("s: %4d t_max: %6.2f f_off: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", s, 
-               t_max, f_offset_log(s/timeStep), f_max, Dtmax, Dthresh);
+        printf("s: %4d t_max: %6.2f f_targ: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", s, 
+               t_max, f_target_log(s/timeStep), f_max, Dtmax, Dthresh);
       end
 
       if Dtmax > Dthresh
         Ndetect++;
         % t_thresh in symbols, we expect t_max= 1, Ns+1, 2*Ns+1,...
-        if (abs(t_max-s) < t_tol_syms) && (abs(f_max-f_offset_log(s/timeStep)) < f_tol_Rs)
+        if (abs(t_max-s) < t_tol_syms) && (abs(f_max-f_target_log(s/timeStep)) < f_tol_Rs)
           Ncorrect++;
         else
           Nfalse++;
@@ -234,7 +246,7 @@ function sim_out = acq_test(sim_in)
 
       Dtmax_log = [Dtmax_log Dtmax];
       t_max_log = [t_max_log t_max];
-      f_max_log = [f_max_log f_max-f_offset_log(s/timeStep)];
+      f_max_log = [f_max_log f_max-f_target_log(s/timeStep)];
     end
 
     % mean time between detections (either true of false), for noise only case Tdet = Tnoise
@@ -304,11 +316,11 @@ function sim_out = acq_test(sim_in)
 
       figure(5); clf; 
       subplot(211); stem(t_max_log*(Ts+Tcp),Dtmax_log/(Nc+2));
-      hold on; plot([1 nsymb*(Ts+Tcp)],[Dthresh Dthresh]/(Nc+2),'r--'); hold off;
+      hold on; plot([0 nsymb*(Ts+Tcp)],[Dthresh Dthresh]/(Nc+2),'r--'); hold off;
+      ylabel('$|D_{tmax}|$'); axis([0 nsymb*(Ts+Tcp) 0 max(Dtmax_log/(Nc+2))]);
 
-      ylabel('$|D_{tmax}|$'); axis([1 nsymb*(Ts+Tcp) 0 max(Dtmax_log/(Nc+2))]);
-      subplot(212); plot(t_max_log*(Ts+Tcp),f_max_log); ylabel('$\Delta$ Freq (Rs)');
-      xlabel('Time(s)'); axis([1 nsymb*(Ts+Tcp) fmin_Rs fmax_Rs]);
+      subplot(212); plot(t_max_log*(Ts+Tcp),f_max_log,'+'); ylabel('$\Delta$ Freq (Rs)');
+      xlabel('Time(s)'); axis([0 nsymb*(Ts+Tcp) fmin_Rs fmax_Rs]);
     end
 
   end

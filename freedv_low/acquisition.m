@@ -237,19 +237,22 @@ function sim_out = acq_test(sim_in)
       f_max_log = [f_max_log f_max-f_offset_log(s/timeStep)];
     end
 
-    Det_per_sec = Ndetect/(nsymb*(Ts+Tcp));
+    % mean time between detections (either true of false), for noise only case Tdet = Tnoise
+    Tdet = (nsymb*(Ts+Tcp))/Ndetect;
     if verbose >= 1
-        printf("EbNodB: %5.0f Nframes: %d Ndetect: %d Pcorrect: %4.3f Pfalse: %4.3f Det/s: %4.3f\n", EbNodB, nframes, Ndetect, Ncorrect/nframes, Nfalse/nframes, Det_per_sec);
+        printf("EbNodB: %5.0f Nframes: %d Ndetect: %d Pcorrect: %4.3f Pfalse: %4.3f Tdet/Tnoise: %4.3f\n", 
+                EbNodB, nframes, Ndetect, Ncorrect/nframes, Nfalse/nframes, Tdet);
         % prob of 1 or more detections per second if we just have noise at the input
         nTimeStepPerFrame = Ns/timeStep
-        nSamplesPerModemFrame = nFreqSteps*nTimeStepPerFrame
-        PdetectPerModemFrame = 1 - binopdf(0,nSamplesPerModemFrame,Pthresh);
-        ModemFramesPerSec = 1/((Ts+Tcp)*Ns);
-        printf("PdetectPerModemFrame: %f Expected detections/s on noise only: %f\n", PdetectPerModemFrame, PdetectPerModemFrame*ModemFramesPerSec);
+        nSamplesPerModemFrame = nFreqSteps*nTimeStepPerFrame;
+        PnoisePerFrame = 1 - binopdf(0,nSamplesPerModemFrame,Pthresh);
+        Tf = (Ts+Tcp)*Ns;
+        printf("Pnoise per frame: %f Tnoise (theory): %f\n", PnoisePerFrame, Tf/PnoisePerFrame);
     end
+
     sim_out.Pcorrect(ne) = Ncorrect/nframes;
     sim_out.Pfalse(ne) = Nfalse/nframes;
-    sim_out.Det_per_sec = Det_per_sec;
+    sim_out.Tdet(ne) = Tdet;
 
     if verbose == 2
       if epslatex

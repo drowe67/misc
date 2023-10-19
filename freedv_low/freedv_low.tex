@@ -812,8 +812,6 @@ The frequency offset can be estimated by adding a frequency correction term $\ha
 \end{equation}
 When $\hat{\omega} = \omega$, the two frequency shift terms will cancel out and we will be left with the ideal  case, maximising $\hat{D}_t$. The frequency offset can therefore be found by sampling (\ref{eq:corr_freq}) on a sufficiently fine grid of $\hat{\omega}$.  Figure \ref{fig:acq_dt_q} suggests sampling $\hat{D}_t$ with $0.5R_s$ Hz steps would be sufficient to bracket the maxima.  
 
-\subsection{Acquisition on Noise}
-
 \subsection{Acquisition Algorithm}
 
 The new acquisition algorithm is therefore:
@@ -840,11 +838,57 @@ Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm
 \end{center}
 \end{figure}
 
-TODO: CPU estimates, especially with +/- 200 Hz frequency offset estimation.
+\subsection{False Acquisition on Noise}
+
+Consider a noise only signal being fed to acquisition system.  We desire a low probability of false detection, to avoid background noise "breaking squelch".  This can be conveniently defined in the mean time between false detections on noise $T_{noise}$ (units s).  Now a false detection occurs if one of more samples of $D_t$ over a modem frame exceeds $D_{thresh}$, which has a probability of $P_{thresh}$ (\ref{eq:prob_thresh}).  We sample $D_t$ on a grid of $N$ time and $M$ frequency points or $N_g=NM$ samples in total. The Binomial distribution can be used to compute the probability of an event occurring $x$ times from $n$ trials, if each event has probability $p$:
+\begin{equation}
+P_x = {n \choose x} p^x (1-p)^{n-x}
+\end{equation}
+A false detection on noise will occur if 1 or more samples of $D_t>D_{thresh}$, which is equivalent to $1-P_0$:
+\begin{equation}
+\label{eq:Pnoise_theory}
+\begin{split}
+P_{noise} &= 1 - {N_g \choose 0} (P_{thresh})^0 (1-P_{thesh})^{N_g} \\
+    &= 1 - N_g(1 - P_{thresh})^{N_g}
+\end{split}
+\end{equation}
+$P_{noise}$ is the probability of false detection on noise for each frame.  If each frame is $T_f$ seconds long:
+\begin{equation}
+\label{eq:t_false_noise}
+\begin{split}
+T_{noise} &= \frac{T_f}{P_{noise}} \\
+   &= \frac{T_f}{(1 - N_g(1-P_{thresh})^{N_g})}
+\end{split}
+\end{equation}
+
+Table \ref{tab:noise_false_comparsion} presents typical simulation results.  This can be used to select a suitable $P_{thresh}$ for the acquisition system.  In practice, a post processing algorithm and state machine will further evaluate any candidates.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{c c c c}
+ \hline
+ $P_{thresh}$ & $P_{noise}$ theory & $T_{noise}$ theory & $T_{noise}$ simulated \\
+ \hline
+ $10^{-4}$ & 0.352 & 0.54 & 0.70 \\
+ $10^{-5}$ & 0.043 & 4.51 & 5.75 \\
+ \hline
+\end{tabular}
+\caption{Comparison of the time between false acquisition events with a noise only signal (in seconds), for an 86 second (449 frame) simulation. The difference can be explained by the approximate fit of $D_t$ to the Rayleigh distribution, as shown in Figure \ref{fig:acq_dt_hist}.}
+\label{tab:noise_false_comparsion}
+\end{table}
+
+\subsection{CPU estimates}
+
+TODO 
+
+Estimate MIP with +/- 200 Hz frequency offset estimation. Compare to 700D.  Suggestions for strategies.
 
 \subsection{Frequency Offset Refinement and Tracking}
 
 TODO
+
+What is req for timing/freq error for successful acquisition?
+Block diagram (above) of all steps, e.g. acquisition, post processing, refinement
 
 \subsection{Pilot Carriers}
 

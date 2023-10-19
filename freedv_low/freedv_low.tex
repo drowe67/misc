@@ -706,23 +706,14 @@ P_t &= P(\ge|D_t|) \\
 Note that large values of $D_t$ are unlikely (low $P_t$) with noise alone. By rearranging (\ref{eq:prob_thresh}) let us set a threshold:
 \begin{equation}
 \label{eq:corr_prob}
-D_{thresh}= \sigma\sqrt{-ln(P_{thresh})}
+D_{thresh} = \sigma\sqrt{-ln(P_{thresh})}
 \end{equation}
 using a sufficiently low probability $P_{thresh}$. Now if $D_t > D_{thresh}$, we can conclude that $p(n)$ has been detected.  
 
-When a signal is present the distribution of $|D_t|$ will no longer be Rayleigh due to the correlation peaks with $p(n)$. Figure \ref{fig:acq_dt_hist} is a histogram of $|D_t|$, the RHS hump in the histogram is due to the correlation peaks.  This is even more obvious in the scatter plot of $D_t$ (Figure \ref{fig:acq_dt_scatter}). It was found that by removing the outliers in a set of $D_t$ samples and recalculating the standard deviation, a good fit can be found with the Rayleigh distribution (green in Figure \ref{fig:acq_dt_hist}).  The outlier removal algorithm is:
-\begin{equation}
-\label{eq:prob_thresh}
-\begin{split}
-\sigma &= Std(D_t) \\
-D^\prime_t &= D_t < 2\sigma \\
-\sigma^\prime &= Std(D^\prime_t)
-\end{split}
-\end{equation}
-Any outlier greater than $2\sigma$ is removed from the set used to calculate the standard deviation, and $\sigma^\prime$ is used to calculate $D_{thresh}$. Note the variance of $D_t$ with signal present is larger than the variance with noise alone, due to random correlations of the modem signal with $p(n)$. The circle in Figure \ref{fig:acq_dt_scatter} shows the threshold calculated for this example.
+When a signal is present the distribution of $|D_t|$ will no longer be Rayleigh due the correlation peaks with $p(n)$. However in practice $D_t$ is sampled on a large grid of time and frequency offset points such that most samples do not correspond to a correlation peak.  Figure \ref{fig:acq_dt_hist} is a histogram of $|D_t|$ and shows a reasonable fit to a Rayleigh distribution with the same variance.  Figure \ref{fig:acq_dt_scatter} is a scatter plot of the same data, where some of the rare correlation peaks are more obvious.
 
 \begin{figure}[H]
-\caption{Histogram of $D_t$ sampled once a symbol over 450 modem frames, for $E_b/N_0=0$ dB.  After removing the outliers due to strong correlation with $p(n)$ on the RHS, the LHS of the histogram is a good fit to the Rayleigh PDF.}
+\caption{Histogram of $D_t$ sampled over a grid of 256 time and 17 frequency points per modem frame, over a total of 47 frames, with $E_b/N_0=10$ dB. The histogram is a reasonable fit to the Rayleigh PDF.}
 \label{fig:acq_dt_hist}
 \begin{center}
 \input acq_dt_hist.tex
@@ -730,24 +721,12 @@ Any outlier greater than $2\sigma$ is removed from the set used to calculate the
 \end{figure}
 
 \begin{figure}[H]
-\caption{Scatter plot of $D_t$ on the complex plane from the same simulation as Figure \ref{fig:acq_dt_hist}. The circle is $D_{thresh}$ from (\ref{eq:corr_prob}) using $\sigma^\prime$ and $P_{thresh}=10^{-3}$.}
+\caption{Scatter plot of $D_t$ on the complex plane from the same simulation as Figure \ref{fig:acq_dt_hist}. The circle is $D_{thresh}$ from (\ref{eq:corr_prob}) using $\sigma$ and $P_{thresh}=10^{-5}$. The crescent of points includes the optimum time/freq offset estimates at the far RHS.}
 \label{fig:acq_dt_scatter}
 \begin{center}
 \input acq_dt_scatter.tex
 \end{center}
 \end{figure}
-
-The new acquisition algorithm is therefore:
-\begin{enumerate}
-\item Using simulation results set a threshold $P_{thresh}$ such that $D_t < D_{thresh}$ with noise alone but $D_t > D_{thresh}$ when signal is present for $E_b/N_0 > 0$ dB.
-\item At run time, extract a $T_f$ long window of samples (one modem frame).
-\item Calculate a set of $D_t$ values over the window.
-\item Find the peak $D_{tmax}$ over the set of $D_t$ samples.
-\item Estimate the standard deviation $\sigma$, then remove outliers to obtain $\sigma^\prime$.
-\item Calculate $D_{thresh}$ using (\ref{eq:corr_prob}).
-\item If $D_{tmax} > D_{thresh}$ we have found a candidate $p(n)$ sequence and the start of a modem frame.
-\end{enumerate}
-Note that unlike the existing 700D/E acquisition algorithm $D_{thresh}$ is dynamic, and based on the standard deviation of the received signal.
 
 \subsection{Coarse Frequency Estimation}
 
@@ -833,10 +812,28 @@ The frequency offset can be estimated by adding a frequency correction term $\ha
 \end{equation}
 When $\hat{\omega} = \omega$, the two frequency shift terms will cancel out and we will be left with the ideal  case, maximising $\hat{D}_t$. The frequency offset can therefore be found by sampling (\ref{eq:corr_freq}) on a sufficiently fine grid of $\hat{\omega}$.  Figure \ref{fig:acq_dt_q} suggests sampling $\hat{D}_t$ with $0.5R_s$ Hz steps would be sufficient to bracket the maxima.  
 
+\subsection{Acquisition on Noise}
+
+\subsection{Acquisition Algorithm}
+
+The new acquisition algorithm is therefore:
+\begin{enumerate}
+\item Using simulation results set a threshold $P_{thresh}$ such that $D_t < D_{thresh}$ with noise alone but $D_t > D_{thresh}$ when signal is present for $E_b/N_0 > 0$ dB.
+\item At run time, extract a $T_f$ long window of samples (one modem frame).
+\item Calculate a set of $D_t$ values over the window on a grid of time and frequency offsets.
+\item Find the peak $D_{tmax}$ over the set of $D_t$ samples.
+\item Estimate the standard deviation $\sigma$ over the set of $D_t$ samples.
+\item Calculate $D_{thresh}$ using (\ref{eq:corr_prob}).
+\item If $D_{tmax} > D_{thresh}$ we have found a candidate $p(n)$ sequence and the start of a modem frame.
+\end{enumerate}
+Note that unlike the existing 700D/E acquisition algorithm $D_{thresh}$ is dynamic, and based on the standard deviation of the received signal.
+
 Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels.
 
+Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm over a range of channels.
+
 \begin{figure}[H]
-\caption{Probability of acquisition for a range of channels and SNRs for 300 seconds of simulated $N_c=16, N_d=1, 1400$ bits/s signal. Correct acquisition is defined as a timing error of $< \pm R_s$ and frequency error of $< \pm 0.5R_s$.  False acquisition occurs when we exceed the threshold for detection but the estimates are outside the success tolerances.}
+\caption{Probability of acquisition for a range of channels and SNRs for 300 seconds of simulated $N_c=16, N_d=1, 1400$ bits/s signal. Correct acquisition is defined as a timing error of $< \pm R_s$ and frequency error of $< \pm 0.5R_s$.  False acquisition occurs when $D_{tmax} > D_{thresh}$ but the estimates are outside the success tolerances.}
 \label{fig:acq_curves}
 \begin{center}
 \input acq_curves.tex

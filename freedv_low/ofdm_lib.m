@@ -11,7 +11,7 @@ function P = barker_pilots(Nc)
   P_barker_8  = [1 1 1 -1 -1 1 -1];
   P_barker_13 = [1 1 1 1 1 -1 -1 1 1 -1 1 -1 1];
   % repeating length 8 Barker code works OK for Nc=8 and Nc=16
-  P= zeros(1,Nc);
+  P= zeros(Nc,1);
   for i=1:Nc
     P(i) = P_barker_8(mod(i,length(P_barker_8))+1);
   end

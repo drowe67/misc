@@ -179,7 +179,7 @@ function sim_out = acq_test(sim_in)
         if rand_freq 
           f_target_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs)
         end
-        omega = 2*pi*f_target_Rs*Rs/Fs
+        omega = 2*pi*f_target_Rs*Rs/Fs;
       end
       f_target_log(t_ind) = f_target_Rs;
 
@@ -208,8 +208,8 @@ function sim_out = acq_test(sim_in)
     % count successful acquisitions
     Ncorrect = 0; Nfalse = 0; Ndetect = 0;
     Dtmax_log = [];
-    t_max_log = []; t_delta_log = [];
-    f_max_log = []; f_delta_log = [];
+    t_max_log = [];
+    stats_log = [];
     for s=1:Ns:nsymb
 
       % threshold estimation for this modem frame
@@ -250,19 +250,20 @@ function sim_out = acq_test(sim_in)
 
       if abs(Dtmax) > Dthresh
         Ndetect++;
-        t_error = abs(t_max-t_target_log(t_ind));
-        f_error = abs(f_max-f_target_log(t_ind));
-        if (t_error < t_tol_syms) && (f_error < f_tol_Rs)
+        t_error = t_max-t_target_log(t_ind);
+        f_error = f_max-f_target_log(t_ind);
+        correct = 0;
+        if (abs(t_error) < t_tol_syms) && (abs(f_error) < f_tol_Rs)
           Ncorrect++;
+          correct = 1;
         else
           Nfalse++;
         end
+        stats_log = [stats_log; t_target_log(t_ind) correct t_error f_error];
       end
 
       Dtmax_log = [Dtmax_log Dtmax];
       t_max_log = [t_max_log t_max];
-      t_delta_log = [t_delta_log t_max - t_target_log(t_ind)];
-      f_delta_log = [f_delta_log f_max - f_target_log(t_ind)];
     end
 
     % mean time between detections (either true of false), for noise only case Tdet = Tnoise
@@ -273,8 +274,8 @@ function sim_out = acq_test(sim_in)
         % prob of 1 or more detections per second if we just have noise at the input
         PnoisePerFrame = 1 - binopdf(0,nSamplesPerModemFrame,Pthresh);
         Tf = (Ts+Tcp)*Ns;
-        printf("EbNodB: %4.0f Nframes: %d Ndetect: %4d Pcorrect: %4.3f Pfalse: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f\n", 
-                EbNodB, nframes, Ndetect, Ncorrect/nframes, Nfalse/nframes, Tdet, PnoisePerFrame, Tf/PnoisePerFrame);
+        printf("EbNodB: %4.0f Nfr: %d Ndet: %4d Ncor: %4d Nfls: %4d Pcor: %4.3f Pfls: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f\n", 
+                EbNodB, nframes, Ndetect, Ncorrect, Nfalse, Ncorrect/nframes, Nfalse/nframes, Tdet, PnoisePerFrame, Tf/PnoisePerFrame);
      end
 
     sim_out.Pcorrect(ne) = Ncorrect/nframes;
@@ -340,23 +341,50 @@ function sim_out = acq_test(sim_in)
 
       % Delta time and freq
       figure(6); clf;
-      subplot(211); plot(t_max_log*(Ts+Tcp),t_delta_log,'+'); ylabel('$\Delta$ T (syms)');
+      subplot(211); plot(stats_log(:,1)*(Ts+Tcp),stats_log(:,3),'+'); ylabel('$\Delta$ T (syms)');
       axis([0 nsymb*(Ts+Tcp) -Ns/2 Ns/2]);
-      subplot(212); plot(t_max_log*(Ts+Tcp),f_delta_log,'+'); ylabel('$\Delta$ Freq (Rs)');
+      subplot(212); plot(stats_log(:,1)*(Ts+Tcp),stats_log(:,4),'+'); ylabel('$\Delta$ Freq (Rs)');
       axis([0 nsymb*(Ts+Tcp) fmin_Rs-0.001 fmax_Rs+0.001]); xlabel('Time(s)');
 
-      % scatter of pilots, treating them like demodulated BPSK 
-      figure(7); clf; hold on;
-      for i=1:length(t_max_log)
-        s = t_max_log(i)
-        st = (s-1)*(M+Ncp)+1;
-        en = st+M+Ncp-1;
-        % TODO include/remove freq offset to model freq offset errors
-        r(:,1) = rx_noise(st+Ncp:en);
-        Dt = r'*p
-        plot(Dtmax_log(i),'+')
+      
+      proto_post_proc = 0;
+      if proto_post_proc
+        % Prototype post processing - are "bit errors" in pilots meaningful?
+        % plot scatter of pilots, treating them like demodulated BPSK 
+        % usage:
+        %   acquisition; run_single(nbits=1E4,ch='awgn',-3,'norand','Pthresh',1E-4
+        % Results were unsatisfactory, even when correct==0, number of correct bits high.
+        % This kind of makes sense, as correllation sum is like soft decision version of bits.
+        % So leaving this for now .... looks like we need a unique word.
+        figure(7); clf; hold on;
+        for i=1:length(stats_log)
+          
+          % extract received samples for candidate
+          % TODO - make this work for random time and freq (use 'norand' option for now)
+          s = stats_log(i,1);
+          st = (s-1)*(M+Ncp)+1;
+          en = st+M+Ncp-1;
+          r(:,1) = rx_noise(st+Ncp:en);
+
+          % back to a set of freq domain symbols
+          P_hat = Wfwd*r;
+
+          % equalise - use simple linear average of adjacent pilots for now
+          H = zeros(Nc+2,1);
+          for c=2:Nc+1
+            H(c) = mean(P_hat(c-1:c+1)./P(c-1:c+1));
+          end
+          H(1) = H(2); H(Nc+2) = H(Nc+1);
+
+          P_eq = P_hat .* exp(-j*angle(H));
+          plot(P_eq,'+');
+
+          % count errors
+          printf("%6.2f %d %2d\n", s, stats_log(i,2), sum(real(P_eq.*P)>0));
+        end
+        hold off; mx = 1.5*max(abs(P_hat(:)));
+        axis([-mx mx -mx mx])
       end
-      hold off;
     end
 
   end

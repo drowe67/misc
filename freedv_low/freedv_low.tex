@@ -712,6 +712,8 @@ using a sufficiently low probability $P_{thresh}$. Now if $D_t > D_{thresh}$, we
 
 When a signal is present the distribution of $|D_t|$ will no longer be Rayleigh due the correlation peaks with $p(n)$. However in practice $D_t$ is sampled on a large grid of time and frequency offset points such that most samples do not correspond to a correlation peak.  Figure \ref{fig:acq_dt_hist} is a histogram of $|D_t|$ and shows a reasonable fit to a Rayleigh distribution with the same variance.  Figure \ref{fig:acq_dt_scatter} is a scatter plot of the same data, where some of the rare correlation peaks are more obvious.
 
+A time grid step size of $R_s/32$ symbols was found to work well by experiment (256 steps across one $N_s=8$ modem frame).  A small step size is required to ensure we sample $D_t$ at a point where ISI from the previous symbol has been resolved, and to minimise any linear phase term across frequency $D_{t-d} = e^{-j \omega d}D_t$ that would distort the phase of the received pilots leading to $|D_{t-d}| < |D_t|$.
+
 \begin{figure}[H]
 \caption{Histogram of $D_t$ sampled over a grid of 256 time and 17 frequency points per modem frame, over a total of 47 frames, with $E_b/N_0=10$ dB. The histogram is a reasonable fit to the Rayleigh PDF.}
 \label{fig:acq_dt_hist}
@@ -848,7 +850,7 @@ Table \ref{tab:noise_false_comparsion} presents typical simulation results.  Thi
  $\num{e-5}$ & 0.043 & 4.51 & 5.75 \\
  \hline
 \end{tabular}
-\caption{Comparison of the time between false acquisition events with a noise only signal (in seconds), for an 86 second (449 frame) simulation. The difference can be explained by the approximate fit of $D_t$ to the Rayleigh distribution, as shown in Figure \ref{fig:acq_dt_hist}.}
+\caption{Comparison of the time between false acquisition events with an AWGN noise only signal (in seconds), for an 86 second (449 frame) simulation. The difference can be explained by the approximate fit of $D_t$ to the Rayleigh distribution, as shown in Figure \ref{fig:acq_dt_hist}.}
 \label{tab:noise_false_comparsion}
 \end{table}
 

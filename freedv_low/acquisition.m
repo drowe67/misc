@@ -118,12 +118,14 @@ function sim_out = acq_test(sim_in)
  
   [tx_bits tx P] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
 
-  % Fixed timing offset applied to entire simulation
-  % TODO: adjust success criteria if we introduce time offset
-  timeOffsetSamples = 0;
+  % Fixed timing offset applied to entire simulation, this puts target timing offset in
+  % the middle of the search window which makes simulation easier as we don't get modulo
+  % Ns peaks in Dt at either end of the search window (which are both correct)
+  timeOffsetSymbols = Ns/2;
   if isfield(sim_in,"timeOffsetSymbols")
-    timeOffsetSamples = M*sim_in.timeOffsetSymbols;
+    timeOffsetSymbols = sim_in.timeOffsetSymbols;
   end
+  timeOffsetSamples = (M+Ncp)*timeOffsetSymbols
   tx = [zeros(1,timeOffsetSamples) tx];
   nsam = length(tx);
 
@@ -159,7 +161,7 @@ function sim_out = acq_test(sim_in)
     % Sample Dt on grid of time and freq steps
    
     Dt = zeros(nFreqSteps,nTimeSteps);
-    f_target_log =zeros(1,nTimeSteps); t_target_log =zeros(1,nTimeSteps);
+    f_target_log =zeros(1,nTimeSteps); t_target_log = zeros(1,nTimeSteps);
     r = zeros(M,1);
     for s=1:timeStep:nsymb
 
@@ -177,12 +179,12 @@ function sim_out = acq_test(sim_in)
       % change target timing offset +/-Rs/2 for every frame
       if mod(s,Ns) == 1
         t_offset_Rs = 0.5 - rand(1,1);
-        t_offset_ind = round(t_offset_Rs*M);
+        t_offset_ind = round(t_offset_Rs*(M+Ncp));
       end
-      t_target_log(t_ind) = s;
-      %if (s != 1) && (s != nsymb)
-      %  st += t_offset_ind; en += t_offset_ind;
-      %end
+      t_target_log(t_ind) = Ns*floor(s/Ns)+1 + timeOffsetSymbols + t_offset_Rs;
+      if (s > 2) && (s < (nsymb-1))
+        st += t_offset_ind; en += t_offset_ind;
+      end
 
       for f_Rs=fmin_Rs:freqStep:fmax_Rs;
         f_Hz = f_Rs*Rs;
@@ -192,7 +194,7 @@ function sim_out = acq_test(sim_in)
         Dt(f_ind,t_ind) = r'*p;
       end
     end
-
+ 
     % count successful acquisitions
     Ncorrect = 0; Nfalse = 0; Ndetect = 0;
     Dtmax_log = [];
@@ -229,15 +231,18 @@ function sim_out = acq_test(sim_in)
         end
       end
       
+      t_ind = s/timeStep-1/timeStep+1;
+
       if verbose == 2
-        printf("s: %4d t_max: %6.2f f_targ: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", s, 
-               t_max, f_target_log(s/timeStep), f_max, Dtmax, Dthresh);
+        printf("t_targ: %6.2f t_max: %6.2f f_targ: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", t_target_log(t_ind), 
+               t_max, f_target_log(t_ind), f_max, Dtmax, Dthresh);
       end
 
       if Dtmax > Dthresh
         Ndetect++;
-        % t_thresh in symbols, we expect t_max= 1, Ns+1, 2*Ns+1,...
-        if (abs(t_max-s) < t_tol_syms) && (abs(f_max-f_target_log(s/timeStep)) < f_tol_Rs)
+        t_error = abs(t_max-t_target_log(t_ind));
+        f_error = abs(f_max-f_target_log(t_ind));
+        if (t_error < t_tol_syms) && (f_error < f_tol_Rs)
           Ncorrect++;
         else
           Nfalse++;
@@ -340,8 +345,7 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
     sim_in.Pthresh     = 3E-5;
-    sim_in.timeOffsetSymbols = 0;
-
+ 
     i = 1;
     while i <= length(varargin)
       if strcmp(varargin{i},"ch_phase")
@@ -377,7 +381,6 @@ function run_curves(runtime_scale=0,epslatex=0)
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
     sim_in.Pthresh     = 3E-5;
-    sim_in.timeOffsetSymbols = 0;
 
     % run long enough to get sensible results, using rec from ITUT F.1487
     Fd_min = 1; run_time_s = 3000/Fd_min; Rb = 100;

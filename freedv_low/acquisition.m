@@ -112,6 +112,10 @@ function sim_out = acq_test(sim_in)
   if isfield(sim_in,"epslatex")
     epslatex = sim_in.epslatex;
   end
+  rand_freq = 1; rand_time = 1;
+  if isfield(sim_in,"norand")
+    rand_freq = 0; rand_time = 0;
+  end
 
   nFreqSteps = length(fmin_Rs:freqStep:fmax_Rs)
   nTimeSteps = nsymb/timeStep
@@ -169,16 +173,22 @@ function sim_out = acq_test(sim_in)
       en = st+M+Ncp-1;
       t_ind = s/timeStep-1/timeStep+1; % as s starts at 1, annoying Octave off by 1 issues :(
 
-      % change target freq offset every modem frame
+      % random freq offset every modem frame
       if mod(s,Ns) == 1
-        f_target_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs);
-        omega = 2*pi*f_target_Rs*Rs/Fs;
+        f_target_Rs = 0;
+        if rand_freq 
+          f_target_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs)
+        end
+        omega = 2*pi*f_target_Rs*Rs/Fs
       end
       f_target_log(t_ind) = f_target_Rs;
 
-      % change target timing offset +/-Rs/2 for every frame
+      % random target timing offset +/-Rs/2 for every modem frame
       if mod(s,Ns) == 1
-        t_offset_Rs = 0.5 - rand(1,1);
+        t_offset_Rs = 0;
+        if rand_time
+          t_offset_Rs = 0.5 - rand(1,1);
+        end
         t_offset_ind = round(t_offset_Rs*(M+Ncp));
       end
       t_target_log(t_ind) = Ns*floor(s/Ns)+1 + timeOffsetSymbols + t_offset_Rs;
@@ -198,8 +208,8 @@ function sim_out = acq_test(sim_in)
     % count successful acquisitions
     Ncorrect = 0; Nfalse = 0; Ndetect = 0;
     Dtmax_log = [];
-    t_max_log = [];
-    f_max_log = [];
+    t_max_log = []; t_delta_log = [];
+    f_max_log = []; f_delta_log = [];
     for s=1:Ns:nsymb
 
       % threshold estimation for this modem frame
@@ -223,8 +233,8 @@ function sim_out = acq_test(sim_in)
         for f_Rs=fmin_Rs:freqStep:fmax_Rs;
           t_ind = t_syms/timeStep-1/timeStep+1;
           f_ind = f_Rs/freqStep + ceil(nFreqSteps/2);
-          if abs(Dt(f_ind,t_ind)) > Dtmax
-            Dtmax = abs(Dt(f_ind,t_ind));
+          if abs(Dt(f_ind,t_ind)) > abs(Dtmax)
+            Dtmax = Dt(f_ind,t_ind);
             t_max = t_syms;
             f_max = f_Rs;
           end
@@ -235,10 +245,10 @@ function sim_out = acq_test(sim_in)
 
       if verbose == 2
         printf("t_targ: %6.2f t_max: %6.2f f_targ: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", t_target_log(t_ind), 
-               t_max, f_target_log(t_ind), f_max, Dtmax, Dthresh);
+               t_max, f_target_log(t_ind), f_max, abs(Dtmax), Dthresh);
       end
 
-      if Dtmax > Dthresh
+      if abs(Dtmax) > Dthresh
         Ndetect++;
         t_error = abs(t_max-t_target_log(t_ind));
         f_error = abs(f_max-f_target_log(t_ind));
@@ -251,7 +261,8 @@ function sim_out = acq_test(sim_in)
 
       Dtmax_log = [Dtmax_log Dtmax];
       t_max_log = [t_max_log t_max];
-      f_max_log = [f_max_log f_max-f_target_log(s/timeStep)];
+      t_delta_log = [t_delta_log t_max - t_target_log(t_ind)];
+      f_delta_log = [f_delta_log f_max - f_target_log(t_ind)];
     end
 
     % mean time between detections (either true of false), for noise only case Tdet = Tnoise
@@ -281,10 +292,10 @@ function sim_out = acq_test(sim_in)
       [h x]=hist(abs(Dt(:)),20);
       plot(x,h/trapz(x,h),'b;Histogram $|D_t|$;'); 
       sigma_r = sigma_est/sqrt(2);
-      p = (x./(sigma_r*sigma_r)).*exp(-(x.^2)/(2*sigma_r*sigma_r));
+      p_rayleigh = (x./(sigma_r*sigma_r)).*exp(-(x.^2)/(2*sigma_r*sigma_r));
       hold on; 
-      plot(x,p,'g;Rayleigh PDF;'); 
-      plot([Dthresh Dthresh],[0 max(p)*0.5],'r;Dthresh;')
+      plot(x,p_rayleigh,'g;Rayleigh PDF;'); 
+      plot([Dthresh Dthresh],[0 max(p_rayleigh)*0.5],'r;Dthresh;')
       hold off;
       legend('boxoff');
 
@@ -294,6 +305,7 @@ function sim_out = acq_test(sim_in)
         printf("printing... %s\n", fn);
       end
 
+      % 2D scatter plot
       figure(2); clf;
       plot(Dt(:),'+');
       if isfield(sim_in,"Pthresh")
@@ -308,6 +320,7 @@ function sim_out = acq_test(sim_in)
         restore_fonts(textfontsize,linewidth);
       end
 
+      % 3D scatter plot
       figure(3); clf;
       [nn cc] = hist3([real(Dt(:)) imag(Dt(:))],[25 25]);
       mesh(cc{1},cc{2},nn);
@@ -319,13 +332,31 @@ function sim_out = acq_test(sim_in)
       
       figure(4); clf; plot_specgram(real(rx_noise),Fs,0,2500);
 
+      % |Dt| against time
       figure(5); clf; 
-      subplot(211); stem(t_max_log*(Ts+Tcp),Dtmax_log/(Nc+2));
+      stem(t_max_log*(Ts+Tcp),abs(Dtmax_log)/(Nc+2));
       hold on; plot([0 nsymb*(Ts+Tcp)],[Dthresh Dthresh]/(Nc+2),'r--'); hold off;
-      ylabel('$|D_{tmax}|$'); axis([0 nsymb*(Ts+Tcp) 0 max(Dtmax_log/(Nc+2))]);
+      ylabel('$|D_{tmax}|$'); axis([0 nsymb*(Ts+Tcp) 0 max(abs(Dtmax_log)/(Nc+2))]);
 
-      subplot(212); plot(t_max_log*(Ts+Tcp),f_max_log,'+'); ylabel('$\Delta$ Freq (Rs)');
-      xlabel('Time(s)'); axis([0 nsymb*(Ts+Tcp) fmin_Rs fmax_Rs]);
+      % Delta time and freq
+      figure(6); clf;
+      subplot(211); plot(t_max_log*(Ts+Tcp),t_delta_log,'+'); ylabel('$\Delta$ T (syms)');
+      axis([0 nsymb*(Ts+Tcp) -Ns/2 Ns/2]);
+      subplot(212); plot(t_max_log*(Ts+Tcp),f_delta_log,'+'); ylabel('$\Delta$ Freq (Rs)');
+      axis([0 nsymb*(Ts+Tcp) fmin_Rs-0.001 fmax_Rs+0.001]); xlabel('Time(s)');
+
+      % scatter of pilots, treating them like demodulated BPSK 
+      figure(7); clf; hold on;
+      for i=1:length(t_max_log)
+        s = t_max_log(i)
+        st = (s-1)*(M+Ncp)+1;
+        en = st+M+Ncp-1;
+        % TODO include/remove freq offset to model freq offset errors
+        r(:,1) = rx_noise(st+Ncp:en);
+        Dt = r'*p
+        plot(Dtmax_log(i),'+')
+      end
+      hold off;
     end
 
   end
@@ -362,7 +393,9 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.Pthresh = varargin{i+1}; i++;    
       elseif strcmp(varargin{i},"timeOffsetSymbols")
         sim_in.timeOffsetSymbols = varargin{i+1}; i++;    
-      else
+       elseif strcmp(varargin{i},"norand")
+        sim_in.norand = 1;    
+     else
         printf("\nERROR unknown argument: %s\n", varargin{i});
         return;
       end

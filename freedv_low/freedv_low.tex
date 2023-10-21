@@ -34,8 +34,9 @@ Compared to the baseline FreeDV 700D/E waveforms:
 \begin{enumerate}
 \item New equalisation algorithm that performs well on a range of AWGN and multipath channels, removing the need for modes, and providing several dB improvement for 700E users.
 \item Diversity in frequency and possibly time providing around 3dB improvement over 700D on multipath channels.  
-\item Dynamic threshold and pilot symbol selection for $\pm 200$ Hz acquisition  (four times wider that 700D/E) at lower SNR, simplifying end user tuning.
-\item Designing the probability of false sync states ``breaking squelch" on noise, removing the need for a squelch slider, and reducing listener fatigue.
+\item Dynamic threshold and pilot symbol selection for $\pm 200$ Hz acquisition (four times wider that 700D/E) at lower SNR, simplifying end user tuning.
+\item More reliable acquisition (sync) - faster acquisition of valid FreeDV signals, better rejection of noise.
+\item Designing the probability of ``breaking squelch" on noise, removing the need for a squelch slider, and reducing listener fatigue.
 \end{enumerate}
 
 \clearpage
@@ -87,6 +88,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
  $N_c$ & Number of carriers in an OFDM waveform \\
  $N_{uw}$ & Number of Unique Word bits \\
  $\omega_c$ & Angular frequency of OFDM carrier $c$ & rads/second \\ 
+ $T_f$ & Modem frame period & seconds \\
  \hline
 \end{tabular}
 \caption{Glossary of Symbols}
@@ -124,9 +126,9 @@ Performance on multipath channels is significantly worse, in our use cases typic
 A more complete model is:
 \begin{equation}
 \label{eq:snr_all}
-SNR = 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\right) + L_p + L_{il} + L_{cp}
+SNR = 10log_{10}\left(\frac{E_b}{N_0}\right) + 10log_{10}\left(\frac{R_b}{B}\right) + L_p + L_{cp} + L_{uw} + L_{il}
 \end{equation}
-where $L_p$ is the loss from power allocated to pilot symbols, $L_{il}$ is the real world implementation loss, and $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix.
+where the $L_p$ is the loss from power allocated to pilot symbols,  $L_{cp}$ is the loss in SNR due to the power allocated to the cyclic prefix, and $L_{uw}$ is the loss from power allocated to unique words bits. $L_{il}$ is the real world implementation loss, due to non ideal syncronisation algorithms in noisy channels.  Each of these losses is derived below.
 
 To combat intersymbol interference and frequency selective fading on HF multipath channels, it is convenient to use parallel tone or OFDM modems. The signal is divided into $N_c$ carriers, each carrying $R_b/N_c$ bits/s.  Due to the spectral efficiency of OFDM, the same bit rate, symbol rate, and occupied bandwidth is required for any $N_c$.  For example:
 \begin{enumerate}
@@ -135,7 +137,7 @@ To combat intersymbol interference and frequency selective fading on HF multipat
 \end{enumerate}
 This simple relationship between per-carrier and total $R_s$ allows us to use them interchangeably for some calculations.
  
-FreeDV signals are typically transmitted over the air using analog HF radios.  We assume a RF bandwidth of 2000 Hz is available, which allows a maximum of 4000 bit/s using QPSK.  In practice the payload data rate is much less, due to various overheads that we will discuss below.
+FreeDV signals are typically transmitted over the air using analog HF radios.  We assume a RF bandwidth of 2000 Hz is available, which allows a maximum of 4000 bit/s using QPSK.  In practice the payload data rate is much less, due to various bandwidth overheads that we will discuss below.
 
 \subsection{Pilot Symbol Overhead}
 
@@ -282,7 +284,20 @@ At this stage it does not appear necessary to add pilot carriers to meet our per
 
 \subsection{Unique Word Overhead}
 
-TODO: quite similar to above, include all loss terms to complete model (\ref{eq:snr_all}) above.  All loss term in glossary of symbols.
+Unique Word (UW) bits are often inserted into a modem frame to add acquisition.  Like pilot symbols and carriers, UW bits consume power at the expense of payload data, so increase the threshold SNR required to establish a voice link.  Consider inserting a $N_{uw}$ bit UW into a frame of $N_sN_c$ symbols.  Assuming QPSK, two UW bits can be placed in each UW symbol, so we need to inject $N_{uw}/2$ new symbols into each modem frame.  Using a similar model to pilot carriers above:
+\begin{equation}
+\label{eq:Luw}
+\begin{split}
+E_s &= \frac{ST_f}{N_sN_c} \\
+E^\prime_s &= \frac{S^\prime T_f}{N_sN_c+N_{uw}/2} \\
+\frac{S^\prime}{S} &= \frac{N_sN_c+N_{uw}/2}{N_sN_c} \\
+SNR^\prime &= SNR + 10log_{10}\left(1 + \frac{N_{uw}}{2N_sN_c}\right)  \\
+SNR^\prime &= SNR + L_{uw}  \quad [\si{dB}] \\
+L_{uw} &= 10log_{10}\left(1 + \frac{N_{uw}}{2N_sN_c}\right) 
+\end{split}
+\end{equation}
+
+For example consider a 700D like waveform with $Ns=8,Nc=16,N_{uw}=16$. Evaluating (\ref{eq:Luw}) gives us $L_{uw}=0.26 \si{dB}$, which is quite modest. Section \ref{sec:uw} discusses the use of UW bits in post processing acquisition candidates.
 
 \subsection{Bandwidth}
 
@@ -432,9 +447,7 @@ y(n) &= G_1s(n)e^{j (\omega n + \phi_2)} + G_2e^{j (\omega (n-dF_s) + \phi_2)} \
 \end{equation}
 Thus if we start detecting $y(n)$ after the longest delay term $dF_s$ we can recover the transmitted PSK symbol without ISI, and equalise it by estimating a single complex coefficient $H(e^{j \omega})$.  In practice detection means integration over a complete symbol $T_s$, therefore the symbol $e^{j \omega n + \phi_n}$ must be transmitted for $d+T^\prime_s=T_{cp}+T^\prime_s$ seconds, with the cyclic prefix length $T_{cp} \ge d$.
 
-\subsection{Waveform Improvements}
-
-In the following sections waveform improvements are presented.
+\subsection{Simulation Strategy}
 
 The general strategy is to propose an innovation, and explore with analysis/maths and Octave simulation. To simulate performance with voice codec, we use a threshold of PER=0.1, BER=0.01 as the threshold for establishing a voice link.
 
@@ -912,6 +925,7 @@ Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm
 \end{figure}
 
 \subsection{Unique Word Post Processing}
+\label{sec:uw}
 
 An acquisition candidate is evaluated by counting the number of errors in a $N_{uw}$ bit Unique Word (UW) - a known sequence of bits that is inserted into every modem frame.  The UW is mapped to $N_{uw}/2$ QPSK symbols that are spread throughout the modem frame.  An ideal post processor would reject all false candidates, and accept all correct candidates.  However there are two fail cases to consider:
 \begin{enumerate}

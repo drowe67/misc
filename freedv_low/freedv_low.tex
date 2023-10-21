@@ -35,6 +35,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
 \item New equalisation algorithm that performs well on a range of AWGN and multipath channels, removing the need for modes, and providing several dB improvement for 700E users.
 \item Diversity in frequency and possibly time providing around 3dB improvement over 700D on multipath channels.  
 \item Dynamic threshold and pilot symbol selection for $\pm 200$ Hz acquisition  (four times wider that 700D/E) at lower SNR, simplifying end user tuning.
+\item Designing the probability of false sync states ``breaking squelch" on noise, removing the need for a squelch slider, and reducing listener fatigue.
 \end{enumerate}
 
 \clearpage
@@ -58,6 +59,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
  MPG & Multipath Good channel, 0.1 Hz Doppler spread, 0.5ms delay spread \\
  MPP & Multipath Poor channel, 1 Hz Doppler spread, 2ms delay spread, typical for US and Australian interstate propagation \\
  MPD & Multipath Disturbed channel, 2 Hz Doppler spread, 4ms delay spread, typical for UK Winter NVIS propagation \\
+ UW & Unique Word - a sequence of known bits used for acquisition \\
  \hline
 \end{tabular}
 \caption{Glossary of Acronyms}
@@ -83,6 +85,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
  $S$ & Signal Power & Watts \\
  $N$ & Noise Power & Watts \\
  $N_c$ & Number of carriers in an OFDM waveform \\
+ $N_{uw}$ & Number of Unique Word bits \\
  $\omega_c$ & Angular frequency of OFDM carrier $c$ & rads/second \\ 
  \hline
 \end{tabular}
@@ -252,6 +255,34 @@ SNR^\prime  &= SNR - 10log_{10}(1-T_{cp}/T_s) \\
 \end{split}
 \end{equation}
 Thus to close the link with the composite symbol the $S/N$ must be increased by a factor of $1/(1 - {T_s}/T_{cp})$ compared to our ideal modem, to account for the energy allocated to the CP.  For example FreeDV 700E has $T_s=0.02$, $T_{cp}=0.006$, giving $L_{cp}=-10log10(1-0.006/0.02)=1.55 \si{dB}$.
+
+\subsection{Pilot Carrier Overhead}
+
+A common acquisition strategy is to add one or more pilot carriers to aid frequency offset estimation. These carriers consume power and carry no payload data so an increase in the threshold SNR is required to maintain the voice link. Consider the effect on $E_b$ when adding an additional carrier:
+\begin{equation}
+\begin{split}
+E_b &= \frac{ST_s}{N_c} \\
+E^\prime_b &= \frac{S^\prime T_s}{N_c+1}
+\end{split}
+\end{equation}
+Where $E_b$ is the energy per bit with $N_c$ data carriers and $E^\prime_b$ is the energy per bit after an additional pilot carrier has been added.  To maintain the link at the same BER:
+\begin{equation}
+\begin{split}
+E^\prime_b &= E_b \\
+\frac{S T_s}{N_c} &= \frac{S^\prime T_s} {N_c+1} \\
+\frac{S^\prime}{S} &= \frac{S (N_c+1)}{N} \\
+SNR^\prime &= SNR + 10log_{10}\left(\frac{N_c+1}{N_c}\right)  \\
+SNR^\prime &= SNR + L_{pc}  \quad [\si{dB}] \\
+L_{pc} &= 10log_{10}\left(\frac{N_c+1}{N_c}\right) 
+\end{split}
+\end{equation}
+where $L_{pc}$ is the loss in dB for adding a single pilot carrier.  For example given a 16 carrier waveform, $L_{pc}=10log_{10}(17/16)=0.26 \si{dB}$, which is quite modest for the potential gains in acquisition performance.  A pilot carrier will also be visible on a real time waterfall and provide a useful manual tuning aid.
+
+At this stage it does not appear necessary to add pilot carriers to meet our performance goals.
+
+\subsection{Unique Word Overhead}
+
+TODO: quite similar to above, include all loss terms to complete model (\ref{eq:snr_all}) above.  All loss term in glossary of symbols.
 
 \subsection{Bandwidth}
 
@@ -816,7 +847,7 @@ When $\hat{\omega} = \omega$, the two frequency shift terms will cancel out and 
 
 \subsection{False Acquisition on Noise}
 
-Consider a noise only signal being fed to acquisition system.  We desire a low probability of false detection, to avoid background noise "breaking squelch".  This can be conveniently defined in the mean time between false detections on noise $T_{noise}$ (units s).  Now a false detection occurs if one of more samples of $D_t$ over a modem frame exceeds $D_{thresh}$, which has a probability of $P_{thresh}$ (\ref{eq:prob_thresh}).  We sample $D_t$ on a grid of $N$ time and $M$ frequency points or $N_g=NM$ samples in total. The Binomial distribution can be used to compute the probability of an event occurring $x$ times from $n$ trials, if each event has probability $p$:
+Consider a noise only signal being fed to acquisition system.  We desire a low probability of false detection, to avoid background noise ``breaking squelch".  This can be conveniently defined in the mean time between false detections on noise $T_{noise}$ (units s).  Now a false detection occurs if one of more samples of $D_t$ over a modem frame exceeds $D_{thresh}$, which has a probability of $P_{thresh}$ (\ref{eq:prob_thresh}).  We sample $D_t$ on a grid of $N$ time and $M$ frequency points or $N_g=NM$ samples in total. The Binomial distribution can be used to compute the probability of an event occurring $x$ times from $n$ trials, if each event has probability $p$:
 \begin{equation}
 P_x = {n \choose x} p^x (1-p)^{n-x}
 \end{equation}
@@ -880,6 +911,54 @@ Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm
 \end{center}
 \end{figure}
 
+\subsection{Unique Word Post Processing}
+
+An acquisition candidate is evaluated by counting the number of errors in a $N_{uw}$ bit Unique Word (UW) - a known sequence of bits that is inserted into every modem frame.  The UW is mapped to $N_{uw}/2$ QPSK symbols that are spread throughout the modem frame.  An ideal post processor would reject all false candidates, and accept all correct candidates.  However there are two fail cases to consider:
+\begin{enumerate}
+\item $P(reject|correct)$ - the UW detector rejects a correct candidate, and transitions back to the ``search" state to look for the start of the next modem frame, which as per Figure \ref{fig:acq_curves} is quite likely in the next few modem frames.  The end user will experience a brief delay.
+\item $P(accept|false)$ - the UW detector accepts a false candidate.  The receiver will transition to the "synced" state and the speech decoder will start decoding random bits.  The end user will experience the receiver "breaking squelch" and R2D2 noises for several frames. Eventually high successive UW error counts will force the receiver back to the ``search" state.
+\end{enumerate}
+We model these two cases using the binomial CDF.  For a UW of length $N_{uw}$, we assume the probability of bit error of a correct candidate $p_c=0.1$ (threshold uncoded BER for a voice link), and the probability of bit error of a false candidate $p_f=0.5$ (random bits).  For $n$ bit errors in the received UW:
+\begin{equation}
+\begin{split}
+P_n &= P(<=n errors, p) \\
+    &= {N_{uw} \choose n} p^n (1-p)^{N_{uw}-n} \\
+P(reject|correct) &= P(> n errors, p_c) \\
+                  &= 1 - P(<=n errors, p_c) \\
+                  &= 1 - {N_{uw} \choose n} p_c^n (1-p_c)^{N_{uw}-n} \\
+P(accept|false)   &= P(<= n errors, p_f) \\
+                  &= {N_{uw} \choose n} p_f^n (1-p_f)^{N_{uw}-n}
+\end{split}
+\end{equation}
+
+Figure \ref{fig:acq_uw} plots the probability of both fail states against the number of UW errors.  A reasonable choice of a threshold is the point that minimises both fail cases, although there is some argument that minimising $P(accept|false)$ is more important as this case is more subjectively annoying.  Table {\ref{tab:acq_uw} shows the probability of each fail state for several UW lengths.  There is a trade off between minimising the probability of failure and the ``UW loss" $L_{uw}$ - the increase in SNR required due to the power consumed by UW bits at the expense of payload data. 
+
+For a given $P_{thesh}$ and $N_{uw}$ and the data in Table \ref{tab:noise_false_comparsion} we can estimate the mean time between ``breaking squelch" on noise after post processing. With $P_{thresh}=3E-5$, and $N_{uw}=8$, $T_{noise}/P(accept|false)=1.57/0.035=45$ seconds.  Through selection of $P_{thresh}, N_{uw}$ and the error threshold $n$ we can engineer an appropriate value for $P(accept|false)$ and hence the time between ``breaking squelch`` events.  Unlike current FreeDV modes, this will be independent of channel SNR, so the ``squelch" may not be required - making life less complicated for end users.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{r c c c}
+ \hline
+ $N_uw$ & $P(reject|correct)$ & $P(accept|false)$ \\ 
+ \hline
+ 8  & 0.038 & 0.035 \\
+ 12 & 0.026 & 0.019 \\
+ 16 & 0.017 & 0.011 \\
+ 24 & 0.007 & 0.003 \\
+ \hline
+\end{tabular}
+\caption{Comparison of UW lengths, threshold chosen to minimise both probabilities.}
+\label{tab:acq_uw}
+\end{table}
+
+\begin{figure}[H]
+\caption{Probability of UW post processor failing against number of UW errors $n$ for a $N_{uw}=16$ bit UW.  The threshold minimises the probability of both fail cases}
+\label{fig:acq_uw}
+\begin{center}
+\input acq_uw.tex
+\end{center}
+\end{figure}
+
 \subsection{CPU estimates}
 
 TODO 
@@ -894,29 +973,6 @@ TODO
 What is req for timing/freq error for successful acquisition?
 Block diagram (above) of all steps, e.g. acquisition, post processing, refinement
 
-\subsection{Pilot Carriers}
-
-A common acquisition strategy is to add one or more pilot carriers to aid frequency offset estimation. These carriers consume power and carry no payload data so an increase in the threshold SNR is required to maintain the voice link. Consider the effect on $E_b$ when adding an additional carrier:
-\begin{equation}
-\begin{split}
-E_b &= \frac{ST_s}{N_c} \\
-E^\prime_b &= \frac{S^\prime T_s}{N_c+1}
-\end{split}
-\end{equation}
-Where $E_b$ is the energy per bit with $N_c$ data carriers and $E^\prime_b$ is the energy per bit after an additional pilot carrier has been added.  To maintain the link at the same BER:
-\begin{equation}
-\begin{split}
-E^\prime_b &= E_b \\
-\frac{S T_s}{N_c} &= \frac{S^\prime T_s} {N_c+1} \\
-\frac{S^\prime}{S} &= \frac{S (N_c+1)}{N} \\
-SNR^\prime &= SNR + 10log_{10}\left(\frac{N_c+1}{N_c}\right)  \\
-SNR^\prime &= SNR + L_{pc}  \quad [\si{dB}] \\
-L_{pc} &= 10log_{10}\left(\frac{N_c+1}{N_c}\right) 
-\end{split}
-\end{equation}
-where $L_{pc}$ is the loss in dB for adding a single pilot carrier.  For example given a 16 carrier waveform, $L_{pc}=10log_{10}(17/16)=0.26 \si{dB}$, which is quite modest for the potential gains in acquisition performance.  A pilot carrier will also be visible on a real time waterfall and provide a useful manual tuning aid.
-
-At this stage it does not appear necessary to add pilot carriers to meet our performance goals.
 
 \subsection{Acquisition TODO}
 

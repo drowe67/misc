@@ -575,26 +575,29 @@ function sweep_q(Nc=16, epslatex=0)
 % Helper function to help design UW error thresholds. See also 
 % https://www.rowetel.com/wordpress/?p=7467
 % Source: codec2/octave/ofdm_helper.m
-function ofdm_determine_bad_uw_errors(Nuw)
-   figure(1); clf;
+function ofdm_determine_bad_uw_errors(Nuw, epslatex=0)
+  if epslatex, [textfontsize linewidth] = set_fonts(); end
+  figure(1); clf;
    
-   % Ideally the 10% and 50% BER curves are a long way apart
-   
-   % Pc(n), prob of n errors with correct acquistion
-   Pc = binocdf(0:Nuw,Nuw,0.1);
-   plot(0:Nuw, 1-Pc,';P(> n errors, corrrect);'); hold on; 
+  % Ideally the 10% and 50% BER curves are a long way apart
+  
+  % Pc(n), prob of n errors with correct acquistion
+  Pc = binocdf(0:Nuw,Nuw,0.1);
+  plot(0:Nuw, 1-Pc,';P(reject|correct);'); hold on; 
 
-   % Pf(n), probability of n errors with false acquistion
-   Pf = binocdf(0:Nuw,Nuw,0.5);
-   plot(0:Nuw, Pf,';P(<= n errors, false);'); 
-   
-   % Find n that minimises 1-Pc(n) and Pf(n)
+  % Pf(n), probability of n errors with false acquistion
+  Pf = binocdf(0:Nuw,Nuw,0.5);
+  plot(0:Nuw, Pf,';P(accept|false);'); 
+  
+  % Find n that minimises 1-Pc(n) and Pf(n)
 
-   [tmp n_min] = min(1-Pc+Pf); 
-   n_min -= 1;
+  [tmp n_min] = min(1-Pc+Pf); 
+  n_min -= 1;
 
-   plot([n_min n_min],[0 1],';suggested threshold;'); hold off; grid
-   xlabel('bit errors in UW');
+  plot([n_min n_min],[0 1],';suggested threshold;'); hold off; grid
+  xlabel('n (bit errors in UW)'); legend("boxoff"); axis([0 Nuw, 0 1]);
 
-   printf("for Nuw = %d, suggest reject error threshold > %d P(rejected|correct): %f P(accepted|false): %f\n", Nuw, n_min, 1-Pc(n_min+1),Pf(n_min+1));
+  if epslatex, print_eps_restore("acq_uw.tex","-S300,250",textfontsize,linewidth); end
+
+  printf("for Nuw = %d, suggest reject error threshold > %d P(rejected|correct): %f P(accepted|false): %f\n", Nuw, n_min, 1-Pc(n_min+1),Pf(n_min));
 end

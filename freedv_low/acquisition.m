@@ -177,7 +177,7 @@ function sim_out = acq_test(sim_in)
       if mod(s,Ns) == 1
         f_target_Rs = 0;
         if rand_freq 
-          f_target_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs)
+          f_target_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs);
         end
         omega = 2*pi*f_target_Rs*Rs/Fs;
       end
@@ -274,7 +274,7 @@ function sim_out = acq_test(sim_in)
         % prob of 1 or more detections per second if we just have noise at the input
         PnoisePerFrame = 1 - binopdf(0,nSamplesPerModemFrame,Pthresh);
         Tf = (Ts+Tcp)*Ns;
-        printf("EbNodB: %4.0f Nfr: %d Ndet: %4d Ncor: %4d Nfls: %4d Pcor: %4.3f Pfls: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f\n", 
+        printf("EbNodB: %4.0f Nfr: %4d Ndet: %4d Ncor: %4d Nfls: %4d Pcor: %4.3f Pfls: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f\n", 
                 EbNodB, nframes, Ndetect, Ncorrect, Nfalse, Ncorrect/nframes, Nfalse/nframes, Tdet, PnoisePerFrame, Tf/PnoisePerFrame);
      end
 
@@ -572,3 +572,29 @@ function sweep_q(Nc=16, epslatex=0)
   end
   endfunction
 
+% Helper function to help design UW error thresholds. See also 
+% https://www.rowetel.com/wordpress/?p=7467
+% Source: codec2/octave/ofdm_helper.m
+function ofdm_determine_bad_uw_errors(Nuw)
+   figure(1); clf;
+   
+   % Ideally the 10% and 50% BER curves are a long way apart
+   
+   % Pc(n), prob of n errors with correct acquistion
+   Pc = binocdf(0:Nuw,Nuw,0.1);
+   plot(0:Nuw, 1-Pc,';P(> n errors, corrrect);'); hold on; 
+
+   % Pf(n), probability of n errors with false acquistion
+   Pf = binocdf(0:Nuw,Nuw,0.5);
+   plot(0:Nuw, Pf,';P(<= n errors, false);'); 
+   
+   % Find n that minimises 1-Pc(n) and Pf(n)
+
+   [tmp n_min] = min(1-Pc+Pf); 
+   n_min -= 1;
+
+   plot([n_min n_min],[0 1],';suggested threshold;'); hold off; grid
+   xlabel('bit errors in UW');
+
+   printf("for Nuw = %d, suggest reject error threshold > %d P(rejected|correct): %f P(accepted|false): %f\n", Nuw, n_min, 1-Pc(n_min+1),Pf(n_min+1));
+end

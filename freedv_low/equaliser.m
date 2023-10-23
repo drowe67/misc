@@ -624,6 +624,11 @@ endfunction
 % load up externally generated simulation data and plot on SNR axis
 % usage:
 %   octave> equaliser; plot_curves_snr()
+%
+% Note before running plot_curves_snr(), run these at least once to generate data:
+%   octave> equaliser; run_curves_diversity()
+%   $ ./ofdm_c.sh
+
 function plot_curves_snr(epslatex=0)
     Ns = 8; Ts = 0.02; Tcp = 0.002;
     Lp = 10*log10(Ns/(Ns-1));        # 700D pilot symbol loss

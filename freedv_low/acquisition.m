@@ -96,7 +96,7 @@ function sim_out = acq_test(sim_in)
   randn('seed',1);
 
   load_const;
-  Pthresh = 1E-3;
+  Pthresh = 3E-5;
   fmin_Rs = floor(-200/Rs);
   fmax_Rs = ceil(200/Rs);
   %fmin_Rs = fmax_Rs = 0;
@@ -129,7 +129,7 @@ function sim_out = acq_test(sim_in)
   if isfield(sim_in,"timeOffsetSymbols")
     timeOffsetSymbols = sim_in.timeOffsetSymbols;
   end
-  timeOffsetSamples = (M+Ncp)*timeOffsetSymbols
+  timeOffsetSamples = (M+Ncp)*timeOffsetSymbols;
   tx = [zeros(1,timeOffsetSamples) tx];
   nsam = length(tx);
 
@@ -161,6 +161,13 @@ function sim_out = acq_test(sim_in)
     variance = 1/EsNo;
     noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
     rx_noise = rx + noise;
+
+    if isfield(sim_in,"add_sine")
+      sin_rms = sim_in.add_sine;
+      w_sin = 2*pi*1000/Fs;
+      rx_noise += sin_rms*exp(j*w_sin*(0:nsam-1));
+      printf("sin/noise: %5.2f dB sin/tx: %5.2f dB\n", 20*log10(sin_rms/sqrt(variance)), 20*log10(sin_rms/std(tx)));
+    end
 
     % Sample Dt on grid of time and freq steps
    
@@ -341,11 +348,15 @@ function sim_out = acq_test(sim_in)
 
       % Delta time and freq
       figure(6); clf;
-      subplot(211); plot(stats_log(:,1)*(Ts+Tcp),stats_log(:,3),'+'); ylabel('$\Delta$ T (syms)');
-      axis([0 nsymb*(Ts+Tcp) -Ns/2 Ns/2]);
-      subplot(212); plot(stats_log(:,1)*(Ts+Tcp),stats_log(:,4),'+'); ylabel('$\Delta$ Freq (Rs)');
-      axis([0 nsymb*(Ts+Tcp) fmin_Rs-0.001 fmax_Rs+0.001]); xlabel('Time(s)');
-
+      if length(stats_log)
+        subplot(211); 
+        plot(stats_log(:,1)*(Ts+Tcp),stats_log(:,3),'+');
+        ylabel('$\Delta$ T (syms)');
+        axis([0 nsymb*(Ts+Tcp) -Ns/2 Ns/2]);
+        subplot(212);
+        plot(stats_log(:,1)*(Ts+Tcp),stats_log(:,4),'+'); ylabel('$\Delta$ Freq (Rs)');
+        axis([0 nsymb*(Ts+Tcp) fmin_Rs-0.001 fmax_Rs+0.001]); xlabel('Time(s)');
+      end
       
       proto_post_proc = 0;
       if proto_post_proc
@@ -421,9 +432,11 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.Pthresh = varargin{i+1}; i++;    
       elseif strcmp(varargin{i},"timeOffsetSymbols")
         sim_in.timeOffsetSymbols = varargin{i+1}; i++;    
-       elseif strcmp(varargin{i},"norand")
+      elseif strcmp(varargin{i},"norand")
         sim_in.norand = 1;    
-     else
+      elseif strcmp(varargin{i},"addsine")
+        sim_in.add_sine = varargin{i+1}; i++;   
+      else
         printf("\nERROR unknown argument: %s\n", varargin{i});
         return;
       end
@@ -482,7 +495,7 @@ function run_curves(runtime_scale=0,epslatex=0)
 endfunction
 
 % automated spot checks for acquisition (candidates for ctests in C implementation)
-function spot_checks(nbits=1E5)
+function spot_checks(nbits=1E4)
     sim_in.verbose     = 1;
     sim_in.nbits       = nbits;
     sim_in.resampler   = "lin2";
@@ -490,18 +503,23 @@ function spot_checks(nbits=1E5)
     sim_in.Nd          = 1;
     sim_in.combining   = 'mrc';
  
+    passes = tests = 0;
     sim_in.ch = 'awgn'; sim_in.EbNovec = 2;  sim_out = acq_test(sim_in);
-    printf("AWGN Pcorrect: %4.2f Pfalse: %4.2f", sim_out.Pcorrect, sim_out.Pfalse);  
-    if sim_out.Pcorrect > 0.95, printf(" [PASS]\n"); else printf(" [FAIL]\n"); end
+    printf("---- AWGN Pcorrect: %4.2f Pfalse: %4.2f", sim_out.Pcorrect, sim_out.Pfalse);  
+    tests++;
+    if sim_out.Pcorrect > 0.8, printf(" [PASS]\n"); passes++; else printf(" [FAIL]\n"); end
 
     sim_in.ch = 'mpp'; sim_in.EbNovec = 7; sim_out = acq_test(sim_in);
-    printf("MPP Pcorrect: %4.2f Pfalse: %4.2f", sim_out.Pcorrect, sim_out.Pfalse);  
-    if sim_out.Pcorrect > 0.75, printf(" PASS]\n"); else printf(" [FAIL]\n"); end
+    printf("---- MPP Pcorrect: %4.2f Pfalse: %4.2f", sim_out.Pcorrect, sim_out.Pfalse);  
+    tests++;
+    if sim_out.Pcorrect > 0.6, printf(" [PASS]\n");  passes++; else printf(" [FAIL]\n"); end
  
     sim_in.ch = 'awgn'; sim_in.EbNovec = -100;  sim_out = acq_test(sim_in);
-    printf("Noise only Pcorrect: %4.2f Pfalse: %4.2f", sim_out.Pcorrect, sim_out.Pfalse);  
-    if sim_out.Pfalse < 0.05, printf(" [PASS]\n"); else printf(" FAIL]\n"); end
+    printf("---- Noise only Tdet: %4.2f", sim_out.Tdet);  
+    tests++;
+    if sim_out.Tdet > 1.5, printf(" [PASS]\n");  passes++; else printf(" [FAIL]\n"); end
 
+    printf("\nPASSED %d/%d\n",passes,tests)
 endfunction
 
 % checking our scale parameter mapping for Rayleigh

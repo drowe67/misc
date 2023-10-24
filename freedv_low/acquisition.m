@@ -579,6 +579,11 @@ function spot_checks(nbits=1E4)
     tests++;
     if sim_out.Tdet > 1.5, printf(" [PASS]\n");  passes++; else printf(" [FAIL]\n"); end
 
+    sim_in.ch = 'awgn'; sim_in.EbNovec = 4;  sim_in.sineci = 3; sim_out = acq_test(sim_in);
+    printf("---- Sine interferer C/I = 3dB Pcorrect: %4.2f"), sim_out.Pcorrect;  
+    tests++;
+    if sim_out.Pcorrect > 0.8, printf(" [PASS]\n");  passes++; else printf(" [FAIL]\n"); end
+
     printf("\nPASSED %d/%d\n",passes,tests)
 endfunction
 

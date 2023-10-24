@@ -35,7 +35,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
 \item New equalisation algorithm that performs well on a range of AWGN and multipath channels, removing the need for modes, and providing several dB improvement for 700E users.
 \item Diversity in frequency and possibly time providing around 3dB improvement over 700D on multipath channels.  
 \item Dynamic threshold and pilot symbol selection for $\pm 200$ Hz acquisition (four times wider that 700D/E) at lower SNR, simplifying end user tuning.
-\item More reliable acquisition (sync) - faster acquisition of valid FreeDV signals, better rejection of noise.
+\item More reliable acquisition (sync) - faster acquisition of valid FreeDV signals, better rejection of noise and no false acquisition on carriers.
 \item Designing the probability of ``breaking squelch" on noise, removing the need for a squelch slider, and reducing listener fatigue.
 \end{enumerate}
 
@@ -912,15 +912,27 @@ The new acquisition algorithm is therefore:
 \end{enumerate}
 Note that unlike the existing 700D/E acquisition algorithm $D_{thresh}$ is dynamic, and based on the standard deviation of the received signal.
 
-Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels.
+Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels. Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm over a range of channels.
 
-Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm over a range of channels.
+Figure \ref{fig:acq_curves_sin} shows the performance with an additive sine wave interferer, typical of other stations "tuning up" on the band.  There are two fail cases to consider:
+\begin{enumerate}
+\item With a FreeDV signal present, the interfering carrier blocks acquisition of our FreeDV signal.  From Figure \ref{fig:acq_curves_sin} we can see this occurs as the carrier power approaches the power of our wanted signal.  This can be explained by the sine wave power being included in the calculation of $\sigma$, hence increasing $D_{thresh}$ computed with (\ref{eq:corr_prob}). This suggests it is possible for malicious band users to block FreeDV using strong carriers, an undesirable result.  If this becomes a practical problem, an automatic notch filter could be employed to remove single frequency tones before the computation of $\sigma$.
+\item With no FreeDV signal present, the acquisition system makes a false detection on the carrier.  This is an issue with FreeDV 700C. The simulations suggest the acquisition system presented here does not falsely detect the carrier in the presence of only channel noise.  In fact the period between false detections $T_{noise}$ increases in the presence of a carrier, a desirable result.  This can also be explained by $\sigma$ and hence $D_{thresh}$ increasing with the carrier.
+\end{enumerate}
 
 \begin{figure}[H]
 \caption{Probability of acquisition for a range of channels and SNRs for 300 seconds of simulated $N_c=16, N_d=1, 1400$ bits/s signal, $P_{thresh}=\num{3e-5}$. Correct acquisition is defined as a timing error of $< \pm R_s$ and frequency error of $< \pm 0.5R_s$.  False acquisition occurs when $D_{tmax} > D_{thresh}$ but the estimates are outside the success tolerances  In this case we rely on post processing to reject the acquisition attempt.}
 \label{fig:acq_curves}
 \begin{center}
 \input acq_curves.tex
+\end{center}
+\end{figure}
+
+\begin{figure}[H]
+\caption{Probability of acquisition with additive sine wave interferer for a 30 second simulation, given a FreeDV signal is present. $C/I$ is the ratio of our wanted signal to the power of the sine wave interferer.  The frequency of the sine wave was changed randomly every 1 second, but always overlapped our OFDM signal.}
+\label{fig:acq_curves_sin}
+\begin{center}
+\input acq_curves_sin.tex
 \end{center}
 \end{figure}
 

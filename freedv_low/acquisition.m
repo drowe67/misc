@@ -117,8 +117,8 @@ function sim_out = acq_test(sim_in)
     rand_freq = 0; rand_time = 0;
   end
 
-  nFreqSteps = length(fmin_Rs:freqStep:fmax_Rs)
-  nTimeSteps = nsymb/timeStep
+  nFreqSteps = length(fmin_Rs:freqStep:fmax_Rs);
+  nTimeSteps = nsymb/timeStep;
  
   [tx_bits tx P] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
 
@@ -162,11 +162,16 @@ function sim_out = acq_test(sim_in)
     noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
     rx_noise = rx + noise;
 
-    if isfield(sim_in,"add_sine")
-      sin_rms = sim_in.add_sine;
-      w_sin = 2*pi*1000/Fs;
-      rx_noise += sin_rms*exp(j*w_sin*(0:nsam-1));
-      printf("sin/noise: %5.2f dB sin/tx: %5.2f dB\n", 20*log10(sin_rms/sqrt(variance)), 20*log10(sin_rms/std(tx)));
+    % random additive sine wave
+    if isfield(sim_in,"sineci") || isfield(sim_in,"sinein") 
+      if isfield(sim_in,"sineci"), sin_rms = std(tx)/(10^(sim_in.sineci/10)); end
+      if isfield(sim_in,"sinein"), sin_rms = (10^(sim_in.sinein/10))*sqrt(variance); end
+      
+      for n=1:Fs:length(rx_noise)
+        omega_sin = (w(Nc+2)-w(1))*rand(1,1) + w(1);
+        st = n; en = min(length(rx_noise),st+Fs-1);
+        rx_noise(st:en) += sin_rms*exp(j*omega_sin*(0:(en-st)));
+      end
     end
 
     % Sample Dt on grid of time and freq steps
@@ -434,8 +439,12 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.timeOffsetSymbols = varargin{i+1}; i++;    
       elseif strcmp(varargin{i},"norand")
         sim_in.norand = 1;    
-      elseif strcmp(varargin{i},"addsine")
-        sim_in.add_sine = varargin{i+1}; i++;   
+      elseif strcmp(varargin{i},"sinecidB")
+        % carrier to sinusoidal interferer ratio 
+        sim_in.sineci = varargin{i+1}; i++;   
+      elseif strcmp(varargin{i},"sineindB")
+        % sinusoidal interferer to noise ratio
+        sim_in.sinein = varargin{i+1}; i++;   
       else
         printf("\nERROR unknown argument: %s\n", varargin{i});
         return;
@@ -487,6 +496,57 @@ function run_curves(runtime_scale=0,epslatex=0)
 
     if epslatex
       fn = "acq_curves.tex";
+      print(fn,"-depslatex","-S350,250");
+      printf("printing... %s\n", fn);
+      restore_fonts(textfontsize,linewidth);
+    end
+   
+endfunction
+
+% acquisition performance with additive sine wave interferer
+% usage: acquisition; run_curves_sin
+function run_curves_sin(nbits=1E5, epslatex=0)
+    sim_in.verbose     = 1;
+    sim_in.ch_phase    = 0;
+    sim_in.resampler   = "lin2";
+    sim_in.ls_pilots   = 1;
+    sim_in.Nd          = 1;
+    sim_in.combining   = 'mrc';
+    sim_in.Pthresh     = 3E-5;
+    sim_in.nbits       = nbits;
+       
+    sim_in.EbNovec = 4; sim_in.ch = 'awgn'; 
+    awgn.P = [];
+    ci_vec = -3:1:10;
+    for n = 1:length(ci_vec)
+      sim_in.sineci = ci_vec(n);
+      sim_out = acq_test(sim_in);
+      awgn.Pcorrect(n) = sim_out.Pcorrect;
+      awgn.Pfalse(n) = sim_out.Pfalse;
+    end
+
+    sim_in.EbNovec = 7; sim_in.ch = 'mpp'; 
+    for n = 1:length(ci_vec)
+      sim_in.sineci = ci_vec(n);
+      sim_out = acq_test(sim_in);
+      mpp.Pcorrect(n) = sim_out.Pcorrect;
+      mpp.Pfalse(n) = sim_out.Pfalse;
+    end
+
+    if epslatex
+      [textfontsize linewidth] = set_fonts();
+    end
+
+    figure(6); clf; hold on;
+    plot(ci_vec,awgn.Pcorrect,'b+-;Pcorrect AWGN;');
+    plot(ci_vec,awgn.Pfalse,'b+-;Pfalse AWGN;');
+    plot(ci_vec,mpp.Pcorrect,'g+-;Pcorrect MPP;');
+    plot(ci_vec,mpp.Pfalse,'g+-;Pfalse MPP;');
+    hold off; axis([min(ci_vec) max(ci_vec) 0 1]); grid;
+    xlabel('C/I (dB)'); legend('boxoff'); legend('location','east');
+
+    if epslatex
+      fn = "acq_curves_sin.tex";
       print(fn,"-depslatex","-S350,250");
       printf("printing... %s\n", fn);
       restore_fonts(textfontsize,linewidth);

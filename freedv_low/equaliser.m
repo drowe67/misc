@@ -26,7 +26,7 @@ function [tx_bits tx] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes
       % set up Nc x Ns array of symbols with pilots
       atx_symb = zeros(Nc,Ns); 
       for c=1:Nc
-        atx_symb(c,1) = 1;
+        atx_symb(c,1) = 1; % TODO make equaliser work with any pilots
         for s=2:Ns
           atx_symb(c,s) = qpsk_mod(tx_bits(bit:bit+1)); bit += 2;
         end
@@ -200,7 +200,7 @@ function sim_out = ber_test(sim_in)
           end
           if strcmp(sim_in.resampler,"lin2")
             % Linear interpolation between two nearest pilots, used on 700E and datac1 modes
-            % 1.5dB Il AWGN, similar performance to mean4 on HF (1.5dB), trade off I guess
+            % 1.5dB IL AWGN, similar performance to mean4 on HF (1.5dB), trade off I guess
             rx_ch(c,:) = interp1(rx_pilots_t,rx_pilots(c,:),rx_symb_t);
           end
           if strcmp(sim_in.resampler,"mean4")

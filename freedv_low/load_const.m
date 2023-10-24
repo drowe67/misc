@@ -28,10 +28,10 @@ pilot_freq_weights = [0 1 0];
 if isfield(sim_in,"pilot_freq_weights")
     pilot_freq_weights = sim_in.pilot_freq_weights;
 end
-combining = "ecg";
 if isfield(sim_in,"Nd")
     Nd = sim_in.Nd;
 end
+combining = "ecg";
 if isfield(sim_in,"combining")
     combining = sim_in.combining;
 end

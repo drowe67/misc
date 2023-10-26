@@ -187,7 +187,7 @@ function sim_out = acq_test(sim_in)
 
       % random freq offset every modem frame
       if mod(s,Ns) == 1
-        f_target_Rs = 0;
+        f_target_Rs = 0.0;
         if rand_freq 
           f_target_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs);
         end
@@ -197,7 +197,7 @@ function sim_out = acq_test(sim_in)
 
       % random target timing offset +/-Rs/2 for every modem frame
       if mod(s,Ns) == 1
-        t_offset_Rs = 0;
+        t_offset_Rs = 0.0;
         if rand_time
           t_offset_Rs = 0.5 - rand(1,1);
         end
@@ -205,7 +205,7 @@ function sim_out = acq_test(sim_in)
       end
       t_target_log(t_ind) = Ns*floor(s/Ns)+1 + timeOffsetSymbols + t_offset_Rs;
       if (s > 2) && (s < (nsymb-1))
-        st += t_offset_ind; en += t_offset_ind;
+        st -= t_offset_ind; en -= t_offset_ind;
       end
 
       for f_Rs=fmin_Rs:freqStep:fmax_Rs;
@@ -255,11 +255,7 @@ function sim_out = acq_test(sim_in)
       
       t_ind = s/timeStep-1/timeStep+1;
 
-      if verbose == 2
-        printf("t_targ: %6.2f t_max: %6.2f f_targ: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", t_target_log(t_ind), 
-               t_max, f_target_log(t_ind), f_max, abs(Dtmax), Dthresh);
-      end
-
+      f_fine_max = 0;
       if abs(Dtmax) > Dthresh
         Ndetect++;
         t_error = t_max-t_target_log(t_ind);
@@ -272,6 +268,38 @@ function sim_out = acq_test(sim_in)
           Nfalse++;
         end
         stats_log = [stats_log; t_target_log(t_ind) correct t_error f_error];
+
+        % Attempt to refine freq estimate at chosen timing est
+        
+        % Reconstruct freq and time offset (messy - not the best simulation design!)
+        omega = 2*pi*f_target_log(t_ind)*Rs/Fs;
+        t_offset_Rs = t_target_log(t_ind) - Ns*floor(t_max/Ns)-1 - timeOffsetSymbols;
+        t_offset_ind = round(t_offset_Rs*(M+Ncp));
+        st = (t_max-1)*(M+Ncp)+1;
+        en = st+M+Ncp-1;
+        if (t_max > 2) && (t_max < (nsymb-1))
+          st -= t_offset_ind; en -= t_offset_ind;
+        end
+
+        fmin_fine_Rs = f_max - freqStep;
+        fmax_fine_Rs = f_max + freqStep;
+        Dtmax1 = 0;
+        for f_Rs=fmin_fine_Rs:0.01:fmax_fine_Rs
+          f_Hz = f_Rs*Rs;
+          omega_hat = 2*pi*f_Hz/Fs;
+          r(:,1) = exp(j*(omega-omega_hat)*(0:M-1)).*rx_noise(st+Ncp:en);
+          Dt1 = r'*p;
+          if abs(Dt1) > abs(Dtmax1)
+            Dtmax1 = Dt1;
+            f_fine_max = f_Rs;
+          end
+        end
+        
+      end
+
+      if verbose == 2
+        printf("t_targ: %6.2f t_max: %6.2f f_targ: %5.2f f_max: %5.2f f_fine_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f\n", 
+               t_target_log(t_ind), t_max, f_target_log(t_ind), f_max, f_fine_max, abs(Dtmax), Dthresh);
       end
 
       Dtmax_log = [Dtmax_log Dtmax];

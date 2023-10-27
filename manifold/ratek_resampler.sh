@@ -569,22 +569,18 @@ function vq_test_subset() {
   c2enc 700C $fullfile - | c2dec 700C - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_10_700C.wav
 }
 
-# generate amp postfiltered rate K training material from source speech file 
-function gen_train() {
+# generate amp postfiltered rate K training material (20 element vectors) from source speech file, 
+# norm enenergy and Nb=20 filtering
+function gen_train_b() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
-  
-  filename_b=${filename}_b.f32
-  if [ $# -eq 2 ]; then
-    filename_b=$2
-  fi
-
+  filename_b=$2
+ 
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
-        ${options} \
-        'K',${K}); quit;" \
+        'K',20,'norm_en'); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
@@ -828,8 +824,8 @@ if [ $# -gt 0 ]; then
         postfilter_rate_test ../raw/kristoff.raw
         postfilter_rate_test ../raw/mmt1.raw      
         ;;
-    gen_train)
-        gen_train $2 $3
+    gen_train_b)
+        gen_train_b $2 $3
         ;;
     gen_train_y)
         gen_train_y $2 $3

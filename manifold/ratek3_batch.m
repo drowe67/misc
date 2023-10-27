@@ -39,7 +39,7 @@ function B = ratek3_batch_tool(samname, varargin)
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
   plot_mic_eq = 0; vq_en = 0; norm_en = 0; compress_en = 0; limit_mean = 0;
-  quant_e4 = 0;
+  quant_e4 = 0; Y_out_fn = ""; 
   
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -126,6 +126,7 @@ function B = ratek3_batch_tool(samname, varargin)
     end
     i++;      
   end  
+  printf("rateK_en: %d K: %d norm_en: %d Nb: %d\n", rateK_en, K, norm_en, Nb);
 
   model_name = strcat(samname,"_model.bin");
   model = load_codec2_model(model_name);
@@ -221,7 +222,7 @@ function B = ratek3_batch_tool(samname, varargin)
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB(f,:), rate_K_sample_freqs_kHz, "spline", "extrap");
       if norm_en
-        B(f,:) = norm_energy(YdB, B(f,:));
+        B(f,:) = norm_energy(YdB(f,:), B(f,:));
       end
       if mic_eq
         B(f,:) -= q;

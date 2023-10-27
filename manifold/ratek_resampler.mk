@@ -98,7 +98,7 @@ $(TRAIN)_y80.f32:
 	./ratek_resampler.sh gen_train_y $(TRAIN_FULL) $(TRAIN)_y80.f32
 
 $(TRAIN)_b20.f32:
-	K=20 ./ratek_resampler.sh gen_train $(TRAIN_FULL) $(TRAIN)_b20.f32
+	./ratek_resampler.sh gen_train_b $(TRAIN_FULL) $(TRAIN)_b20.f32
 
 clean:
 	rm -f $(PLOT_DATA)

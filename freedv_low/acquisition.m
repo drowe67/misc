@@ -329,7 +329,8 @@ function sim_out = acq_test(sim_in)
     sim_out.Pcorrect(ne) = Ncorrect/nframes;
     sim_out.Pfalse(ne) = Nfalse/nframes;
     sim_out.Tdet(ne) = Tdet;
-    sim_out.f_fine_log(ne,:) = f_fine_log;
+    % note we just store latest here - only usable for single points
+    sim_out.f_fine_log = f_fine_log;
 
     if verbose == 2
       if epslatex

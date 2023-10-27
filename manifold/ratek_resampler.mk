@@ -94,11 +94,11 @@ $(TRAIN)_pred_res1.txt $(TRAIN)_pred_res2.txt: $(TRAIN)_b20.f32
 	K=20 Kst=0 Ken=19 M=$(M) removemean=" " lower=-100 extract_options="--p 0.9 -d 2" \
 	../script/ratek_resampler.sh train_lbg_pred $(TRAIN)_b20.f32 $(TRAIN)_pred
 
-$(TRAIN)_b.f32:
-	../script/ratek_resampler.sh gen_train $(TRAIN_FULL)
+$(TRAIN)_y80.f32:
+	./ratek_resampler.sh gen_train_y $(TRAIN_FULL) $(TRAIN)_y80.f32
 
 $(TRAIN)_b20.f32:
-	K=20 ../script/ratek_resampler.sh gen_train $(TRAIN_FULL) $(TRAIN)_b20.f32
+	K=20 ./ratek_resampler.sh gen_train $(TRAIN_FULL) $(TRAIN)_b20.f32
 
 clean:
 	rm -f $(PLOT_DATA)

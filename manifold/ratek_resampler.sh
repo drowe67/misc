@@ -4,7 +4,7 @@
 #
 # Support for rate K resampler experiments see doc/ratek_resampler
 
-CODEC2_PATH=$HOME/codec2
+CODEC2_PATH=$HOME/codec2-dev
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
 
 # bunch of options we can set via variables
@@ -588,21 +588,18 @@ function gen_train() {
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
-function gen_train_comp() {
+# Generate oversampled K=80 (79 element vectors) training material from source speech file
+# Energy is normalised and no filtering.
+function gen_train_y() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   extension="${filename##*.}"
   filename="${filename%.*}"
-  
-  filename_b=${filename}_b.f32
-  if [ $# -eq 2 ]; then
-    filename_b=$2
-  fi
+  filename_y=$2
 
-  c2sim $fullfile --hpf --prede --comp_gain 6 --comp 10000 --comp_dr 30 --modelout ${filename}_model.bin
-  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
-        ${options} \
-        'K',${K}); quit;" \
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'Y_out',\"${filename_y}\", \
+        'norm_en','Nb',100); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
@@ -833,6 +830,9 @@ if [ $# -gt 0 ]; then
         ;;
     gen_train)
         gen_train $2 $3
+        ;;
+    gen_train_y)
+        gen_train_y $2 $3
         ;;
     gen_train_comp)
         gen_train_comp $2 $3

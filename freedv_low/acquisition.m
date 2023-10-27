@@ -220,7 +220,7 @@ function sim_out = acq_test(sim_in)
     % count successful acquisitions
     Ncorrect = 0; Nfalse = 0; Ndetect = 0;
     Dtmax_log = [];
-    t_max_log = [];
+    t_max_log = []; f_fine_log = [];
     stats_log = [];
     for s=1:Ns:nsymb
 
@@ -257,6 +257,9 @@ function sim_out = acq_test(sim_in)
 
       f_fine_max = 0;
       if abs(Dtmax) > Dthresh
+
+        % Evaluate candidate
+
         Ndetect++;
         t_error = t_max-t_target_log(t_ind);
         f_error = f_max-f_target_log(t_ind);
@@ -267,8 +270,7 @@ function sim_out = acq_test(sim_in)
         else
           Nfalse++;
         end
-        stats_log = [stats_log; t_target_log(t_ind) correct t_error f_error];
-
+ 
         % Attempt to refine freq estimate at chosen timing est
         
         % Reconstruct freq and time offset (messy - not the best simulation design!)
@@ -281,6 +283,7 @@ function sim_out = acq_test(sim_in)
           st -= t_offset_ind; en -= t_offset_ind;
         end
 
+        % Correlate over a fine freq grid
         fmin_fine_Rs = f_max - freqStep;
         fmax_fine_Rs = f_max + freqStep;
         Dtmax1 = 0;
@@ -295,6 +298,11 @@ function sim_out = acq_test(sim_in)
           end
         end
         
+        if correct
+          f_fine_error = f_fine_max-f_target_log(t_ind);
+          f_fine_log = [f_fine_log f_fine_error];
+        end
+        stats_log = [stats_log; t_target_log(t_ind) correct t_error f_error];
       end
 
       if verbose == 2
@@ -314,13 +322,14 @@ function sim_out = acq_test(sim_in)
         % prob of 1 or more detections per second if we just have noise at the input
         PnoisePerFrame = 1 - binopdf(0,nSamplesPerModemFrame,Pthresh);
         Tf = (Ts+Tcp)*Ns;
-        printf("EbNodB: %4.0f Nfr: %4d Ndet: %4d Ncor: %4d Nfls: %4d Pcor: %4.3f Pfls: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f\n", 
-                EbNodB, nframes, Ndetect, Ncorrect, Nfalse, Ncorrect/nframes, Nfalse/nframes, Tdet, PnoisePerFrame, Tf/PnoisePerFrame);
+        printf("EbNodB: %4.0f Nfr: %4d Ndet: %4d Ncor: %4d Nfls: %4d Pcor: %4.3f Pfls: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f f_freq std: %4.3f\n", 
+                EbNodB, nframes, Ndetect, Ncorrect, Nfalse, Ncorrect/nframes, Nfalse/nframes, Tdet, PnoisePerFrame, Tf/PnoisePerFrame,std(f_fine_log));
      end
 
     sim_out.Pcorrect(ne) = Ncorrect/nframes;
     sim_out.Pfalse(ne) = Nfalse/nframes;
     sim_out.Tdet(ne) = Tdet;
+    sim_out.f_fine_log(ne,:) = f_fine_log;
 
     if verbose == 2
       if epslatex
@@ -391,43 +400,10 @@ function sim_out = acq_test(sim_in)
         axis([0 nsymb*(Ts+Tcp) fmin_Rs-0.001 fmax_Rs+0.001]); xlabel('Time(s)');
       end
       
-      proto_post_proc = 0;
-      if proto_post_proc
-        % Prototype post processing - are "bit errors" in pilots meaningful?
-        % plot scatter of pilots, treating them like demodulated BPSK 
-        % usage:
-        %   acquisition; run_single(nbits=1E4,ch='awgn',-3,'norand','Pthresh',1E-4
-        % Results were unsatisfactory, even when correct==0, number of correct bits high.
-        % This kind of makes sense, as correllation sum is like soft decision version of bits.
-        % So leaving this for now .... looks like we need a unique word.
-        figure(7); clf; hold on;
-        for i=1:length(stats_log)
-          
-          % extract received samples for candidate
-          % TODO - make this work for random time and freq (use 'norand' option for now)
-          s = stats_log(i,1);
-          st = (s-1)*(M+Ncp)+1;
-          en = st+M+Ncp-1;
-          r(:,1) = rx_noise(st+Ncp:en);
-
-          % back to a set of freq domain symbols
-          P_hat = Wfwd*r;
-
-          % equalise - use simple linear average of adjacent pilots for now
-          H = zeros(Nc+2,1);
-          for c=2:Nc+1
-            H(c) = mean(P_hat(c-1:c+1)./P(c-1:c+1));
-          end
-          H(1) = H(2); H(Nc+2) = H(Nc+1);
-
-          P_eq = P_hat .* exp(-j*angle(H));
-          plot(P_eq,'+');
-
-          % count errors
-          printf("%6.2f %d %2d\n", s, stats_log(i,2), sum(real(P_eq.*P)>0));
-        end
-        hold off; mx = 1.5*max(abs(P_hat(:)));
-        axis([-mx mx -mx mx])
+      % Histogram of fine freq errors
+      figure(7); clf;
+      if length(f_fine_log)
+        hist(f_fine_log);
       end
     end
 
@@ -510,7 +486,7 @@ function run_curves(runtime_scale=0,epslatex=0)
       [textfontsize linewidth] = set_fonts();
     end
 
-    figure(6); clf; hold on;
+    figure(8); clf; hold on;
     plot(EbNovec,awgn.Pcorrect,'b+-;Pcorrect AWGN;');
     plot(EbNovec,awgn.Pfalse,'b+-;Pfalse AWGN;');
     plot(EbNovec,mpp.Pcorrect,'g+-;Pcorrect MPP;');
@@ -565,7 +541,7 @@ function run_curves_sin(nbits=1E5, epslatex=0)
       [textfontsize linewidth] = set_fonts();
     end
 
-    figure(6); clf; hold on;
+    figure(8); clf; hold on;
     plot(ci_vec,awgn.Pcorrect,'b+-;Pcorrect AWGN;');
     plot(ci_vec,awgn.Pfalse,'b+-;Pfalse AWGN;');
     plot(ci_vec,mpp.Pcorrect,'g+-;Pcorrect MPP;');
@@ -575,6 +551,51 @@ function run_curves_sin(nbits=1E5, epslatex=0)
 
     if epslatex
       fn = "acq_curves_sin.tex";
+      print(fn,"-depslatex","-S350,250");
+      printf("printing... %s\n", fn);
+      restore_fonts(textfontsize,linewidth);
+    end
+   
+endfunction
+
+% Histograms of fine freq error
+% usage: acquisition; fine_freq_hist
+function fine_freq_hist(nbits=1E5, epslatex=0)
+    sim_in.verbose     = 1;
+    sim_in.ch_phase    = 0;
+    sim_in.resampler   = "lin2";
+    sim_in.ls_pilots   = 1;
+    sim_in.Nd          = 1;
+    sim_in.combining   = 'mrc';
+    sim_in.Pthresh     = 3E-5;
+    sim_in.nbits       = nbits;
+       
+    sim_in.EbNovec = 100; sim_in.ch = 'awgn';
+    awgn_out1 = acq_test(sim_in);
+    sim_in.EbNovec = 2; sim_in.ch = 'awgn';
+    awgn_out2 = acq_test(sim_in);
+    sim_in.EbNovec = 7; sim_in.ch = 'mpp'; 
+    mpp_out = acq_test(sim_in);
+
+    if epslatex
+      [textfontsize linewidth] = set_fonts();
+    end
+
+    figure(8); clf; hold on;
+    [h1 x]=hist(awgn_out1.f_fine_log);
+    %h1 = h1/trapz(x,h);
+    plot(x,h1,'r;AWGN $E_b/N_0=100$ dB;'); 
+    [h2 x]=hist(awgn_out2.f_fine_log);
+    %h2 = h2/trapz(x,h);
+    plot(x,h2,'b;AWGN $E_b/N_0=2$ dB;'); 
+    [h3 x]=hist(mpp_out.f_fine_log);
+    %h3 = h3/trapz(x,h);
+    plot(x,h3,'g;MPP $E_b/N_0=7$ dB;'); 
+    hold off; grid; axis([-0.2 0.2 0 max([h1 h2 h3])]);
+    xlabel('Freq Error ($R_s$)'); legend('boxoff');
+
+    if epslatex
+      fn = "acq_fine_hist.tex";
       print(fn,"-depslatex","-S350,250");
       printf("printing... %s\n", fn);
       restore_fonts(textfontsize,linewidth);

@@ -959,7 +959,7 @@ P(accept|false)   &= P(<= n errors, p_f) \\
 
 Figure \ref{fig:acq_uw} plots the probability of both fail states against the number of UW errors.  A reasonable choice of a threshold is the point that minimises both fail cases, although there is some argument that minimising $P(accept|false)$ is more important as this case is more subjectively annoying.  Table {\ref{tab:acq_uw} shows the probability of each fail state for several UW lengths.  There is a trade off between minimising the probability of failure and the ``UW loss" $L_{uw}$ - the increase in SNR required due to the power consumed by UW bits at the expense of payload data. 
 
-For a given $P_{thesh}$ and $N_{uw}$ and the data in Table \ref{tab:noise_false_comparsion} we can estimate the mean time between ``breaking squelch" on noise after post processing. With $P_{thresh}=3E-5$, and $N_{uw}=8$, $T_{noise}/P(accept|false)=1.57/0.035=45$ seconds.  Through selection of $P_{thresh}, N_{uw}$ and the error threshold $n$ we can engineer an appropriate value for $P(accept|false)$ and hence the time between ``breaking squelch`` events.  Unlike current FreeDV modes, this will be independent of channel SNR, so the ``squelch" may not be required - making life less complicated for end users.
+For a given $P_{thesh}$ and $N_{uw}$ and the data in Table \ref{tab:noise_false_comparsion} we can estimate the mean time between ``breaking squelch" on noise after post processing. With $P_{thresh}=3E-5$, and $N_{uw}=8$, $T_{noise}/P(accept|false)=1.57/0.035=45$ seconds.  Through selection of $P_{thresh}, N_{uw}$ and the error threshold $n$ we can engineer an appropriate value for $P(accept|false)$ and hence the time between ``breaking squelch`` events.  Unlike current FreeDV modes, this will be independent of channel SNR, so a ``squelch" control may not be required - making life less complicated for end users.
 
 \begin{table}[h]
 \centering
@@ -987,39 +987,32 @@ For a given $P_{thesh}$ and $N_{uw}$ and the data in Table \ref{tab:noise_false_
 
 \subsection{CPU estimates}
 
-TODO 
-
-Estimate MIP with +/- 200 Hz frequency offset estimation. Compare to 700D.  Suggestions for strategies.
-Compare to load when demodulating
+TODO: Estimate MIP with +/- 200 Hz frequency offset estimation. Compare to 700D.  Compare to load when demodulating.  How vectorised can we get it, e.g. organising as a big matrix multiply might vectorise better. Maths/example for using FFT, issue in that it calculates every step.
 
 \subsection{Frequency Offset Refinement and Tracking}
 
-TODO
+\begin{figure}[H]
+\caption{Histograms of fine freq error using a $0.01R_s$ grid to evaluate $D_{tmax}$. $E_b/N_0=100$ dB is the ideal, no noise case; the other two cases are worst case, threshold $E_b/N_0$ for the channels.}
+\label{fig:acq_fine_hist}
+\begin{center}
+\input acq_fine_hist.tex
+\end{center}
+\end{figure}
 
-What is req for timing/freq error for successful acquisition?
+TODO: Should we do fine freq sampling/refinement before UW?  I think so, as it will improve UW results.  What is req for timing/freq error for successful acquisition?  I guess within capability of phase correction in equalisation to resolve, x\% of the time.
+
+For tracking we wish to be able to follow a certain rate of change, and resolve freq error to within range of phase est to resolve.
+
 Block diagram (above) of all steps, e.g. acquisition, post processing, refinement
 
 
 \subsection{Acquisition TODO}
 
 \begin{enumerate}
-\item Determine dimensions of time/freq sampling grid, for example is $D_t$ is maximised despite +/-200 Hz offset, ie do we need to sample it at every time instant and every freq instant, or can we just scan time first.
-\item Derive correlation approach as MMSE.  Show issue with combining $C_p$ from adjacent carriers. Can we establish reason it breaks down at +/- 25 Hz?  Are there any cycles at $T_f$?  Review blog posts.
-\item Include frequency offset in $E$ and $C_p$, explain how that can be included as function that we sample.
-\item Can we come up with an expression for the $C_t$ threshold?
-\item Can we come up for an expression for probability of error?
-\item Simply optimise what we have, make it work at a wider range.
-\item Even if cost function with freq offset is non-linear, can we differentiate it and solve iteratively?
 \item Can phase shift between successive pilots be used for fine freq estimation/refinement?
-\item Simulation framework to test current performance, measure probability of sync and probability of failure.  Why do we need UW?  Lets drill into that.
-\item Other methods (multiple by time shifted version) once we have a framework.
 \item With a wider $Nd=2$ signal, we might get better results.  We could also consider different pilots for each copy, as they aren't used for combining.
-\item There may be a good way to select an appropriate sequence for pilots to maximise the probability of detection, and mimimise PAPR.
-\item Consider an "end of over frame", to signal a clean end of over and squelch.
-\item Algorithm idea. Pilots can be considered a set of QPSK symbols, e.g. if $N_c=16$ we have 32 bits. We could equalise then measure BER and use this as metric for sync.  It also gives a us a tractable probability of error, and an easy way to combine with adjacent pilots.
-\item test with impulse noise and sinusoids
-\item plot Rayleigh on top of histogram
-\item req: we want acquisition to work a few dB lower than FEC.
+\item Consider an "end of over frame", signal a clean end of over and squelch.
+\item test with impulse noise and speech
 \end{enumerate}
 
 \subsection{Timing estimation}

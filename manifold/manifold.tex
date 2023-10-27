@@ -1,0 +1,62 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{tikz}
+\begin{document}
+
+\title{Unwrapping Codec 2 Data Manifolds}
+\maketitle
+
+``Uncrumpling paper balls is what machine learning is all about: finding neat representations for complex, highly folded data manifolds." \cite{chollet2018deep}
+
+Speech coding can be defined as the art of representing speech using a small number of parameters that can be efficiently sent over a channel.
+
+Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $\{A_m\}, m=1..L$ to a set of fixed length $K=20$ samples $\{B_k\},k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is therefore dependent on the magnitude spectra available at the receiver. A post filter $P()$ is applied which improves the perceptual quality, in particular for low pitched (male) speakers. The post filter is a form of ad-hoc non-linear filtering, using experimentally derived constants.  It raises formants and lowers anti-formants, effectively reducing formant bandwidth and more widely distributing energy in time (each formant ``rings" longer).
+
+There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, narrow formant bandwidths must be maintained in order to spread formant energy in time.  When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Female speech is less sensitive as the wide harmonic spacing results in adequate energy distribution over the pitch cycle.
+
+Neural codecs have shown high quality speech can be synthesised using vectors of sparsely sampled frequency domain samples (MFCs).  Applying linear transformations (such as IDCT and interpolation) to recover $\{A_m\}$ from MFCs results in poor quality synthesised speech in sinusoidal codecs.  This implies neural codecs are enjoying a non-linear transformation, made possible by modern machine learning techniques.
+
+\section{Vector Quantisation}
+
+Vector quantisers can take advantage of linear and non-linear dependencies to reduce bit rate \cite{makhoul1985vector}.  They can efficiently exploit information that is uncorrelated in a linear sense (no linear transformation exists), but is statistically dependant.
+
+The 700C resampling to a fixed length $K<<L_{max}$ is a linear transformation aimed at fixing the dimension of the data, reducing the dimension of the data making is easier to quantise (less information) and reducing VQ storage.  Implicit in the resampling is a filtering/smoothing/aliasing operation, so some information is lost.
+
+In this experiment we will upsample the variable rate $L$ vectors to a fixed length $K=80$, then vector quantise.  In this way no information is lost from the source vectors, and we can utilise the non-linear dependency matching properties of VQ.  We will ignore storage concerns for this experiment.
+
+\section{Machine Learning}
+
+In this approach we will attempt to take a $K=20$ vector and resample it to $K=80$ using a small neural network.   We hope the network will discover any non-linear dependencies, and produce narrow bandwidth formants and (when synthesised using Codec 2) reasonable quality speech for low pitched speakers.  
+
+We will include pitch as a feature (perhaps via an embedding network), arguing that the formant bandwidth is a function of pitch ($F_0$).  Using a fixed length target vector simplifies any issues around variable vector length.  This is similar to the decoder side of an autoencoder network.  Autoencoder designs could therefore be used as candidate architectures.
+
+We argue that this same information is used for high quality speech synthesis with neural vocoders, therefore these networks must be performing a similar non-linear mapping of MFCs to narrow bandwidth formants speech spectra.   A counter argument is a simple neural network may not be capable of representing the non-linear function that maps between the two vectors, or may not be capable or learning.  However we are not trying to synthesise speech here - just the speech spectral envelope.  It would be prudent to train on several hours of material.
+
+\section{Evaluation}
+
+Evaluation of the results using objective measures such as spectral distortion may not be indicative.  For a given bit rate spectral distortion (SD) may be larger at $K=80$ but the synthesised speech may sound better. Another candidate objective measure is Peak Average Power Ratio (PAPR). This tends to be higher when the formant bandwidths are not preserved. Visual inspection of speech spectra and waveforms of speech synthesised from both methods (prior to post filtering) would indicate if narrow formants have been preserved for males.
+
+Success would be indicated by evidence of formant bandwidth being preserved, and higher quality speech from male speakers compared to $K=20$ approaches. Speech should be synthesised using phases recovered from the output magnitude spectra using the minimum phase model - the degradation in quality is less obvious when original harmonic phases are used. 
+
+For controls we could use:
+\begin{enumerate}
+\item Speech resampled through the $K=20$ "bottleneck" (without postfiltering).
+\item Speech VQed at $K=20$ and $K=80$. 
+\end{enumerate}
+
+\subsection{Further Work}
+
+TODO:
+\begin{enumerate}
+\item Do we need an embedding layer for pitch?  Research embedding networks.
+\item Should we construct some contrived test data?
+\item Just include voiced frames?
+\item make sure we use energy normalisation
+\item If fixed $K$ works, try to come up with a network that handles spares vectors.
+\item a network that uses PAPR as part of the cost function.  It would be useful if we can directly move across this latent space, e.g. to add compression and reduce dynamic range.
+\end{enumerate}
+
+\bibliographystyle{plain}
+\bibliography{manifold_refs}
+\end{document}

@@ -24,26 +24,27 @@ Neural codecs have shown high quality speech can be synthesised using vectors of
 This document describes two experiments to determine if narrow bandwidth formants can be preserved for low pitch speakers using non-linear transformations, and reasonable quality speech can be synthesised using Codec 2 for low pitched speakers (without the use of a post filter).  
 
 \section{Vector Quantisation}
+\label{sec:vq}
 
 Vector quantisers can take advantage of linear and non-linear dependencies to reduce bit rate \cite{makhoul1985vector}.  They can efficiently exploit information that is uncorrelated in a linear sense (no linear transformation exists), but is statistically dependant.
 
-The 700C resampling to a fixed length $K<<L_{max}$ is a linear transformation aimed at fixing the dimension of the data, reducing the dimension of the data making is easier to quantise (less information) and reducing VQ storage.  Implicit in the resampling is a filtering/smoothing/aliasing operation, so some information is lost.
+The 700C resampling to a fixed length $K<<L_{max}$ is a linear transformation aimed at fixing the dimension of the data; reducing the dimension of the data to make it easier to quantise, and reducing VQ storage requirements.  However the resampling is a filtering/smoothing/aliasing operation, so some information is lost, for example narrow bandwidth formants cannot be recovered by a linear transformation.
 
-In this experiment we will upsample the variable rate $L$ vectors to a fixed length $K=80$, then vector quantise.  In this way no information is lost from the source vectors, and we can utilise the non-linear dependency matching properties of VQ.  We will ignore storage concerns for this experiment. 
+In this experiment we will upsample the variable rate $L$ vectors to a fixed length $K=80$, then vector quantise.  In this way no information is lost from the source vectors.  The aim is to utilise the non-linear dependency matching properties of VQ to preserve high quality speech, while still maintaining a similar bit rate to $K=20$ quantisation.  We will ignore storage concerns for this experiment. 
 
 \section{Machine Learning}
 
 In this approach we will attempt to take a $K=20$ vector and resample it to $K=80$ using a small neural network.   We hope the network will discover any non-linear dependencies, and produce narrow bandwidth formants and (when synthesised using Codec 2) reasonable quality speech for low pitched speakers.  
 
-We will include pitch as a feature (perhaps via an embedding network), arguing that the formant bandwidth is a function of pitch ($F_0$).  Using a fixed length target vector simplifies any issues around variable vector length.  This is similar to the decoder side of an autoencoder network.  Autoencoder designs could therefore be used as candidate architectures.
+We will include pitch as a feature (perhaps via an embedding network), arguing that the formant bandwidth is a function of pitch ($F_0$).  This is information the VQ in Section \ref{sec:vq} does not consider, which implies better expected results from the ML approach. Using a fixed length target vector simplifies any issues around variable vector length.  This is similar to the decoder side of an autoencoder network.  Autoencoder designs could therefore be used as candidate architectures.
 
-We argue that this same information is used for high quality speech synthesis with neural vocoders, therefore these networks must be performing a similar non-linear mapping of MFCs to narrow bandwidth formants speech spectra.   A counter argument is a simple neural network may not be capable of representing the non-linear function that maps between the two vectors.  However we are not trying to synthesise speech here - just the speech spectral envelope.  Another difference is the network proposed here outputs linear values using regression, more sophisticated neural vocoders output a PDF.
+We argue that essentially the same information (in the form of MFCCs) is used for high quality speech synthesis with neural vocoders, therefore these networks must be performing a similar non-linear mapping of coarsely sampled, smoothed spectral information to speech spectra that includes narrow bandwidth formants.  A counter argument is a simple neural network may not be capable of representing the non-linear function that maps between the two vectors.  However we are not trying to synthesise speech here - just the speech spectral envelope.  Other differences: the network proposed here outputs linear values using regression, more sophisticated neural vocoders employ sophisticated conditional probability models and output a PDF; this network considers just one frame, rather than utilising an autoregressive design that considers many past samples.
 
 \section{Evaluation}
 
-Evaluation methods consider:
+Evaluation methods considered:
 \begin{enumerate}
-\item Evaluation of the results using objective measures such as spectral distortion, however ths relationship to subjective quality may be complex.  For a given bit rate spectral distortion (SD) may be larger at $K=80$ but the synthesised speech may sound better.
+\item Evaluation of the results using objective measures such as Spectral Distortion (SD), however the relationship to subjective quality may be complex.  For a given bit rate SD may be larger at $K=80$ but the synthesised speech may sound better.
 \item Another candidate objective measure is Peak Average Power Ratio (PAPR). This tends to be higher when the formant bandwidths are not preserved.
 \item Visual inspection of speech spectra and waveforms of speech synthesised from both methods (prior to post filtering) would indicate if narrow formants have been preserved for males.
 \end{enumerate}
@@ -54,6 +55,7 @@ For controls we could use:
 \begin{enumerate}
 \item Speech resampled through the $K=20$ "bottleneck" (without postfiltering).
 \item Speech VQed at $K=20$ and $K=80$. 
+\item Codec 2 3200 - this uses finely quantised LSPs that preserve formant shapes (and a post filter). 
 \end{enumerate}
 
 \subsection{Notes and Further Work}
@@ -61,17 +63,19 @@ For controls we could use:
 Notes:
 \begin{enumerate}
 \item Do we need an embedding layer for pitch?  Research embedding networks.
-\item Should we construct some contrived test data?  Introduce expected non-linearity and see if network can train as a check.
+\item Should we test with some contrived data?  Introduce expected non-linearity and see if network can train as a check.
 \item Just include voiced frames?  This seems like a good idea.  For UV frames pitch may not be meaningful, and may cause random noise. Set UV frames to a constant $F_0$ (like 0) so at least the network "knows".
 \item Make sure we use energy normalisation \cite{rowe2023_ratek_study} when resampling to rate $K$.
-\item Used mean removed vectors, just consider > 200 Hz and < 3600 Hz, for consistency with recent Codec 2 VQ work in \cite{rowe2023_ratek_study}.
-\item Block diagram of Codec 2 700C processing.
+\item Used mean removed vectors, just consider $200 < f < 3600$ Hz, for consistency with recent Codec 2 VQ work in \cite{rowe2023_ratek_study}.
+\item Add a block diagram of Codec 2 700C processing.
+\item Add to text $K=80$ are linear spaced, $K=20$ Mel spaced.
 \end{enumerate}
 
 Further work:
 \begin{enumerate}
 \item If fixed $K$ works, try to come up with a network that handles sparse vectors.
 \item A network that uses PAPR as part of the cost function.  It would be useful if we can directly move across this latent space, e.g. to add compression and reduce dynamic range.  For V or UV, we should never have highly concentrated energy in time (clicks).
+\item Are MFCCs good choices for input features to neural vocoders? They are smoothed, linear transformations of the input speech.  Other latent spaces may be more suitable.
 \end{enumerate}
 
 \bibliographystyle{plain}

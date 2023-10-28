@@ -11,7 +11,7 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
 
 1. Build C tools from ~/codec2-dev dr-papr branch, Git hash e430c433bcb34c6:
 
-1. Build K=20 & K=80 VQs with small train_120 test database, PNG VQ perf plot
+1. Build K=20 & K=80 M=512 2 stage VQs with small train_120 test database, output PNG VQ plot
    ```
    make -f ratek_resampler.mk
    ```

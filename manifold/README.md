@@ -15,3 +15,7 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
    ```
    make -f ratek_resampler.mk
    ```
+1. Build K=20 & K=80 M=4096 2 stage VQs with larger train test database, output PNG VQ plot
+   ```
+   TRAIN=train M=4096 make -f ratek_resampler.mk
+   ```

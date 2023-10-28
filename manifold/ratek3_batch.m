@@ -33,14 +33,14 @@ function B = ratek3_batch_tool(samname, varargin)
   newamp_700c;
   Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
   
-  Nb=20; K=30; rateK_en = 0; verbose = 1; eq =0;
+  Nb=20; K=79; rateK_en = 0; verbose = 1; eq =0;
   A_out_fn = ""; B_out_fn = ""; vq_stage1_f32=""; vq_stage2_f32=""; vq_stage3_f32="";
   H_out_fn = ""; amp_pf_en = 0;  phase_pf_en=0; i = 1;
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
   plot_mic_eq = 0; vq_en = 0; norm_en = 0; compress_en = 0; limit_mean = 0;
-  quant_e4 = 0; Y_out_fn = ""; 
-  
+  quant_e4 = 0; Y_out_fn = ""; w1 = ones(1,K);
+
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
   
@@ -118,7 +118,7 @@ function B = ratek3_batch_tool(samname, varargin)
       limit_mean = 1;    
     elseif strcmp(varargin{i},"quant_e4") 
       quant_e4 = 1;
-      e_q_4bit = [21.892 25.783 29.595 33.169 36.549 39.743 42.868 45.920 \
+      e_q_4bit = [21.892 25.783 29.595 33.169 36.549 39.743 42.868 45.920 ...
                   49.002 52.023 54.937 57.811 60.608 63.290 65.929 68.622];
     else
       printf("\nERROR unknown argument: %s\n", varargin{i});
@@ -219,6 +219,8 @@ function B = ratek3_batch_tool(samname, varargin)
     end
     
     if rateK_en
+      % rate K ---------------------------------------------------------------------------------------------
+
       % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
       B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB(f,:), rate_K_sample_freqs_kHz, "spline", "extrap");
       if norm_en
@@ -330,6 +332,28 @@ function B = ratek3_batch_tool(samname, varargin)
         H(f,1:L) = synth_phase_from_mag(rate_K_sample_freqs_kHz, B_hat(f,:), Fs, Wo, L, phase_pf_en);
       end
     else
+      % not rate K -----------------------------------------------------------------------------
+
+      if vq_en
+        target = zeros(1,K);
+        target(Kst+1:Ken+1) = YdB(f,Kst+1:Ken+1);
+        amean = sum(target)/(Ken-Kst+1);          
+        target -= amean;
+        [res target_ ind] = mbest(vq, target, mbest_depth, w1);
+        YdB_hat = target_ + amean;
+        Eq(f) = sum((target-target_).^2)/(Ken-Kst+1);
+        if amean > lower, sum_Eq += Eq(f); nEq++; end
+     
+        if verbose >= 2
+          printf("f: %3d Eq: %4.2f dB^2", f, Eq(f));
+          for i=1:length(ind)
+            printf(" %4d",ind(i));
+          end
+          printf("\n");
+        end
+        Ydb(f,:) = YdB_hat;
+      end
+      
       % Optional amplitude post filtering
       if amp_pf_en
         YdB(f,:) = amplitude_postfilter(rate_Lhigh_sample_freqs_kHz, YdB(f,:), Fs, F0high, eq);

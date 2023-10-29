@@ -58,7 +58,7 @@ function B = ratek3_batch_tool(samname, varargin)
       H_out_fn = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"vq1") 
       vq_stage1_f32 = varargin{i+1}; i++;
-      rateK_en = 1; vq_en = 1;
+      vq_en = 1;
     elseif strcmp(varargin{i},"vq2") 
       vq_stage2_f32 = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"vq3") 

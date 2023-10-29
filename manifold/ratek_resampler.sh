@@ -53,7 +53,7 @@ function vq_test_231028() {
   filename="${filename%.*}"
   extension="${filename##*.}"
   mkdir -p $out_dir
-  if [ 1 -eq 0 ]; then
+  
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
 
   # orig amp and phase
@@ -67,7 +67,7 @@ function vq_test_231028() {
   batch_process $fullfile "'K',20,'norm_en', \
   'vq1','train_k20_vq1.f32', \
   'vq2','train_k20_vq2.f32'"  "3_k20_vq"
-fi
+
   # Amps Nb filtered, phase0, rate K=20 resampling, normalise energy
   batch_process $fullfile "'norm_en','Nb',100'" "4_k80"  
 
@@ -170,8 +170,8 @@ if [ $# -gt 0 ]; then
     gen_train_y)
         gen_train_y $2 $3
         ;;
-    gen_train_comp)
-        gen_train_comp $2 $3
+    train_lbg)
+        train_lbg $2 $3
         ;;
     vq_test_231028)
         vq_test_231028 ${CODEC2_PATH}/raw/big_dog.raw

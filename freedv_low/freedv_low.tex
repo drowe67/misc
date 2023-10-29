@@ -43,7 +43,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
 
 \subsection{Glossary}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{l p{8cm} }
  \hline
@@ -66,7 +66,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
 \caption{Glossary of Acronyms}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{l m{6cm} l}
  \hline
@@ -1005,7 +1005,6 @@ For tracking we wish to be able to follow a certain rate of change, and resolve 
 
 Block diagram (above) of all steps, e.g. acquisition, post processing, refinement
 
-
 \subsection{Acquisition TODO}
 
 \begin{enumerate}
@@ -1022,6 +1021,10 @@ TODO: make sure the current algorithm is doing sensible things on real world HF 
 \subsection{PAPR reduction}
 
 TODO: expressions for PAPR reduction, model for improved SNR at Rx.
+
+Idea: extra carrier(s), that supply a -ve pulse only when required, so they would be zero energy most of the time.  Just one symbol long.  Must be the shape of one cycle, to stay orthogonal to other carriers.  Can we describe this with math?  What benefit will it give?
+
+PAPR defined by probability - we don't mind clipping every 5 seconds.
 
 \section{Further Work}
 

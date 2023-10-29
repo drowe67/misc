@@ -9,19 +9,21 @@
 \title{Unwrapping Codec 2 Data Manifolds}
 \maketitle
 
-\epigraph{Uncrumpling paper balls is what machine learning is all about: finding neat representations for complex, highly folded data manifolds. \cite{chollet2018deep}}
+\epigraph{Uncrumpling paper balls is what machine learning is all about: finding neat representations for complex, highly folded data manifolds}{Francois Chollet \cite{chollet2018deep}}
 
 Speech coding can be defined as the art of representing speech using a small number of parameters that can be efficiently sent over a channel.
 
-Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $\{A_m\}, m=1..L$ to a set of fixed length $K=20$ samples $\{B_k\},k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is therefore dependent on the magnitude spectra available at the receiver.
+Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $\{A_m\}, m=1..L$ to a set of fixed length $K=20$ samples $\{B_k\},k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
 
-There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, narrow formant bandwidths must be maintained in order to spread formant energy in time.  When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Female speech is less sensitive as the wide harmonic spacing results in adequate energy distribution over the pitch cycle.
+There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, the formant energy must be spread in time.  As Codec 2 recover phase using a minimum phase model - this implies narrow formant bandwidths must be maintained \footnote{Other ways of spreading time domain energy are possible, for example generating phases through heuristics, non-minimum phase models, manipulation of phases, or time domain compression \cite{rowe2023_ratek_study}}.  Narrow formant bandwidths lead to long decay times for filters ``ringing`` with formant energy. When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Speech with a short pitch period (e.g. female) has less time to decay between pitch cycles so is less sensitive to formant bandwidths, the short pitch period naturally leads to a more uniform distribution of energy over time.
 
 At the Codec 2 receiver, a post filter $P()$ is applied which improves the perceptual quality, in particular for low pitched (male) speakers. The post filter is a form of ad-hoc non-linear filtering, using experimentally derived constants.  It raises formants and lowers anti-formants, effectively reducing formant bandwidth and more widely distributing energy in time (each formant ``rings" longer).
 
-Neural codecs have shown high quality speech can be synthesised using vectors of sparsely sampled frequency domain samples (MFCCs) \cite{davis1980comparison}.  Applying linear transformations (such as IDCT and interpolation) to recover $\{A_m\}$ from MFCCs results in poor quality synthesised speech in sinusoidal codecs.  This implies neural codecs are enjoying a non-linear transformation, made possible by modern machine learning techniques.
+Neural codecs have shown high quality speech can be synthesised using vectors of sparsely sampled frequency domain samples (MFCCs) \cite{davis1980comparison}.  Applying linear transformations (such as IDCT and interpolation) to recover $\{A_m\}$ from MFCCs results in poor quality synthesised speech in sinusoidal codecs.  This implies neural codecs are employing a non-linear transformation, made possible by modern deep learning techniques.
 
-This document describes two experiments to determine if narrow bandwidth formants can be preserved for low pitch speakers using non-linear transformations, and reasonable quality speech can be synthesised using Codec 2 for low pitched speakers (without the use of a post filter).  
+From an information theory perspective there is no reason to believe there is more information in speech from low pitch speakers than high pitched speakers. Therefore with an appropriate transformation we should be able to synthesise equivalent quality speech regardless of pitch.
+
+This document describes two experiments to determine if narrow bandwidth formants can be preserved for low pitch speakers using non-linear transformations, resulting in reasonable quality speech when synthesised using Codec 2 (without the use of a post filter).  
 
 \section{Vector Quantisation}
 \label{sec:vq}
@@ -44,6 +46,7 @@ We argue that essentially the same information (in the form of MFCCs) is used fo
 
 Evaluation methods considered:
 \begin{enumerate}
+\item Informal listening tests and ranking across a small number of samples.
 \item Evaluation of the results using objective measures such as Spectral Distortion (SD), however the relationship to subjective quality may be complex.  For a given bit rate SD may be larger at $K=80$ but the synthesised speech may sound better.
 \item Another candidate objective measure is Peak Average Power Ratio (PAPR). This tends to be higher when the formant bandwidths are not preserved.
 \item Visual inspection of speech spectra and waveforms of speech synthesised from both methods (prior to post filtering) would indicate if narrow formants have been preserved for males.
@@ -73,9 +76,12 @@ Notes:
 
 Further work:
 \begin{enumerate}
+\item try bigger VQ training databases, concat some vectors (time-freq).
 \item If fixed $K$ works, try to come up with a network that handles sparse vectors.
 \item A network that uses PAPR as part of the cost function.  It would be useful if we can directly move across this latent space, e.g. to add compression and reduce dynamic range.  For V or UV, we should never have highly concentrated energy in time (clicks).
 \item Are MFCCs good choices for input features to neural vocoders? They are smoothed, linear transformations of the input speech.  Other latent spaces may be more suitable.
+\item A linear transformation (like a DCT or PCA) followed by VQ is a good idea - DCT will reduce the dimension, making storage easier, and VQ will capture any non-linear dependencies.
+\item Can we avoid gradient shift with multiple stage VQs?  Does mbest help?
 \end{enumerate}
 
 \bibliographystyle{plain}

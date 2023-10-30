@@ -126,7 +126,7 @@ function B = ratek3_batch_tool(samname, varargin)
     end
     i++;      
   end  
-  printf("rateK_en: %d K: %d norm_en: %d Nb: %d\n", rateK_en, K, norm_en, Nb);
+  printf("rateK_en: %d K: %d norm_en: %d Nb: %d vq_en: %d verbose: %d\n", rateK_en, K, norm_en, Nb, vq_en, verbose);
 
   model_name = strcat(samname,"_model.bin");
   model = load_codec2_model(model_name);

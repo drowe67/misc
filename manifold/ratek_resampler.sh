@@ -34,13 +34,16 @@ function batch_process {
   outname=$3
   c2sim_opt=$4
   tmp=$(mktemp)
-  
+
+  # if something bombs make sure we rm previous sample to indicate problem
+  rm -f ${out_dir}/${filename}_${outname}.wav
+
   echo "ratek3_batch;" \
        "ratek3_batch_tool(\"${filename}\", "\
                           "'A_out',\"${filename}_a.f32\"," \
                           "'H_out',\"${filename}_h.f32\"," \
                           "${batch_opt},'logfn',\"${tmp}\"); quit;" \
-  | octave -p ${CODEC2_PATH}/octave -qf
+  | octave-cli -qf
   c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - \
   ${c2sim_opt} | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
@@ -53,7 +56,7 @@ function vq_test_231028() {
   filename="${filename%.*}"
   extension="${filename##*.}"
   mkdir -p $out_dir
-  
+
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
 
   # orig amp and phase
@@ -68,7 +71,7 @@ function vq_test_231028() {
   'vq1','train_k20_vq1.f32', \
   'vq2','train_k20_vq2.f32'"  "3_k20_vq"
 
-  # Amps Nb filtered, phase0, rate K=20 resampling, normalise energy
+  # No filtering, phase0, rate K=80 resampling, normalise energy
   batch_process $fullfile "'norm_en','Nb',100'" "4_k80"  
 
   # K=80, 2 x 12 VQ
@@ -76,8 +79,7 @@ function vq_test_231028() {
   'vq1','train_k80_vq1.f32', \
   'vq2','train_k80_vq2.f32'"  "5_k80_vq"
 
-  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_3200.wav
-  
+  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_3200.wav 
 }
 
 # generate amp postfiltered rate K training material (20 element vectors) from source speech file, 
@@ -176,12 +178,6 @@ if [ $# -gt 0 ]; then
     vq_test_231028)
         vq_test_231028 ${CODEC2_PATH}/raw/big_dog.raw
         vq_test_231028 ${CODEC2_PATH}/raw/two_lines.raw
-        #comp_test_230323 ../raw/forig.raw     
-        #comp_test_230323 ../raw/pickle.raw
-        #comp_test_230323 ../raw/tea.raw
-        #comp_test_230323 ../raw/kristoff.raw        
-        #comp_test_230323 ../raw/ve9qrp_10s.raw     
-        #comp_test_230323 ../raw/mmt1.raw     
         ;;
     esac
 else

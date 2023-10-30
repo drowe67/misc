@@ -14,7 +14,7 @@
 
 Speech coding can be defined as the art of representing speech using a small number of parameters that can be efficiently sent over a channel.
 
-Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $\{A_m\}, m=1..L$ to a set of fixed length $K=20$ samples $\{B_k\},k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
+Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $\{20log_{10}(A_m)\}, m=1..L$ to a set of fixed length $K=20$ samples $\{B_k\},k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
 
 There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, the formant energy must be spread in time.  As Codec 2 recover phase using a minimum phase model - this implies narrow formant bandwidths must be maintained \footnote{Other ways of spreading time domain energy are possible, for example generating phases through heuristics, non-minimum phase models, manipulation of phases, or time domain compression \cite{rowe2023_ratek_study}}.  Narrow formant bandwidths lead to long decay times for filters ``ringing`` with formant energy. When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Speech with a short pitch period (e.g. female) has less time to decay between pitch cycles so is less sensitive to formant bandwidths, the short pitch period naturally leads to a more uniform distribution of energy over time.
 
@@ -31,7 +31,7 @@ This document describes two experiments to determine if narrow bandwidth formant
 
 Vector quantisers can take advantage of linear and non-linear dependencies to reduce bit rate \cite{makhoul1985vector}.  They can efficiently exploit information that is uncorrelated in a linear sense (no linear transformation exists), but is statistically dependant.
 
-The 700C resampling to a fixed length $K<<L_{max}$ is a linear transformation aimed at fixing the dimension of the data; reducing the dimension of the data to make it easier to quantise, and reducing VQ storage requirements.  However the resampling is a filtering/smoothing/aliasing operation, so some information is lost, for example narrow bandwidth formants cannot be recovered by a linear transformation.
+The 700C resampling to a fixed length $K<<L_{max}$ is a linear transformation aimed at fixing the dimension of the data; reducing the distortion with multistage VQ where residuals tend towards independent Gaussians; and reducing VQ storage requirements.  However the resampling is a filtering/smoothing/aliasing operation, so some information is lost, for example narrow bandwidth formants cannot be recovered by a linear transformation.
 
 In this experiment we will upsample the variable rate $L$ vectors to a fixed length $K=80$, then vector quantise.  In this way no information is lost from the source vectors.  The aim is to utilise the non-linear dependency matching properties of VQ to preserve high quality speech, while still maintaining a similar bit rate to $K=20$ quantisation.  We will ignore storage concerns for this experiment. 
 
@@ -64,7 +64,7 @@ For controls we could use:
 
 \section{Results}
 
-$K=20$ and $K=80$ 2x12 bit (24 bit total VQs) were trained on 114,000 vectors using the LBG algorithm.  A single male and female sample were processed under a variety of conditions (see \path{README}).  The $K=80$ male sample sounded better than the $K=20$ sample, however there was still significant distortion.  The female sample was approximately the same for both conditions.
+$K=20$ and $K=80$ 2x12 bit (24 bit total VQs) were trained on 114,000 vectors using the LBG algorithm.  A single male and female sample were processed under a variety of conditions (see \path{README}).  The $K=80$ male sample sounded better than the $K=20$ sample, however there is still significant distortion.  The female sample was approximately the same for both $K=20$ and $K=80$.
 
 Figure \ref{fig:big_dog_f61_k20} is a plot of a single frame from the male sample.  The SD was significantly higher for $K=80$ than $K=20$, the reverse of the subjective results.
 
@@ -79,7 +79,7 @@ Visual inspection of the time domain synthesised waveforms and measurement of PA
 \end{center}
 \end{figure}
 
-These experiments suggest that the $K=80$ VQ is better at preserving formants, they tend to get smoothed by the $K=20$ processing.  There was no direct support for the energy distribution theory.
+These experiments suggest the $K=80$ VQ is better at preserving perceptually important information at a given bit rate for the male sample tested.  A visual inspection  of the spectra suggests formants tend to get smoothed by the $K=20$ processing.  Therefore direct VQ of the $K=80$ vectors may simply be a better linear transformation (less smoothing, and/or preserving narrow formants through a higher sampling rate) than $K=20$ (downsampling, then followed by VQ). The results suggest there is a limit to how much downsampling is acceptable prior to VQ. The disadvantage of multi-stage VQ with large $K$ is the reduction in quantisation distortion is small from successive stages, as the residual vectors tend towards a set of $K$ independent Gaussians. There was no direct support for the energy distribution or non-linear dependency theory.  
 
 \subsection{Notes and Further Work}
 
@@ -97,8 +97,8 @@ Further work:
 \begin{enumerate}
 \item If fixed $K$ works, try to come up with a network that handles sparse vectors.
 \item Are MFCCs good choices for input features to neural vocoders? They are smoothed, linear transformations of the input speech.  Other latent spaces may be more suitable.
-\item A linear transformation (like a DCT or PCA) followed by VQ is a good idea - DCT will reduce the dimension, making storage easier, and VQ will capture any non-linear dependencies.
-\item Can we avoid gradient shift with multiple stage VQs?  Does mbest help?
+\item A linear transformation (like a DCT or PCA) followed by VQ is a good idea - truncating DCT coeffs will reduce the dimension, making storage easier, and VQ will capture any non-linear dependencies.  Smaller dimension will help residual error problem in multistage VQ. Trade off between truncation and VQ distortion.
+\item Can we avoid gradient shift/tendancy towards Gaussians with multistage VQ?  Does mbest help?
 \end{enumerate}
 
 \bibliographystyle{plain}

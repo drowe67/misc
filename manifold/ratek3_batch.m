@@ -353,6 +353,11 @@ function B = ratek3_batch_tool(samname, varargin)
           end
           printf("\n");
         end
+
+        Ylin = 10 .^ (YdB(f,:)/20); E1 = sum(Ylin .^2);
+        Ylin_hat = 10 .^ (YdB_hat/20); E2 = sum(Ylin_hat .^2);      
+        YdB_hat += 10*log10(E1/E2);
+ 
         YdB(f,:) = YdB_hat;
       end
       

@@ -7,11 +7,11 @@
 # 1. Use train_120.spc (runs fairly quickly, good for initial tests)
 #
 #   cd codec2/build/linux
-#   make -f ../script/ratek_resampler.mk
+#   make -f ratek_resampler.mk
 #
 # 2. Use train.spc 
 #
-#    TRAIN=train M=4096 make -f ../script/ratek_resampler.mk
+#    TRAIN=train M=4096 make -f ratek_resampler.mk
 #
 # 3. Generate .tex/.eps file for use in report
 #
@@ -24,7 +24,7 @@ SHELL  := /bin/bash
 CODEC2 := $(HOME)/codec2
 TRAIN_FULL := ~/Downloads/$(TRAIN).spc
 
-PLOT_DATA := $(TRAIN)_k20_res1.txt $(TRAIN)_k80_res1.txt $(TRAIN)_k80_4_70_res1.txt
+PLOT_DATA := $(TRAIN)_k20_res1.txt $(TRAIN)_k40_res1.txt $(TRAIN)_k80_res1.txt 
 	      
 all: $(TRAIN)_ratek.png
 
@@ -35,29 +35,33 @@ $(TRAIN)_ratek.png: $(PLOT_DATA) FORCE
 	echo "ratek_resampler_plot(\"$(TRAIN)_ratek.png\", \
 	         \"$(TRAIN)_k20_res1.txt\",'b-*;k20 1;', \
 			 'continue',\"$(TRAIN)_k20_res2.txt\",'b-*;k20 2;', \
+ 	         \"$(TRAIN)_k40_res1.txt\",'r-*;k40 1;', \
+			 'continue',\"$(TRAIN)_k40_res2.txt\",'r-*;k40 2;', \
              \"$(TRAIN)_k80_res1.txt\",'g-+;k80 1;', \
-             'continue', \"$(TRAIN)_k80_res2.txt\",'g-+;k80 2;', \
-             \"$(TRAIN)_k80_4_70_res1.txt\",'r-+;k80_4_70 1;', \
-             'continue', \"$(TRAIN)_k80_4_70_res2.txt\",'r-+;k80_4_70 2;' \
-              ); quit" | octave-cli -p $(CODEC2)/octave --no-init-file
+             'continue', \"$(TRAIN)_k80_res2.txt\",'g-+;k80 2;' \
+             ); quit" | octave-cli -p $(CODEC2)/octave --no-init-file
 
 # (1) K=20 two stage VQ
 $(TRAIN)_k20_res1.txt: $(TRAIN)_b20.f32
 	K=20 Kst=0 Ken=19 M=$(M) ./ratek_resampler.sh train_lbg $(TRAIN)_b20.f32 $(TRAIN)_k20
 
+# (1) K=40 two stage VQ
+$(TRAIN)_k40_res1.txt: $(TRAIN)_b40.f32
+	K=40 Kst=0 Ken=39 M=$(M) ./ratek_resampler.sh train_lbg $(TRAIN)_b40.f32 $(TRAIN)_k40
+
 # (2) K=80 two stage VQ
 $(TRAIN)_k80_res1.txt: $(TRAIN)_y80.f32
 	K=79 Kst=0 Ken=78 M=$(M) ./ratek_resampler.sh train_lbg $(TRAIN)_y80.f32 $(TRAIN)_k80
 
-# (3) K=80 two stage VQ, 200 - 3600 Hz
-$(TRAIN)_k80_4_70_res1.txt: $(TRAIN)_y80.f32
-	K=79 Kst=4 Ken=70 M=$(M) ./ratek_resampler.sh train_lbg $(TRAIN)_y80.f32 $(TRAIN)_k80_4_70
-
 $(TRAIN)_b20.f32:
 	./ratek_resampler.sh gen_train_b $(TRAIN_FULL) $(TRAIN)_b20.f32
 
+$(TRAIN)_b40.f32:
+	./ratek_resampler.sh gen_train_b40 $(TRAIN_FULL) $(TRAIN)_b40.f32
+
 $(TRAIN)_y80.f32:
 	./ratek_resampler.sh gen_train_y $(TRAIN_FULL) $(TRAIN)_y80.f32
+
 
 clean:
 	rm -f $(PLOT_DATA)

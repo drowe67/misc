@@ -49,6 +49,32 @@ function batch_process {
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
 }
 
+# 231031: Testing a few different K, no decimation in time (10ms frames)
+function vq_test_231031() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  extension="${filename##*.}"
+  mkdir -p $out_dir
+  
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+
+  # orig amp and phase
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
+  sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
+ 
+  # Amps Nb=20 filtered, phase0, rate K=20 resampling, normalise energy
+  batch_process $fullfile "'K',20,'norm_en'" "2_k20"  
+
+  # Amps Nb=40 filtered, phase0, rate K=40 resampling, normalise energy
+  batch_process $fullfile "'K',40,'norm_en','Nb',40" "3_k40"  
+
+  # No filtering, phase0, rate K=80 resampling, normalise energy
+  batch_process $fullfile "'norm_en','Nb',100, " "4_k80"  
+
+  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav 
+}
+
 # 231028: Testing K=20 and K=80 VQs, no decimation in time (10ms frames)
 function vq_test_231028() {
   fullfile=$1
@@ -71,24 +97,26 @@ function vq_test_231028() {
   'vq1','train_k20_vq1.f32', \
   'vq2','train_k20_vq2.f32'"  "3_k20_vq"
 
+  # K=40, Nb=40
+  batch_process $fullfile "'K',40,'norm_en','Nb',40" "4_k40"
+
+  # K=40, 2 x 12 VQ
+  batch_process $fullfile "'K',40,'norm_en','Nb',40,'verbose', \
+  'vq1','train_k40_vq1.f32', \
+  'vq2','train_k40_vq2.f32'"  "5_k40_vq"
+
   # No filtering, phase0, rate K=80 resampling, normalise energy
-  batch_process $fullfile "'norm_en','Nb',100'" "4_k80"  
-  
+  batch_process $fullfile "'norm_en','Nb',100" "6_k80"  
+
   # K=80, 2 x 12 VQ
-  batch_process $fullfile "'norm_en','Nb',100', 'verbose', \
+  batch_process $fullfile "'norm_en','Nb',100, 'verbose', \
   'vq1','train_k80_vq1.f32', \
-  'vq2','train_k80_vq2.f32'"  "5_k80_vq"
+  'vq2','train_k80_vq2.f32'"  "7_k80_vq"
 
-  # K=80, 2 x 12 VQ, 200-23600 Hz to avoid highly attenuated sections
-  batch_process $fullfile "'norm_en','Nb',100','subset','verbose', \
-  'vq1','train_k80_4_70_vq1.f32', \
-  'vq2','train_k80_4_70_vq2.f32'"  "6_k80_4_70_vq"
-
-  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav 
+  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_3200.wav 
 }
 
-# generate amp postfiltered rate K training material (20 element vectors) from source speech file, 
-# norm enenergy and Nb=20 filtering
+# generate rate K=20, Nb=20 training data
 function gen_train_b() {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -99,6 +127,20 @@ function gen_train_b() {
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
         'K',20,'norm_en'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+}
+
+# generate rate K=40, Nb=40 training data
+function gen_train_b40() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  filename_b=$2
+ 
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
+        'K',40,'norm_en','Nb',40); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
@@ -174,6 +216,9 @@ if [ $# -gt 0 ]; then
     gen_train_b)
         gen_train_b $2 $3
         ;;
+    gen_train_b40)
+        gen_train_b40 $2 $3
+        ;;
     gen_train_y)
         gen_train_y $2 $3
         ;;
@@ -184,6 +229,10 @@ if [ $# -gt 0 ]; then
         vq_test_231028 ${CODEC2_PATH}/raw/big_dog.raw
         vq_test_231028 ${CODEC2_PATH}/raw/two_lines.raw
         ;;
+    vq_test_231031)
+        vq_test_231031 ${CODEC2_PATH}/raw/big_dog.raw
+        vq_test_231031 ${CODEC2_PATH}/raw/two_lines.raw
+        ;;   
     esac
 else
   echo "usage:

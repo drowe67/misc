@@ -56,7 +56,7 @@ function vq_test_231028() {
   filename="${filename%.*}"
   extension="${filename##*.}"
   mkdir -p $out_dir
-
+  
   c2sim $fullfile --hpf --modelout ${filename}_model.bin
 
   # orig amp and phase
@@ -73,13 +73,18 @@ function vq_test_231028() {
 
   # No filtering, phase0, rate K=80 resampling, normalise energy
   batch_process $fullfile "'norm_en','Nb',100'" "4_k80"  
-
+  
   # K=80, 2 x 12 VQ
-  batch_process $fullfile "'norm_en','Nb',100', \
+  batch_process $fullfile "'norm_en','Nb',100', 'verbose', \
   'vq1','train_k80_vq1.f32', \
   'vq2','train_k80_vq2.f32'"  "5_k80_vq"
 
-  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_6_3200.wav 
+  # K=80, 2 x 12 VQ, 200-23600 Hz to avoid highly attenuated sections
+  batch_process $fullfile "'norm_en','Nb',100','subset','verbose', \
+  'vq1','train_k80_4_70_vq1.f32', \
+  'vq2','train_k80_4_70_vq2.f32'"  "6_k80_4_70_vq"
+
+  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_7_3200.wav 
 }
 
 # generate amp postfiltered rate K training material (20 element vectors) from source speech file, 

@@ -82,7 +82,7 @@ function B = ratek3_batch_tool(samname, varargin)
       % restrict range of VQ match to a subset of rate K vector B
       % these are in C index format for compatability with C
       % so default is Kst=0 Ken=K-1;
-      Kst = 2; Ken = 24;
+      Kst = 4; Ken = 70;
       w(1:Kst) = 0; w(Ken+2:K) = 0;
     elseif strcmp(varargin{i},"dec") 
       dec = varargin{i+1}; i++;
@@ -126,7 +126,8 @@ function B = ratek3_batch_tool(samname, varargin)
     end
     i++;      
   end  
-  printf("rateK_en: %d K: %d norm_en: %d Nb: %d vq_en: %d verbose: %d\n", rateK_en, K, norm_en, Nb, vq_en, verbose);
+  printf("rateK_en: %d K: %d norm_en: %d Nb: %d vq_en: %d verbose: %d amp_pf: %d phase_pf: %d\n", 
+         rateK_en, K, norm_en, Nb, vq_en, verbose, amp_pf_en, phase_pf_en);
 
   model_name = strcat(samname,"_model.bin");
   model = load_codec2_model(model_name);
@@ -338,9 +339,10 @@ function B = ratek3_batch_tool(samname, varargin)
         target = zeros(1,K);
         target(Kst+1:Ken+1) = YdB(f,Kst+1:Ken+1);
         amean = sum(target)/(Ken-Kst+1);          
-        target -= amean;
+        target(Kst+1:Ken+1) -= amean;
         [res target_ ind] = mbest(vq, target, mbest_depth, w1);
-        YdB_hat = target_ + amean;
+        YdB_hat = zeros(1,K);
+        YdB_hat(Kst+1:Ken+1) = target_(Kst+1:Ken+1) + amean;
         Eq(f) = sum((target-target_).^2)/(Ken-Kst+1);
         if amean > lower, sum_Eq += Eq(f); nEq++; end
      
@@ -351,7 +353,7 @@ function B = ratek3_batch_tool(samname, varargin)
           end
           printf("\n");
         end
-        Ydb(f,:) = YdB_hat;
+        YdB(f,:) = YdB_hat;
       end
       
       % Optional amplitude post filtering

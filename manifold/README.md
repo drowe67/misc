@@ -24,4 +24,12 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
    ```
    ./ratek_resampler.sh vq_test_23102
    ```
+1. Frame by frame version of K=20:
+   ```
+   ratek3_fbf("big_dog",61,"train_k20_vq1.f32","train_k20_vq2.f32",20,20)
+   ```
+1. Frame by frame version of K=80:
+   ```
+   ratek3_fbf("big_dog",61,"train_k80_vq1.f32","train_k80_vq2.f32",79,100)
+   ```
 

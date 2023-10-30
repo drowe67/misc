@@ -3,6 +3,7 @@
 \usepackage{hyperref}
 \usepackage{tikz}
 \usepackage{epigraph}
+\usepackage{float}
 
 \begin{document}
 
@@ -63,9 +64,22 @@ For controls we could use:
 
 \section{Results}
 
-Table, headphones, speaker, preference of author, 4 samples
+$K=20$ and $K=80$ 2x12 bit (24 bit total VQs) were trained on 114,000 vectors using the LBG algorithm.  A single male and female sample were processed under a variety of conditions (see \path{README}).  The $K=80$ male sample sounded better than the $K=20$ sample, however there was still significant distortion.  The female sample was approximately the same for both conditions.
 
-Note $K=80$ better than 3200, represent LF better (failing of LPC near DC).
+Figure \ref{fig:big_dog_f61_k20} is a plot of a single frame from the male sample.  The SD was significantly higher for $K=80$ than $K=20$, the reverse of the subjective results.
+
+Visual inspection of the time domain synthesised waveforms and measurement of PAPR showed no significant difference between the $K=20$ and $K=80$, VQ samples.
+
+\begin{figure}
+\caption{Voiced frame from male speaker, 24 bits/frame. Objective VQ distortion is higher at $K=80$ however formants are sharper and F3/F4 better preserved}
+\label{fig:big_dog_f61_k20}
+\begin{center}
+\input big_dog_f61_k20.tex
+\input big_dog_f61_k79.tex
+\end{center}
+\end{figure}
+
+These experiments suggest that the $K=80$ VQ is better at preserving formants, they tend to get smoothed by the $K=20$ processing.  There was no direct support for the energy distribution theory.
 
 \subsection{Notes and Further Work}
 
@@ -76,15 +90,12 @@ Notes:
 \item Just include voiced frames?  This seems like a good idea.  For UV frames pitch may not be meaningful, and may cause random noise. Set UV frames to a constant $F_0$ (like 0) so at least the network "knows".
 \item Make sure we use energy normalisation \cite{rowe2023_ratek_study} when resampling to rate $K$.
 \item Used mean removed vectors, just consider $200 < f < 3600$ Hz, for consistency with recent Codec 2 VQ work in \cite{rowe2023_ratek_study}.
-\item Add a block diagram of Codec 2 700C processing.
-\item Add to text $K=80$ are linear spaced, $K=20$ Mel spaced.
+\item The $K=80$ are linear spaced, $K=20$ Mel spaced.
 \end{enumerate}
 
 Further work:
 \begin{enumerate}
-\item try bigger VQ training databases, concat some vectors (time-freq).
 \item If fixed $K$ works, try to come up with a network that handles sparse vectors.
-\item A network that uses PAPR as part of the cost function.  It would be useful if we can directly move across this latent space, e.g. to add compression and reduce dynamic range.  For V or UV, we should never have highly concentrated energy in time (clicks).
 \item Are MFCCs good choices for input features to neural vocoders? They are smoothed, linear transformations of the input speech.  Other latent spaces may be more suitable.
 \item A linear transformation (like a DCT or PCA) followed by VQ is a good idea - DCT will reduce the dimension, making storage easier, and VQ will capture any non-linear dependencies.
 \item Can we avoid gradient shift with multiple stage VQs?  Does mbest help?

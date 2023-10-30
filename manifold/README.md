@@ -33,3 +33,18 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
    ratek3_fbf("big_dog",61,"train_k80_vq1.f32","train_k80_vq2.f32",79,100)
    ```
 
+   # Samples in `vq_20_80`
+
+   | Index | Processing |
+   | ---- | ---- |
+   | 1 | orginal amplitudes and phase
+   | 2 | K=20 mel unquantised, synthetic phases |
+   | 3 | K=20 mel 24 bit two stage VQ, synthetic phases |
+   | 4 | K=40 mel unquantised, synthetic phases |
+   | 5 | K=40 mel 24 bit two stage VQ, synthetic phases |
+   | 6 | K=80 linear unquantised, synthetic phases |
+   | 7 | K=80 linear 24 bit two stage VQ, synthetic phases |
+   | 8 | Codec 2 3200 anchor |
+
+
+   

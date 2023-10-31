@@ -82,7 +82,8 @@ function ratek3_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="", K=79, Nb=100
     Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
-    
+    rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
+
     % optionally apply pre-emphasis
     if pre_en
       p = 1 - cos(Wo*(1:L)) + j*sin(Wo*(1:L));
@@ -129,16 +130,40 @@ function ratek3_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="", K=79, Nb=100
     figure(2); clf;
     % Synthesise phase  using Hilbert Transform
     if rateK_en
-      YdB_hat = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat 0], rate_Lhigh_sample_freqs_kHz, "spline", 0);
+      AmdB_hat = interp1([0 rate_K_sample_freqs_kHz 4], [0 B_hat 0], rate_L_sample_freqs_kHz, "spline", 0);
+      phase_hat = synth_phase_from_mag(rate_K_sample_freqs_kHz, B_hat, Fs, Wo, L, 0);
+    else
+      AmdB_hat = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB_hat 0], rate_L_sample_freqs_kHz, "spline", 0);
+      phase_hat = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB_hat, Fs, Wo, L, 0);
     end
-    phase_hat(1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB_hat, Fs, Wo, L,0);
+    Am_hat = 10.^(AmdB_hat/20);
     subplot(211);
-    [lo mid hi] = synth_time(Wo, L, Am, phase(f,:), N);
-    plot_time(lo, mid, hi);
+    [orig_lo orig_mid orig_hi] = synth_time(Wo, L, Am, phase(f,:), N);
+    plot_time(orig_lo, orig_mid, orig_hi);
     subplot(212);
-    [lo mid hi] = synth_time(Wo, L, Am, phase_hat, N);
-    plot_time(lo, mid, hi);
-   
+    [synth_lo synth_mid synth_hi] = synth_time(Wo, L, Am_hat, phase_hat, N);
+    plot_time(synth_lo, synth_mid, synth_hi);
+
+    if epslatex == 2
+      fn = sprintf("%s_f%d_k%d_bandpass.tex",samname,f,K);
+      print(fn,"-depslatex","-S300,250");
+      printf("printing... %s\n", fn);
+    end
+
+    figure(4); clf;
+    subplot(211);
+    plot_time_all(orig_lo, orig_mid, orig_hi);
+    subplot(212);
+    plot_time_all(synth_lo, synth_mid, synth_hi);
+  
+    if epslatex == 2
+      fn = sprintf("%s_f%d_k%d_all.tex",samname,f,K);
+      print(fn,"-depslatex","-S300,250");
+      printf("printing... %s\n", fn);
+      restore_fonts(textfontsize,linewidth);
+      epslatex = 0;
+    end
+
     figure(3); clf;
     hold on;
     plot((0:255)*4000/256, Sw(f,:),";Sw;");
@@ -156,11 +181,11 @@ function ratek3_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="", K=79, Nb=100
     hold off;
  
     fn = sprintf("%s_f%d_k%d.tex",samname,f,K);
-    if epslatex print_eps_restore(fn,"-S300,250",textfontsize,linewidth); epslatex=0; end
+    if epslatex ==1, print_eps_restore(fn,"-S300,250",textfontsize,linewidth); epslatex=0; end
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-nxt b-bck q-qt v-vq[%d] p-print", f, vq_en);
+    printf("\rframe: %d  menu: n-nxt b-bck q-qt v-vq[%d] p-printFig3 t-printFig2&4", f, vq_en);
     fflush(stdout);
     k = kbhit();
 
@@ -168,6 +193,7 @@ function ratek3_fbf(samname, f, vq_stage1_f32="", vq_stage2_f32="", K=79, Nb=100
     if k == 'b', f = f - 1; end
     if k == 'v', vq_en = mod(vq_en+1,2); end
     if k == 'p', epslatex=1; end
+    if k == 't', epslatex=2; end
 
   until (k == 'q')
   printf("\n");
@@ -219,4 +245,10 @@ function plot_time(lo, mid, hi)
   plot(2*y_off + real(hi),sprintf('b;%s;',papr(hi)));
   legend("boxoff")
   hold off;
+endfunction
+
+function plot_time_all(lo, mid, hi)
+  all = lo+mid+hi;
+  plot(real(all),sprintf('g;%s;',papr(all)));
+  legend("boxoff")
 endfunction

@@ -16,7 +16,7 @@ Speech coding can be defined as the art of representing speech using a small num
 
 Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $\{20log_{10}(A_m)\}, m=1..L$ to a set of fixed length $K=20$ samples $\{B_k\},k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
 
-There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, the formant energy must be spread in time.  As Codec 2 recover phase using a minimum phase model - this implies narrow formant bandwidths must be maintained \footnote{Other ways of spreading time domain energy are possible, for example generating phases through heuristics, non-minimum phase models, manipulation of phases, or time domain compression \cite{rowe2023_ratek_study}}.  Narrow formant bandwidths lead to long decay times for filters ``ringing`` with formant energy. When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Speech with a short pitch period (e.g. female) has less time to decay between pitch cycles so is less sensitive to formant bandwidths, the short pitch period naturally leads to a more uniform distribution of energy over time.
+There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, the formant energy must be spread in time.  As Codec 2 recover phase using a minimum phase model - this implies narrow formant bandwidths must be maintained \footnote{Other ways of spreading time domain energy are possible, for example generating phases through heuristics, non-minimum phase models, or time domain compression \cite{rowe2023_ratek_study}}.  Narrow formant bandwidths lead to long decay times for filters ``ringing`` with formant energy. When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Speech with a short pitch period (e.g. female) has less time to decay between pitch cycles so is less sensitive to formant bandwidths, the short pitch period naturally leads to a more uniform distribution of energy over time.
 
 At the Codec 2 receiver, a post filter $P()$ is applied which improves the perceptual quality, in particular for low pitched (male) speakers. The post filter is a form of ad-hoc non-linear filtering, using experimentally derived constants.  It raises formants and lowers anti-formants, effectively reducing formant bandwidth and more widely distributing energy in time (each formant ``rings" longer).
 
@@ -64,22 +64,33 @@ For controls we could use:
 
 \section{Results}
 
-$K=20$ and $K=80$ 2x12 bit (24 bit total VQs) were trained on 114,000 vectors using the LBG algorithm.  A single male and female sample were processed under a variety of conditions (see \path{README}).  The $K=80$ male sample sounded better than the $K=20$ sample, however there is still significant distortion.  The female sample was approximately the same for both $K=20$ and $K=80$.
+$K=20$ and $K=80$ 2x12 bit (24 bit total VQs) were trained on 114,000 vectors using the LBG algorithm.  A single male and female sample were processed under a variety of conditions (see \path{README}).  The $K=80$ male sample sounded better than the $K=20$ sample, however there is still significant distortion.  A significant artefact is a clicky/buzzy attribute after VQ, which is much more obvious at $K=20$. The female sample was approximately the same for both $K=20$ and $K=80$.
 
-Figure \ref{fig:big_dog_f61_k20} is a plot of a single frame from the male sample.  The SD was significantly higher for $K=80$ than $K=20$, the reverse of the subjective results.
+Figure \ref{fig:big_dog_f165_freq} is a plot of a single frame from the male sample.  The SD was significantly higher for $K=80$ than $K=20$, the reverse of the subjective results.  Note the narrow bandwidth of the formants - in this frame F1 is defined by a single harmonic around 10dB higher than adjacent harmonics.  While $K=80$ preserves the spectral detail well, the VQ is very noisy due to the difficulty with large dimension, multi-stage VQ.
 
-Visual inspection of the time domain synthesised waveforms and measurement of PAPR showed no significant difference between the $K=20$ and $K=80$, VQ samples.
+Visual inspection of the male time domain synthesised waveforms and measurement of PAPR (Figure \ref{fig:big_dog_f165_time}) demonstrates the energy distribution issue. The process of dimension reduction and quantisation leads to spectral smoothing; narrow formants become wider.  A wider filter in the frequency domain leads to more concentration of energy in time (faster decay of the time domain envelope), which we believe is the source of the unpleasant buzzy artefact.  The human ear does not like clicks.
 
 \begin{figure}
-\caption{Voiced frame from male speaker, 24 bits/frame. Objective VQ distortion is higher at $K=80$ however formants are sharper and F3/F4 better preserved}
-\label{fig:big_dog_f61_k20}
+\caption{Voiced frame 165 frequency domain from male speaker for $K=20$ and $K=80$, red is 24 bits/frame VQ. Objective VQ distortion is higher at $K=80$ however formants are sharper and formants better preserved.  F3 is poorly represented in both cases.  Note the formants F1-F3 are defined by single harmonics, indicating narrow bandwidth.}
+\label{fig:big_dog_f165_freq}
 \begin{center}
-\input big_dog_f61_k20.tex
-\input big_dog_f61_k79.tex
+\input big_dog_f165_k20.tex
+\input big_dog_f165_k79.tex
 \end{center}
 \end{figure}
 
-These experiments suggest the $K=80$ VQ is better at preserving perceptually important information at a given bit rate for the male sample tested.  A visual inspection  of the spectra suggests formants tend to get smoothed by the $K=20$ processing.  Therefore direct VQ of the $K=80$ vectors may simply be a better linear transformation (less smoothing, and/or preserving narrow formants through a higher sampling rate) than $K=20$ (downsampling, then followed by VQ). The results suggest there is a limit to how much downsampling is acceptable prior to VQ. The disadvantage of multi-stage VQ with large $K$ is the reduction in quantisation distortion is small from successive stages, as the residual vectors tend towards a set of $K$ independent Gaussians. There was no direct support for the energy distribution or non-linear dependency theory.  
+\begin{figure}
+\caption{Voiced frame 165 time domain synthesised speech from male speaker.  Plots 1 and 3 are the speech synthesised with original harmonic magnitudes and phases, presented as a control.  Plot 2 is speech synthesised from the $K=20$ model, plot 4 $K=80$. The difference in energy distribution over the pitch cycle is clear.  The objective PAPR measure ranks the samples correctly but is unsatisfactory due to low resolution.}
+\label{fig:big_dog_f165_time}
+\begin{center}
+\input big_dog_f165_k20_all.tex
+\input big_dog_f165_k79_all.tex
+\end{center}
+\end{figure}
+
+These experiments suggest the $K=80$ VQ is better at preserving spectral detail such as narrow bandwidth formants and provides a better time domain energy distribution than $K=20$.  However large dimension multi-stage VQ with acceptable quality is difficult, as the residual error vectors from each stage tend towards independent Gaussians.
+
+The problem remains - higher pitched speakers sound acceptable at low spectral resolution such as $K=20$, so it should be possible to encode low pitch speech with acceptable quality at the same dimension.
 
 \subsection{Notes and Further Work}
 

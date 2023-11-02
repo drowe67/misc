@@ -35,7 +35,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
 \item New equalisation algorithm that performs well on a range of AWGN and multipath channels, removing the need for modes, and providing several dB improvement for 700E users.
 \item Diversity in frequency and possibly time providing around 3dB improvement over 700D on multipath channels.  
 \item Dynamic threshold and pilot symbol selection for $\pm 200$ Hz acquisition (four times wider that 700D/E) at lower SNR, simplifying end user tuning.
-\item More reliable acquisition (sync) - faster acquisition of valid FreeDV signals, better rejection of noise.
+\item More reliable acquisition (sync) - faster acquisition of valid FreeDV signals, better rejection of noise and no false acquisition on carriers.
 \item Designing the probability of ``breaking squelch" on noise, removing the need for a squelch slider, and reducing listener fatigue.
 \end{enumerate}
 
@@ -43,7 +43,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
 
 \subsection{Glossary}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{l p{8cm} }
  \hline
@@ -66,7 +66,7 @@ Compared to the baseline FreeDV 700D/E waveforms:
 \caption{Glossary of Acronyms}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{l m{6cm} l}
  \hline
@@ -912,15 +912,27 @@ The new acquisition algorithm is therefore:
 \end{enumerate}
 Note that unlike the existing 700D/E acquisition algorithm $D_{thresh}$ is dynamic, and based on the standard deviation of the received signal.
 
-Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels.
+Multipath will introduce frequency selective phase shifts, perturbing the phase of the received pilots $P_c$ and lowering $|D_{tmax}|$.  However the greatest change in phase will be near the notches in the spectra where the pilot amplitudes are smallest, and we tend to operate at higher SNRs in multipath channels. Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm over a range of channels.
 
-Figure \ref{fig:acq_curves} presents the simulation results of the new algorithm over a range of channels.
+Figure \ref{fig:acq_curves_sin} shows the performance with an additive sine wave interferer, typical of other stations "tuning up" on the band.  There are two fail cases to consider:
+\begin{enumerate}
+\item With a FreeDV signal present, the interfering carrier blocks acquisition of our FreeDV signal.  From Figure \ref{fig:acq_curves_sin} we can see this occurs as the carrier power approaches the power of our wanted signal.  This can be explained by the sine wave power being included in the calculation of $\sigma$, hence increasing $D_{thresh}$ computed with (\ref{eq:corr_prob}). This suggests it is possible for malicious band users to block FreeDV using strong carriers, an undesirable result.  If this becomes a practical problem, an automatic notch filter could be employed to remove single frequency tones before the computation of $\sigma$.
+\item With no FreeDV signal present, the acquisition system makes a false detection on the carrier.  This is an issue with FreeDV 700C. The simulations suggest the acquisition system presented here does not falsely detect the carrier in the presence of only channel noise.  In fact the period between false detections $T_{noise}$ increases in the presence of a carrier, a desirable result.  This can also be explained by $\sigma$ and hence $D_{thresh}$ increasing with the carrier.
+\end{enumerate}
 
 \begin{figure}[H]
 \caption{Probability of acquisition for a range of channels and SNRs for 300 seconds of simulated $N_c=16, N_d=1, 1400$ bits/s signal, $P_{thresh}=\num{3e-5}$. Correct acquisition is defined as a timing error of $< \pm R_s$ and frequency error of $< \pm 0.5R_s$.  False acquisition occurs when $D_{tmax} > D_{thresh}$ but the estimates are outside the success tolerances  In this case we rely on post processing to reject the acquisition attempt.}
 \label{fig:acq_curves}
 \begin{center}
 \input acq_curves.tex
+\end{center}
+\end{figure}
+
+\begin{figure}[H]
+\caption{Probability of acquisition with additive sine wave interferer for a 30 second simulation, given a FreeDV signal is present. $C/I$ is the ratio of our wanted signal to the power of the sine wave interferer.  The frequency of the sine wave was changed randomly every 1 second, but always overlapped our OFDM signal.}
+\label{fig:acq_curves_sin}
+\begin{center}
+\input acq_curves_sin.tex
 \end{center}
 \end{figure}
 
@@ -947,7 +959,7 @@ P(accept|false)   &= P(<= n errors, p_f) \\
 
 Figure \ref{fig:acq_uw} plots the probability of both fail states against the number of UW errors.  A reasonable choice of a threshold is the point that minimises both fail cases, although there is some argument that minimising $P(accept|false)$ is more important as this case is more subjectively annoying.  Table {\ref{tab:acq_uw} shows the probability of each fail state for several UW lengths.  There is a trade off between minimising the probability of failure and the ``UW loss" $L_{uw}$ - the increase in SNR required due to the power consumed by UW bits at the expense of payload data. 
 
-For a given $P_{thesh}$ and $N_{uw}$ and the data in Table \ref{tab:noise_false_comparsion} we can estimate the mean time between ``breaking squelch" on noise after post processing. With $P_{thresh}=3E-5$, and $N_{uw}=8$, $T_{noise}/P(accept|false)=1.57/0.035=45$ seconds.  Through selection of $P_{thresh}, N_{uw}$ and the error threshold $n$ we can engineer an appropriate value for $P(accept|false)$ and hence the time between ``breaking squelch`` events.  Unlike current FreeDV modes, this will be independent of channel SNR, so the ``squelch" may not be required - making life less complicated for end users.
+For a given $P_{thesh}$ and $N_{uw}$ and the data in Table \ref{tab:noise_false_comparsion} we can estimate the mean time between ``breaking squelch" on noise after post processing. With $P_{thresh}=3E-5$, and $N_{uw}=8$, $T_{noise}/P(accept|false)=1.57/0.035=45$ seconds.  Through selection of $P_{thresh}, N_{uw}$ and the error threshold $n$ we can engineer an appropriate value for $P(accept|false)$ and hence the time between ``breaking squelch`` events.  Unlike current FreeDV modes, this will be independent of channel SNR, so a ``squelch" control may not be required - making life less complicated for end users.
 
 \begin{table}[h]
 \centering
@@ -975,39 +987,31 @@ For a given $P_{thesh}$ and $N_{uw}$ and the data in Table \ref{tab:noise_false_
 
 \subsection{CPU estimates}
 
-TODO 
-
-Estimate MIP with +/- 200 Hz frequency offset estimation. Compare to 700D.  Suggestions for strategies.
-Compare to load when demodulating
+TODO: Estimate MIP with +/- 200 Hz frequency offset estimation. Compare to 700D.  Compare to load when demodulating.  How vectorised can we get it, e.g. organising as a big matrix multiply might vectorise better. Maths/example for using FFT, issue in that it calculates every step.
 
 \subsection{Frequency Offset Refinement and Tracking}
 
-TODO
+\begin{figure}[H]
+\caption{Histograms of fine freq error using a $0.01R_s$ grid to evaluate $D_{tmax}$. $E_b/N_0=100$ dB is the ideal, no noise case; the other two cases are worst case, threshold $E_b/N_0$ for the channels.}
+\label{fig:acq_fine_hist}
+\begin{center}
+\input acq_fine_hist.tex
+\end{center}
+\end{figure}
 
-What is req for timing/freq error for successful acquisition?
+TODO: Should we do fine freq sampling/refinement before UW?  I think so, as it will improve UW results.  What is req for timing/freq error for successful acquisition?  I guess within capability of phase correction in equalisation to resolve, x\% of the time.
+
+For tracking we wish to be able to follow a certain rate of change, and resolve freq error to within range of phase est to resolve.
+
 Block diagram (above) of all steps, e.g. acquisition, post processing, refinement
-
 
 \subsection{Acquisition TODO}
 
 \begin{enumerate}
-\item Determine dimensions of time/freq sampling grid, for example is $D_t$ is maximised despite +/-200 Hz offset, ie do we need to sample it at every time instant and every freq instant, or can we just scan time first.
-\item Derive correlation approach as MMSE.  Show issue with combining $C_p$ from adjacent carriers. Can we establish reason it breaks down at +/- 25 Hz?  Are there any cycles at $T_f$?  Review blog posts.
-\item Include frequency offset in $E$ and $C_p$, explain how that can be included as function that we sample.
-\item Can we come up with an expression for the $C_t$ threshold?
-\item Can we come up for an expression for probability of error?
-\item Simply optimise what we have, make it work at a wider range.
-\item Even if cost function with freq offset is non-linear, can we differentiate it and solve iteratively?
 \item Can phase shift between successive pilots be used for fine freq estimation/refinement?
-\item Simulation framework to test current performance, measure probability of sync and probability of failure.  Why do we need UW?  Lets drill into that.
-\item Other methods (multiple by time shifted version) once we have a framework.
 \item With a wider $Nd=2$ signal, we might get better results.  We could also consider different pilots for each copy, as they aren't used for combining.
-\item There may be a good way to select an appropriate sequence for pilots to maximise the probability of detection, and mimimise PAPR.
-\item Consider an "end of over frame", to signal a clean end of over and squelch.
-\item Algorithm idea. Pilots can be considered a set of QPSK symbols, e.g. if $N_c=16$ we have 32 bits. We could equalise then measure BER and use this as metric for sync.  It also gives a us a tractable probability of error, and an easy way to combine with adjacent pilots.
-\item test with impulse noise and sinusoids
-\item plot Rayleigh on top of histogram
-\item req: we want acquisition to work a few dB lower than FEC.
+\item Consider an "end of over frame", signal a clean end of over and squelch.
+\item test with impulse noise and speech
 \end{enumerate}
 
 \subsection{Timing estimation}
@@ -1017,6 +1021,10 @@ TODO: make sure the current algorithm is doing sensible things on real world HF 
 \subsection{PAPR reduction}
 
 TODO: expressions for PAPR reduction, model for improved SNR at Rx.
+
+Idea: extra carrier(s), that supply a -ve pulse only when required, so they would be zero energy most of the time.  Just one symbol long.  Must be the shape of one cycle, to stay orthogonal to other carriers.  Can we describe this with math?  What benefit will it give?
+
+PAPR defined by probability - we don't mind clipping every 5 seconds.
 
 \section{Further Work}
 

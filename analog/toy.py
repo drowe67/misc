@@ -1,11 +1,14 @@
 """
-Toy autoencoder
+Toy autoencoder to gain experience with PyTorch
 """
 
 import torch
 from torch import nn
 import numpy as np
 import argparse
+
+# from: https://github.com/drowe67/opus/blob/dr-minor-typos/dnn/torch/rdovae/rdovae/dataset.py
+# Opus GitHub repo opus-ng branch
 
 class LPCNetDataset(torch.utils.data.Dataset):
     def __init__(self,
@@ -32,7 +35,7 @@ parser.add_argument('features', type=str, help='path to feature file in .f32 for
 args = parser.parse_args()
 
 feature_file = args.features
-num_used_features=20
+num_used_features = 20
 sequence_length = 1
 batch_size = 32
 
@@ -83,8 +86,8 @@ for epoch in range(epochs):
         x = x.to(device)
         y = model(x)
         loss = loss_fn(x, y)   
-        optimizer.step()
         loss.backward() 
+        optimizer.step()
         optimizer.zero_grad()
  
     running_loss += loss.item()

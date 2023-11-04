@@ -62,11 +62,11 @@ For controls we could use:
 \item Codec 2 3200 - this uses finely quantised LSPs that preserve formant shapes (and a post filter). 
 \end{enumerate}
 
-\section{Results}
+\section{$K=80$ VQ Results}
 
 $K=20$ and $K=80$ 2x12 bit (24 bit total VQs) were trained on 114,000 vectors using the LBG algorithm.  A single male and female sample were processed under a variety of conditions (see \path{README}).  The $K=80$ male sample sounded better than the $K=20$ sample, however there is still significant distortion.  A significant artefact is a clicky/buzzy attribute after VQ, which is much more obvious at $K=20$. The female sample was approximately the same for both $K=20$ and $K=80$.
 
-Figure \ref{fig:big_dog_f165_freq} is a plot of a single frame from the male sample.  The SD was significantly higher for $K=80$ than $K=20$, the reverse of the subjective results.  Note the narrow bandwidth of the formants - in this frame F1 is defined by a single harmonic around 10dB higher than adjacent harmonics.  While $K=80$ preserves the spectral detail well, the VQ is very noisy due to the difficulty with large dimension, multi-stage VQ.
+Figure \ref{fig:big_dog_f165_freq} is a plot of a single frame from the male sample.  The SD was significantly higher for $K=80$ than $K=20$, the reverse of the subjective results.  Note the narrow bandwidth of the formants - in this frame F1 is defined by a single harmonic around 10dB higher than adjacent harmonics.  While $K=80$ preserves the spectral detail well, the VQ is very noisy due to the difficulty with large dimension, multi-stage VQ. The largest errors (black) are around the formants - precisely the opposite of what we would like.
 
 Visual inspection of the male time domain synthesised waveforms and measurement of PAPR (Figure \ref{fig:big_dog_f165_time}) demonstrates the energy distribution issue. The process of dimension reduction and quantisation leads to spectral smoothing; narrow formants become wider.  A wider filter in the frequency domain leads to more concentration of energy in time (faster decay of the time domain envelope), which we believe is the source of the unpleasant buzzy artefact.  The human ear does not like clicks.
 
@@ -80,7 +80,7 @@ Visual inspection of the male time domain synthesised waveforms and measurement 
 \end{figure}
 
 \begin{figure}
-\caption{Voiced frame 165 time domain synthesised speech from male speaker.  Plots 1 and 3 are the speech synthesised with original harmonic magnitudes and phases, presented as a control.  Plot 2 is speech synthesised from the $K=20$ model, plot 4 $K=80$. The difference in energy distribution over the pitch cycle is clear.  The objective PAPR measure ranks the samples correctly but is unsatisfactory due to low resolution.}
+\caption{Voiced frame 165 time domain synthesised speech from male speaker.  Plots 1 and 3 are the speech synthesised with original harmonic magnitudes and phases, presented as a control.  Plot 2 is speech synthesised from the $K=20$ model, plot 4 $K=80$. The difference in energy distribution over the pitch cycle is clear.  The objective PAPR measure ranks the samples correctly but appears only weekly related to energy distribution.}
 \label{fig:big_dog_f165_time}
 \begin{center}
 \input big_dog_f165_k20_all.tex
@@ -91,6 +91,23 @@ Visual inspection of the male time domain synthesised waveforms and measurement 
 These experiments suggest the $K=80$ VQ is better at preserving spectral detail such as narrow bandwidth formants and provides a better time domain energy distribution than $K=20$.  However large dimension multi-stage VQ with acceptable quality is difficult, as the residual error vectors from each stage tend towards independent Gaussians.
 
 The problem remains - higher pitched speakers sound acceptable at low spectral resolution such as $K=20$, so it should be possible to encode low pitch speech with acceptable quality at the same dimension.
+
+\section{ML Design}
+
+In order to develop a ML system, we need to develop a cost function and appropriate model.  A first choice is $K=80$ vectors as a target, and MSE between log spectra as the cost function.  However like VQ, this will try to minimise the error across the entire spectra, and not focus on the critical formant bandwidths.  The VQ search uses MSE between log spectra, and often removes/rounds off spectral peaks and broadens formant bandwidths.  VQ training using kmeans also encourages averaging which de-emphasises vectors with tight spectral peaks (VQ doesn't consider $F_0$).
+
+\begin{enumerate}
+\item Matching the time domain waveform or frequency domain amplitude and phase is not critical, it's the time domain envelope that counts.
+\item Lets separate the problem of quantisation from energy distribution.  Use a low dimension, unquantised $K=20$ or MFCC vector as input, and focus on reasonable quality low pitched speech as the output.
+\item We are not tied to the current Codec 2 algorithm of converting magnitude spectra to phase spectra via a minimum phase Hilbert Transform.  We can generate phase spectra using other means.
+\item The cost function should be weighted against clicks in the synthesised speech.  This implies we need a function $X(\{A_m\},\{\theta_m\})$ that measures energy distribution.
+\item PAPR is not satisfactory (confirm/explore why).
+\item We would like formant bandwidth to be a function of $F_0$, as it matters for low pitched speakers (e.g. males) than females.  Having said that - females undersample the spectra which just one harmonic per formant so formant bandwidth is perhaps irrelevant.  We just wish to preserve the power of the harmonic(s) in that formant (something the current ad-hoc post filter doesn't explicitly do).  A narrow bandwidth formant would fit both male and female speech.
+\item Smooth post filtering across frames is important, we don't want abrupt changes in harmonic energy or discontinuous phases.
+\item For UV speech mistakenly classified at V, we should also have energy distributed - we should never synthesise clicks.  UV speech tends to have broad, flat spectral peaks, so if synthesised as V will have noticeable clicks.
+\item When formants are broadened, multiple harmonics of similar level are synthesised, creating a "two tone" time domain waveform envelope, rather than a damped exponential (bandpass figures).
+\item Idea: can we "fit" damped exponentials to spectra, like VQ-VAE fits Gaussians?
+\end{enumerate}
 
 \subsection{Notes and Further Work}
 
@@ -110,6 +127,7 @@ Further work:
 \item Are MFCCs good choices for input features to neural vocoders? They are smoothed, linear transformations of the input speech.  Other latent spaces may be more suitable.
 \item A linear transformation (like a DCT or PCA) followed by VQ is a good idea - truncating DCT coeffs will reduce the dimension, making storage easier, and VQ will capture any non-linear dependencies.  Smaller dimension will help residual error problem in multistage VQ. Trade off between truncation and VQ distortion.
 \item Can we avoid gradient shift/tendancy towards Gaussians with multistage VQ?  Does mbest help?
+\item Scripts supporting this study need refactoring.
 \end{enumerate}
 
 \bibliographystyle{plain}

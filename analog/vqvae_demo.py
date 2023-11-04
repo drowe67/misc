@@ -1,5 +1,5 @@
 """
-Test VQVAE by getting it to train on a QPSK constellation
+Test VQVAE by training on a QPSK constellation, ie 4 points at (+/-1,+/-1)
 """
 
 import torch
@@ -42,6 +42,7 @@ class NeuralNetwork(nn.Module):
     def __init__(self, embedding_dim, num_embeddings):
         super().__init__()
         self.vq = VectorQuantizer(embedding_dim, num_embeddings)
+        # Torch chokes if we don't have a trainable layer, this will just to an arbitrary rotation
         self.lin = nn.Linear(embedding_dim, embedding_dim)
     def forward(self, x):
         z = self.lin(x)
@@ -56,6 +57,7 @@ embedding_dim = 2
 num_embedding = 4
 num_samples = 1024
 batch_size = 4
+epochs = 3
 
 dataset = QPSKDataset(embedding_dim, num_samples)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
@@ -72,7 +74,6 @@ train_params = [params for params in model.parameters()]
 print(train_params)
 optimizer = torch.optim.SGD(train_params, lr=0.01)
 
-epochs = 3
 for epoch in range(epochs):
     running_loss = 0.0
     for batch, x in enumerate(dataloader):
@@ -91,7 +92,7 @@ for epoch in range(epochs):
 
 for param in model.parameters():
   print(param.data)
-
+model.eval()
 x_train = np.empty((0,2))
 x_pred = np.empty((0,2))
 with torch.no_grad():
@@ -100,9 +101,9 @@ with torch.no_grad():
         y = model(x)
         x_train = np.append(x_train, x.cpu(), axis=0)
         x_pred = np.append(x_pred, y["x_recon"].cpu(), axis=0)
-print(x_train.shape,x_pred.shape)
 
 plt.scatter(x_train[:,0],x_train[:,1],label='train')
 plt.scatter(x_pred[:,0],x_pred[:,1],label='pred')
 plt.legend()
+plt.grid(True)
 plt.show()

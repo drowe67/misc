@@ -64,11 +64,10 @@ class VectorQuantizer(nn.Module):
             + (self.e_i_ts ** 2).sum(0, keepdim=True)
         )
         encoding_indices = distances.argmin(1)
-        #print(encoding_indices, encoding_indices)
+        
         quantized_x = F.embedding(
             encoding_indices.view(x.shape[0], *x.shape[2:]), self.e_i_ts.transpose(0, 1)
         )
-        #print(x,quantized_x)
         
         # See second term of Equation (3).
         if not self.use_ema:
@@ -82,6 +81,7 @@ class VectorQuantizer(nn.Module):
         quantized_x = x + (quantized_x - x).detach()
 
         if self.use_ema and self.training:
+            #print(self.training)
             with torch.no_grad():
                 # See Appendix A.1 of "Neural Discrete Representation Learning".
 

@@ -96,6 +96,7 @@ The problem remains - higher pitched speakers sound acceptable at low spectral r
 
 In order to develop a ML system, we need to develop a cost function and appropriate model.  A first choice is $K=80$ vectors as a target, and MSE between log spectra as the cost function.  However like VQ, this will try to minimise the error across the entire spectra, and not focus on the critical formant bandwidths.  The VQ search uses MSE between log spectra, and often removes/rounds off spectral peaks and broadens formant bandwidths.  VQ training using kmeans also encourages averaging which de-emphasises vectors with tight spectral peaks (VQ doesn't consider $F_0$).
 
+Notes:
 \begin{enumerate}
 \item Matching the time domain waveform or frequency domain amplitude and phase is not critical, it's the time domain envelope that counts.
 \item Lets separate the problem of quantisation from energy distribution.  Use a low dimension, unquantised $K=20$ or MFCC vector as input, and focus on reasonable quality low pitched speech as the output.
@@ -107,6 +108,27 @@ In order to develop a ML system, we need to develop a cost function and appropri
 \item For UV speech mistakenly classified at V, we should also have energy distributed - we should never synthesise clicks.  UV speech tends to have broad, flat spectral peaks, so if synthesised as V will have noticeable clicks.
 \item When formants are broadened, multiple harmonics of similar level are synthesised, creating a "two tone" time domain waveform envelope, rather than a damped exponential (bandpass figures).
 \item Idea: can we "fit" damped exponentials to spectra, like VQ-VAE fits Gaussians?
+\end{enumerate}
+
+Requirements for cost function:
+\begin{enumerate}
+\item Models energy distribution of real world speech, and way ear integrates energy.
+\item Good distribution in each formant, this may not be obvious in non-preemph speech due to spectral tilt.
+\item Formant energy should be the same after processing.
+\item Formant energy should be smooth between frames.  Avoid amplitude modulation at the frame rate.
+\item Smooth transition between frames, don't break phase track.
+\item Deals with time varying number of harmonics, e.g. via interpolation of sparse functions
+\item Stretch goal: For UV speech mistakenly classifed as V, doesn't generate clicks.
+\end{enumerate}
+
+Candidates techniques:
+\begin{enumerate}
+\item Damped exponential $\alpha$.
+\item Match spectra, especially around formants, and use a HT min-phase to get phases.  $N_b$ filtering broadens peaks and chops off tops, several harmonics enter formant filter and $\alpha$ is reduced.
+\item Modify phases, not amplitude spectra.  Experiments show original phase and rate $K$ spectra sounds OK.  Ear is not that sensitive to frequency as long as energy distribution is OK.  Modifying spectra can lead to other artefacts as energy bounces around. OTOH, it might help intelligability.
+\item Use a CELP style weighting filter.  This will combine energy match of highest amplitude spectra, with some match of lower energy, and will ignore low energy HP/LP sections that have been filtered out.
+\item Ratio of minima/maxima of envelope.  Someone must have worked out expressions for these?  Can we solve anlaytically?  Fourier series stuff really.
+\item Can we specify mag envelope and inverse transform to get phases?
 \end{enumerate}
 
 \subsection{Notes and Further Work}

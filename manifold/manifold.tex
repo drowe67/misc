@@ -14,7 +14,7 @@
 
 Speech coding can be defined as the art of representing speech using a small number of parameters that can be efficiently sent over a channel.
 
-Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $\{20log_{10}(A_m)\}, m=1..L$ to a set of fixed length $K=20$ samples $\{B_k\},k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
+Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $20log_{10}(A_m), m=1..L$ to a set of fixed length $K=20$ samples $B_k,k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
 
 There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, the formant energy must be spread in time.  As Codec 2 recover phase using a minimum phase model - this implies narrow formant bandwidths must be maintained \footnote{Other ways of spreading time domain energy are possible, for example generating phases through heuristics, non-minimum phase models, or time domain compression \cite{rowe2023_ratek_study}}.  Narrow formant bandwidths lead to long decay times for filters ``ringing`` with formant energy. When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Speech with a short pitch period (e.g. female) has less time to decay between pitch cycles so is less sensitive to formant bandwidths, the short pitch period naturally leads to a more uniform distribution of energy over time.
 
@@ -94,18 +94,106 @@ The problem remains - higher pitched speakers sound acceptable at low spectral r
 
 \section{ML Design}
 
-In order to develop a ML system, we need to develop a cost function and appropriate model.  A first choice is $K=80$ vectors as a target, and MSE between log spectra as the cost function.  However like VQ, this will try to minimise the error across the entire spectra, and not focus on the critical formant bandwidths.  The VQ search uses MSE between log spectra, and often removes/rounds off spectral peaks and broadens formant bandwidths.  VQ training using kmeans also encourages averaging which de-emphasises vectors with tight spectral peaks (VQ doesn't consider $F_0$).
+In order to develop a ML system, we need to develop network model and loss functions.
+
+\section{Second Order Systems}
+
+To gain some insight into the energy distribution of speech across a pitch period consider a damped 2nd order system approximating a formant at $\omega_f$ radians:
+\begin{equation}
+x(n) = e^{-\alpha n}e^{j \omega_f n}
+\end{equation}
+As the sequence $x(n)$ is defined as analytical (complex valued), the magnitude as a function of time is simply:
+\begin{equation}
+|x(n)| = e^{-\alpha n}
+\end{equation}
+Hence $\alpha$ is a time constant defining the distribution of energy across the pitch period.  The Discrete Time Continuous Frequency Fourier Transform is:
+\begin{equation}
+\begin{split}
+X(\omega) &= \sum_{n=0}^{n=M} e^{-\alpha n}e^{j \omega_f n}e^{-j \omega n} \\
+           &= \sum_{n=0}^{n=M} e^{n(-\alpha + j \omega_f - j \omega)}
+\end{split}
+\end{equation}
+Using the identity:
+\begin{equation}
+\label{eq:geo_sum}
+\sum_{n=0}^{M-1} r^n = 
+\begin{cases}
+  \frac{1-r^M}{1-r} & r \ne 1 \\
+   M                & r = 1 
+\end{cases}   
+\end{equation}
+\begin{equation}
+\begin{split}
+X(\omega) &= \frac{1 - e^{M(-\alpha + j \omega_f - j \omega})}{1 - e^{-\alpha - j \omega_f + j \omega}} \\
+          &= \frac{1 - e^{-M \alpha}e^{M( j \omega_f - j \omega})}{1 - e^{-\alpha}e^{ j( \omega_f - \omega)}} \\
+           &= \frac{1}{1 - e^{-\alpha}e^{j (\omega_f - \omega)}}
+\end{split}
+\end{equation}
+for large $M$.  We can sample at $X(\omega_0 m)$ to obtain the phase and amplitude of each harmonic. This shows that for a simple system, we can obtain the harmonic phases as a function of the energy distribution defined by $\alpha$.  The peak amplitude at $\omega=\omega_f$ is:
+\begin{equation}
+H(\omega_f) = \frac{1}{1-e^{-\alpha}}	
+\end{equation}
+The bandwidth can be found be by solving for the half power frequency:
+\begin{equation}
+\begin{split}
+|H(\omega)|^2 &= \frac{1}{2}|H(\omega_f)|^2 \\
+\frac{1}{|1 - e^{-\alpha}e^{j (\omega_f - \omega)}|^2} &= \frac{1}{2|1-e^{-\alpha}|^2} \\
+\frac{1}{1 - 2e^{-\alpha}cos(\omega_f - \omega) + e^{-2\alpha}} &= \frac{1}{2(1-2e^{-\alpha} + e^{-2 \alpha})} \\
+cos(\omega_f - \omega) &= 2 - \frac{e^{\alpha}}{2} - \frac{e^{-\alpha}}{2}
+\end{split}
+\end{equation}
+The bandwidth $B=2(\omega_f - \omega)$, and using the approximation $cos(a) \approx 1-a^2/2$ for small angles:
+\begin{equation}
+\begin{split}
+B &\approx 2\sqrt{e^\alpha+e^{-\alpha}-2} \\
+  &\approx 2\alpha
+\end{split}
+\end{equation}
+We can observe that if the energy in the formant declines slowly over time (large $\alpha$), the magnitude of the peak is high, the bandwidth narrow, and the phase shift over the peak is greater (TODO plot mag and phase for a couple of alphas).
+	
+However our problem is more complex:
+\begin{enumerate}
+\item We have a smoothed (wide bandwidth formant) version of the amplitudes spectrum $B_m,k=1..K$ and pitch $F_0$ available.
+\item From $\{B_k\}$ we wish to obtain a set of amplitude and phase spectra $\{A_m\}, \{\theta_m\},m=1..L$ such that the energy distribution across the pitch period is similar to the input speech.
+\end{enumerate}
+If our ML algorithm is working we would expect to see a narrowing of formants for males, an increase in phase shift across the formant, and energy distributed across the pitch cycle.
+
+\subsection{ML Design candidate}
+
+Let the $K=20$ $N_b$ filtered vector $\mathbf{b} = \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix}$, and the $K=80$ unfiltered, oversampled vector be $\mathbf{y} = \begin{bmatrix} Y_1, Y_2, \ldots Y_K \end{bmatrix}$. The network and loss functions are:
+\begin{equation}
+\begin{split}
+\hat{\mathbf{y}} &= F(\mathbf{b},\omega_0) \\
+L(\mathbf{y},\hat{\mathbf{y}}) &= W(\mathbf{y},\hat{\mathbf{y}})
+\end{split}
+\end{equation}
+where $W$ compares the spectrally weighted linear energy, and $\mathbf{b}$ and $\mathbf{y}$ are computeted from pre-emphasised speech and presented to the network as $log_10()$ scaled values (not dB) without mean removal, and $\omega_0$ is in radians.  The candidate has the following features:
+\begin{enumerate}
+\item It operates at fixed sample rates.
+\item Experience has shown us that if formant bandwidths are preserved, the $K=80$ spectrum can be used to generate speech with a good energy distribution using phase obtained by a minimum phase (Hilbert) transform.
+\item Operating in the magnitude domain with fixed $K=80$ avoids the problems around dealing with phase and time varying number of phases in the network and loss function.
+\item A loss function in the weighted linear domain will emphasise spectral match (and hence formant bandwidth preservation) in the high energy formants.  The weighting means it will pay some attention to interformant regions but less to very low energy regions at the low and high frequency ends due to input filtering.
+\item Using pre-emphasised speech will also help the formant matching and energy distribution of higher frequency formants.
+\item We could choose to use the amplitudes as well as the phases derived from $\hat{\mathbf{y}}$, or just the phases.
+\item A loss term could be introduced to ensure an energy match is mantained, despite modification of the spectral shape.  The loss function $L$ will need to be a function of $\omega_0$, as the energy of the sampled signal will vary with sample rate.
+\end{enumerate}
+
+
+\subsection{ML Design Notes}
 
 Notes:
 \begin{enumerate}
-\item Matching the time domain waveform or frequency domain amplitude and phase is not critical, it's the time domain envelope that counts.
+\item A first choice is $K=80$ vectors as a target, and MSE between log spectra as the cost function.  However like VQ, this will try to minimise the error across the entire spectra, and not focus on the critical formant bandwidths.
+\item The VQ search uses MSE between log spectra, and often removes/rounds off spectral peaks and broadens formant bandwidths.  
+\item VQ training using kmeans also encourages averaging which de-emphasises vectors with tight spectral peaks (VQ doesn't consider $F_0$).
+\item Matching the time domain waveform (or equivalently frequency domain amplitude and phase) is not critical, it's the time domain envelope that counts.
 \item Lets separate the problem of quantisation from energy distribution.  Use a low dimension, unquantised $K=20$ or MFCC vector as input, and focus on reasonable quality low pitched speech as the output.
 \item We are not tied to the current Codec 2 algorithm of converting magnitude spectra to phase spectra via a minimum phase Hilbert Transform.  We can generate phase spectra using other means.
-\item The cost function should be weighted against clicks in the synthesised speech.  This implies we need a function $X(\{A_m\},\{\theta_m\})$ that measures energy distribution.
-\item PAPR is not satisfactory (confirm/explore why).
-\item We would like formant bandwidth to be a function of $F_0$, as it matters for low pitched speakers (e.g. males) than females.  Having said that - females undersample the spectra which just one harmonic per formant so formant bandwidth is perhaps irrelevant.  We just wish to preserve the power of the harmonic(s) in that formant (something the current ad-hoc post filter doesn't explicitly do).  A narrow bandwidth formant would fit both male and female speech.
-\item Smooth post filtering across frames is important, we don't want abrupt changes in harmonic energy or discontinuous phases.
-\item For UV speech mistakenly classified at V, we should also have energy distributed - we should never synthesise clicks.  UV speech tends to have broad, flat spectral peaks, so if synthesised as V will have noticeable clicks.
+\item The cost function should be weighted against energy being confined to short time durations (clicks) in the synthesised speech.  This implies we need a function $X(\{A_m\},\{\theta_m\})$ that measures energy distribution.
+\item PAPR does not appear to be satisfactory (confirm/explore why).
+\item We would like formant bandwidth to be a function of $F_0$, as it matters for low pitched speakers (e.g. males) than females.  Having said that - females undersample the spectra which just one harmonic per formant so formant bandwidth is perhaps irrelevant to females.  We do want to preserve the power of the harmonic(s) in that formant (something the current ad-hoc post filter doesn't explicitly do).  A narrow bandwidth formant may work for both male and female speech.
+\item Smooth post filtering across frames is important, we don't want abrupt changes in formant energy or discontinuous phases.
+\item For UV speech mistakenly classified at V, we should also have energy distributed - we should never synthesise clicks.  UV speech tends to have broad, flat spectra with no sharp peaks, so if synthesised as V will have noticeable clicks.
 \item When formants are broadened, multiple harmonics of similar level are synthesised, creating a "two tone" time domain waveform envelope, rather than a damped exponential (bandpass figures).
 \item Idea: can we "fit" damped exponentials to spectra, like VQ-VAE fits Gaussians?
 \end{enumerate}
@@ -113,22 +201,24 @@ Notes:
 Requirements for cost function:
 \begin{enumerate}
 \item Models energy distribution of real world speech, and way ear integrates energy.
-\item Good distribution in each formant, this may not be obvious in non-preemph speech due to spectral tilt.
+\item Good time domain distribution in each formant, this may not be obvious in non-preemph speech due to spectral tilt.
 \item Formant energy should be the same after processing.
 \item Formant energy should be smooth between frames.  Avoid amplitude modulation at the frame rate.
 \item Smooth transition between frames, don't break phase track.
 \item Deals with time varying number of harmonics, e.g. via interpolation of sparse functions
 \item Stretch goal: For UV speech mistakenly classifed as V, doesn't generate clicks.
+\item Low implemenation complexity in ML, to minimise chances of implemenation mistakes with current ML experience.
+\item Operate in the pre-emphasised domain to ensure the energy distribution of HF formants is treated equally with LF formants.  Removes spectral tilt.
 \end{enumerate}
 
 Candidates techniques:
 \begin{enumerate}
-\item Damped exponential $\alpha$.
+\item Derive a loss function based on comparing 2nd order exponential $\alpha$.
 \item Match spectra, especially around formants, and use a HT min-phase to get phases.  $N_b$ filtering broadens peaks and chops off tops, several harmonics enter formant filter and $\alpha$ is reduced.
 \item Modify phases, not amplitude spectra.  Experiments show original phase and rate $K$ spectra sounds OK.  Ear is not that sensitive to frequency as long as energy distribution is OK.  Modifying spectra can lead to other artefacts as energy bounces around. OTOH, it might help intelligability.
 \item Use a CELP style weighting filter.  This will combine energy match of highest amplitude spectra, with some match of lower energy, and will ignore low energy HP/LP sections that have been filtered out.
-\item Ratio of minima/maxima of envelope.  Someone must have worked out expressions for these?  Can we solve anlaytically?  Fourier series stuff really.
-\item Can we specify mag envelope and inverse transform to get phases?
+\item Ratio of minima/maxima of magnitude envelope, which can be used to obtain $\alpha$.  Someone must have worked out expressions for these?  Can we solve anlaytically?  Given Fourier series define by $\{A_m\}, \{\theta_m\},m=1..L$, can we obtain an expression for min/max or $\alpha$.
+\item Can we derive an expression for mag envelope as a function of phases?
 \end{enumerate}
 
 \subsection{Notes and Further Work}
@@ -152,6 +242,8 @@ Further work:
 \item Scripts supporting this study need refactoring.
 \end{enumerate}
 
+
 \bibliographystyle{plain}
 \bibliography{manifold_refs}
 \end{document}
+

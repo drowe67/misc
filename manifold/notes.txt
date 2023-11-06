@@ -1,0 +1,87 @@
+[ ] goal
+    + control energy distribution across pitch cycle
+    + thru selection of phases (and possibily amplitudes)
+    + lets just start with phases
+    + this means {theta_m} = f(alpha)
+[ ] expression for min and max of a complex harmonic series
+    + get my head around problem with tractable, toy example
+    [ ] Find expression for Am and theta_m for 2nd order system, as
+        a function of alpha
+	[ ] DFT of 2nd order exp
+	[ ] via z-transform
+    [ ] octave demo
+        + set alpha and omega_f, synth x_a(n) --- (1)
+	+ get H(exp(jomega)) and hence Am, theta_m
+	+ from freq domain synth x_a(n) -- (2)
+	+ compare (1) and (2)
+	+ measure alpha from (1) and (2)
+	+ compare to actual alpha
+    [ ] is general problem tractable anlaytically?  If No -> use ML        
+        + fourier anlaysis says any perdiodic function can be expressed as
+          sum of sinusoids
+	+ but we don't know how to fit our spectra to a model.  At least
+	  I don't
+	+ could solve numerically perhaps (without NN), have starting
+	  point for that from a few months ago, iterative version
+[ ] take a real speech frame, Am and theta_m, synth
+    + look at |x_a(n)| over a period or two
+[ ] expression for alpha, given we have amplitudes
+    + brute force it, find |x_a(0)| and |x_a(P)|
+    + might actually need min & max of |x_a(n)|, not all sequences have max
+      at start,and with linear offset, who knows
+    + find min and max, est alpha
+    + alpha is the input to the cost function.  Could also be envelope shape,
+      but not sure that matters.  Trick is to avoid reduction
+    + NN twiddles phases to min alpha across cycle.  Problem, how do we
+      represent phases?  Perhaps part of sparse, cont function? Or mag
+      spectra via HT, or IDFT?
+[ ] reconcile impulse driving system over one cycle with harmonics
+    driving system over many.  Derive FD or TD expression using both
+[ ] test with simple contrived 2nd order system
+    [ ] move to speech later
+    [ ] visualise spiral on complex plane
+[ ] show we can control energy distribution of a contrived signal
+[ ] expression for how ear detects?    
+    + need energy spread over time
+
+ML model A
+----------
+
++ for a single cycle, minimum is simply |x(P)|
++ not sure if max is |x(0)|
++ consider including some sort of energy match in cost function
++ feature input low rsln mag spectra, pitch, output high rsln mag spectra
++ compare with orig speech alpha (say via sinusoidial model, or HT or input
+  speech)
++ cost function takes that and computes alpha.  Hmm, that's the messy part, we would
+  need HT, sine syth in GPU
++ work in pre-emph domain
++ a latent space where we can mess with alpha would be nice
++ a win is squeezing of male formant bandwidths and greater phase shift
+  thru fomants
++ So innovation here is cost function, we compare alphas rather than
+  mag spectrum directly
++ test with some contrived spectra.  We could take 2nd or even 10th order
+  spectra, make it lower resln, see if haronics are recovered.
+
+ML Model B
+----------
+
++ we know K=80 (un quantised) sounds good
++ as orginal spectrum (when passing thru HT) has narrow bandwidths, so good env properties
++ so use K=80 as a target, on basis that if we match that, envelope will be good
++ use some sort of weighted linear measure, to emphasise high energy formants
++ operate in pre-emp domain, so high formants get considered 
++ input feature B log K=20 smoothed, pitch, output Y_hat K=20
++ target Y K=80, loss weighted lin between Y and Y_hat
++ use log spectra inside NN to reduce DR, but loss operates on weighted linear
++ overcomes variable pitch thing.  Emphasises high enegry formants, but some consdieration
+  of low energy parts of spectra
++ we can choose to just use phases, or use "filtered" amplitudes too
++ could include energy normalisation term in loss function
++ could compare alpha at end of each epoch, using code running on CPU (even shelled out to Octave)
+
+Theory:
+- if energy/power/amplitude drops to a minima over pitch cycle ear perceives
+  a time domain modulation of click
+  

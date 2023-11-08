@@ -72,10 +72,10 @@ ML Model B
 + so use K=80 as a target, on basis that if we match that, envelope will be good
 + use some sort of weighted linear measure, to emphasise high energy formants
 + operate in pre-emp domain, so high formants get considered 
-+ input feature B log K=20 smoothed, pitch, output Y_hat K=20
++ input feature B log K=20 smoothed, pitch, output Y_hat K80
 + target Y K=80, loss weighted lin between Y and Y_hat
 + use log spectra inside NN to reduce DR, but loss operates on weighted linear
-+ overcomes variable pitch thing.  Emphasises high enegry formants, but some consdieration
++ overcomes variable pitch thing.  Emphasises high energy formants, but some consideration
   of low energy parts of spectra
 + we can choose to just use phases, or use "filtered" amplitudes too
 + could include energy normalisation term in loss function

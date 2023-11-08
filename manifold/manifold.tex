@@ -94,90 +94,37 @@ The problem remains - higher pitched speakers sound acceptable at low spectral r
 
 \section{ML Design}
 
-In order to develop a ML system, we need to develop network model and loss functions.
+In order to develop a ML system, we need to develop network model and loss functions. To gain some insight into the energy distribution of speech across a pitch period a damped second order system was studied (appendix \ref{sec:second_order}).
 
-\section{Second Order Systems}
-
-To gain some insight into the energy distribution of speech across a pitch period consider a damped 2nd order system approximating a formant at $\omega_f$ radians:
-\begin{equation}
-x(n) = e^{-\alpha n}e^{j \omega_f n}
-\end{equation}
-As the sequence $x(n)$ is defined as analytical (complex valued), the magnitude as a function of time is simply:
-\begin{equation}
-|x(n)| = e^{-\alpha n}
-\end{equation}
-Hence $\alpha$ is a time constant defining the distribution of energy across the pitch period.  The Discrete Time Continuous Frequency Fourier Transform is:
-\begin{equation}
-\begin{split}
-X(\omega) &= \sum_{n=0}^{n=M} e^{-\alpha n}e^{j \omega_f n}e^{-j \omega n} \\
-           &= \sum_{n=0}^{n=M} e^{n(-\alpha + j \omega_f - j \omega)}
-\end{split}
-\end{equation}
-Using the identity:
-\begin{equation}
-\label{eq:geo_sum}
-\sum_{n=0}^{M-1} r^n = 
-\begin{cases}
-  \frac{1-r^M}{1-r} & r \ne 1 \\
-   M                & r = 1 
-\end{cases}   
-\end{equation}
-\begin{equation}
-\begin{split}
-X(\omega) &= \frac{1 - e^{M(-\alpha + j \omega_f - j \omega})}{1 - e^{-\alpha - j \omega_f + j \omega}} \\
-          &= \frac{1 - e^{-M \alpha}e^{M( j \omega_f - j \omega})}{1 - e^{-\alpha}e^{ j( \omega_f - \omega)}} \\
-           &= \frac{1}{1 - e^{-\alpha}e^{j (\omega_f - \omega)}}
-\end{split}
-\end{equation}
-for large $M$.  We can sample at $X(\omega_0 m)$ to obtain the phase and amplitude of each harmonic. This shows that for a simple system, we can obtain the harmonic phases as a function of the energy distribution defined by $\alpha$.  The peak amplitude at $\omega=\omega_f$ is:
-\begin{equation}
-H(\omega_f) = \frac{1}{1-e^{-\alpha}}	
-\end{equation}
-The bandwidth can be found be by solving for the half power frequency:
-\begin{equation}
-\begin{split}
-|H(\omega)|^2 &= \frac{1}{2}|H(\omega_f)|^2 \\
-\frac{1}{|1 - e^{-\alpha}e^{j (\omega_f - \omega)}|^2} &= \frac{1}{2|1-e^{-\alpha}|^2} \\
-\frac{1}{1 - 2e^{-\alpha}cos(\omega_f - \omega) + e^{-2\alpha}} &= \frac{1}{2(1-2e^{-\alpha} + e^{-2 \alpha})} \\
-cos(\omega_f - \omega) &= 2 - \frac{e^{\alpha}}{2} - \frac{e^{-\alpha}}{2}
-\end{split}
-\end{equation}
-The bandwidth $B=2(\omega_f - \omega)$, and using the approximation $cos(a) \approx 1-a^2/2$ for small angles:
-\begin{equation}
-\begin{split}
-B &\approx 2\sqrt{e^\alpha+e^{-\alpha}-2} \\
-  &\approx 2\alpha
-\end{split}
-\end{equation}
-We can observe that if the energy in the formant declines slowly over time (large $\alpha$), the magnitude of the peak is high, the bandwidth narrow, and the phase shift over the peak is greater (TODO plot mag and phase for a couple of alphas).
-	
-However our problem is more complex:
+Our problem is more complex that the second order example:
 \begin{enumerate}
-\item We have a smoothed (wide bandwidth formant) version of the amplitudes spectrum $B_m,k=1..K$ and pitch $F_0$ available.
+\item Rather that a transfer function we have a smoothed (wide bandwidth formant) version of the amplitude spectrum $B_k,k=1..K$ and pitch $F_0$ available.
 \item From $\{B_k\}$ we wish to obtain a set of amplitude and phase spectra $\{A_m\}, \{\theta_m\},m=1..L$ such that the energy distribution across the pitch period is similar to the input speech.
 \end{enumerate}
-If our ML algorithm is working we would expect to see a narrowing of formants for males, an increase in phase shift across the formant, and energy distributed across the pitch cycle.
+However the second order example gives us some hints on what we would expectto see from a viable ML system: a narrowing of formants for males, an increase in phase shift across each formant, and energy distributed across the pitch cycle.
+
 
 \subsection{ML Design candidate}
 
-Let the $K=20$ $N_b$ filtered vector $\mathbf{b} = \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix}$, and the $K=80$ unfiltered, oversampled vector be $\mathbf{y} = \begin{bmatrix} Y_1, Y_2, \ldots Y_K \end{bmatrix}$. The network and loss functions are:
+Let the $K=20$ $N_b$ filtered vector $\mathbf{b} = \begin{bmatrix} B_1, B_2, \ldots B_K \end{bmatrix}$, and the $K=80$ unfiltered, oversampled vector $\mathbf{y} = \begin{bmatrix} Y_1, Y_2, \ldots Y_K \end{bmatrix}$, where both are resampled versions of $log_{10}A_m$ scaled to have unit (linear) energy. The network and loss functions are:
 \begin{equation}
 \begin{split}
 \hat{\mathbf{y}} &= F(\mathbf{b},\omega_0) \\
-L(\mathbf{y},\hat{\mathbf{y}}) &= W(\mathbf{y},\hat{\mathbf{y}})
+L(\mathbf{y},\hat{\mathbf{y}}) &= \sum_{k=1}^{K=80}|(10^{Y_k}-10^{\hat{Y_k}})W(k)|^2 \\
+      &= \sum_{k=1}^{K=80}|(10^{Y_k}-10^{\hat{Y_k}})10^{-Y_k \gamma}|^2
 \end{split}
 \end{equation}
-where $W$ compares the spectrally weighted linear energy, and $\mathbf{b}$ and $\mathbf{y}$ are computeted from pre-emphasised speech and presented to the network as $log_10()$ scaled values (not dB) without mean removal, and $\omega_0$ is in radians.  The candidate has the following features:
+where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra peaks and emphasises spectral valleys, with $0<\gamma<1$ chosen by experiment.  The loss function compares the spectrally weighted linear energy. This candidate has the following features:
 \begin{enumerate}
-\item It operates at fixed sample rates.
 \item Experience has shown us that if formant bandwidths are preserved, the $K=80$ spectrum can be used to generate speech with a good energy distribution using phase obtained by a minimum phase (Hilbert) transform.
 \item Operating in the magnitude domain with fixed $K=80$ avoids the problems around dealing with phase and time varying number of phases in the network and loss function.
-\item A loss function in the weighted linear domain will emphasise spectral match (and hence formant bandwidth preservation) in the high energy formants.  The weighting means it will pay some attention to interformant regions but less to very low energy regions at the low and high frequency ends due to input filtering.
-\item Using pre-emphasised speech will also help the formant matching and energy distribution of higher frequency formants.
-\item We could choose to use the amplitudes as well as the phases derived from $\hat{\mathbf{y}}$, or just the phases.
-\item A loss term could be introduced to ensure an energy match is mantained, despite modification of the spectral shape.  The loss function $L$ will need to be a function of $\omega_0$, as the energy of the sampled signal will vary with sample rate.
+\item Features in the network $F()$ are in the $log_{10}()$ domain to reduce dynamic range. 
+\item A loss function in the linear (rather than $log()$) domain will emphasise spectral match (and hence formant bandwidth preservation) in the high energy formants.
+\item Weighting means it will pay some attention to interformant regions and less to very low energy regions at low and high frequencies (due to input filtering of the source speech).
+\item Using pre-emphasised speech to extract $\{A_m\}$ will also help formant matching and energy distribution of higher frequency formants (assuming the input speech has flat filtering).
+\item For synthesis we could choose to use the amplitudes as well as the phases derived from $\hat{\mathbf{y}}$, or just the phases.
+\item The weighting filter means energies will be matched in the weighted domain.  This may not be the same as matching energy in the synthesised speech. A loss term could be introduced to ensure an energy match is mantained, despite modification of the spectral shape.
 \end{enumerate}
-
 
 \subsection{ML Design Notes}
 
@@ -242,6 +189,91 @@ Further work:
 \item Scripts supporting this study need refactoring.
 \end{enumerate}
 
+\appendix
+
+\section{Second Order Systems}
+\label{sec:second_order}
+
+Consider a damped 2nd order system approximating a vocal tract formant resonance at $\omega_f$ radians:
+\begin{equation}
+x(n) = e^{-\alpha n}e^{j \omega_f n} \quad n \ge 0
+\end{equation}
+As the sequence $x(n)$ is defined as analytical (complex valued), the magnitude as a function of time is simply:
+\begin{equation}
+|x(n)| = e^{-\alpha n}
+\end{equation}
+Hence $\alpha$ is a time constant defining the distribution of energy across the pitch period.  The Discrete Time Continuous Frequency Fourier Transform is:
+\begin{equation}
+\begin{split}
+X(\omega) &= \sum_{n=0}^{n=M} e^{-\alpha n}e^{j \omega_f n}e^{-j \omega n} \\
+           &= \sum_{n=0}^{n=M} e^{n(-\alpha + j \omega_f - j \omega)}
+\end{split}
+\end{equation}
+Using the identity:
+\begin{equation}
+\label{eq:geo_sum}
+\sum_{n=0}^{M-1} r^n = 
+\begin{cases}
+  \frac{1-r^M}{1-r} & r \ne 1 \\
+   M                & r = 1 
+\end{cases}   
+\end{equation}
+\begin{equation}
+\label{eq:sec_order}
+\begin{split}
+X(\omega) &= \frac{1 - e^{M(-\alpha + j \omega_f - j \omega})}{1 - e^{-\alpha - j \omega_f + j \omega}} \\
+          &= \frac{1 - e^{-M \alpha}e^{M( j \omega_f - j \omega})}{1 - e^{-\alpha}e^{ j( \omega_f - \omega)}} \\
+           &= \frac{1}{1 - e^{-\alpha}e^{j (\omega_f - \omega)}}
+\end{split}
+\end{equation}
+for large $M$.  We can sample at $X(\omega_0 m)$ to obtain the phase and amplitude of each harmonic. This shows that for a simple system, we can obtain the harmonic phases as a function of the energy distribution defined by $\alpha$.  The peak amplitude at $\omega=\omega_f$ is:
+\begin{equation}
+H(\omega_f) = \frac{1}{1-e^{-\alpha}}	
+\end{equation}
+The bandwidth can be found be by solving for the half power frequency:
+\begin{equation}
+\begin{split}
+|H(\omega)|^2 &= \frac{1}{2}|H(\omega_f)|^2 \\
+\frac{1}{|1 - e^{-\alpha}e^{j (\omega_f - \omega)}|^2} &= \frac{1}{2|1-e^{-\alpha}|^2} \\
+\frac{1}{1 - 2e^{-\alpha}cos(\omega_f - \omega) + e^{-2\alpha}} &= \frac{1}{2(1-2e^{-\alpha} + e^{-2 \alpha})} \\
+cos(\omega_f - \omega) &= 2 - \frac{e^{\alpha}}{2} - \frac{e^{-\alpha}}{2}
+\end{split}
+\end{equation}
+The bandwidth $B=2(\omega_f - \omega)$.  Using some approximations for $cos(a)$ when $a$ is small, and $e^x$ when $x$ is small:
+\begin{equation}
+\begin{split}
+cos(x) &\approx 1-x^2/2 \\
+e^x &= \sum_{k=0}^{\infty}\frac{x^k}{k!} \\
+e^x + e^{-x} &= 2 + x^2 + \frac{x^4}{3} + ... \\
+             &\approx 1 + x^2     \\
+B &\approx 2\sqrt{e^\alpha+e^{-\alpha}-2} \\
+  &\approx 2\alpha
+\end{split}
+\end{equation}
+To determine the phase, lets evaluate (\ref{eq:sec_order}) at one of the half power frequencies:
+\begin{equation}
+\begin{split}
+X(\alpha) &= \frac{1}{1 - e^{-\alpha}e^{j (\omega_f - \alpha)}} \left(\frac{1 - e^{-\alpha}e^{-j (\omega_f - \alpha)}}{1 - e^{-\alpha}e^{-j (\omega_f - \alpha)}} \right)\\
+         &= \frac{1 - e^{-\alpha}e^{-j (\omega_f - \alpha)}}{1-2e^{-\alpha}cos(\omega_f-\alpha) + e^{-2\alpha}}
+\end{split}
+\end{equation}
+To determine the phase at the upper half power frequency:
+\begin{equation}
+\begin{split}
+arg\{X(\omega_f + \alpha)\} &= -atan\left[\frac{1}{X(\omega_f+\alpha)}\right] \\
+                 &= - atan\left[\frac{-e^{-\alpha}sin(\alpha)}{1-e^{-\alpha} cos(\alpha)}\right]
+\end{split}
+\end{equation}
+
+Figure \ref{fig:sec_order} illustrates the second order system for various values of $\alpha$. We can observe that if the energy in the formant is declines slowly over time (small $\alpha$), the magnitude of the peak is high, the bandwidth narrow, and the rate of change of phase wrt frequency is greater.
+ 	
+\begin{figure}
+\caption{Second order simulation for various values of $\alpha$. Top is $Re\{x(n)\}$ time domain.}
+\label{fig:sec_order}
+\begin{center}
+\input sec_order.tex
+\end{center}
+\end{figure}
 
 \bibliographystyle{plain}
 \bibliography{manifold_refs}

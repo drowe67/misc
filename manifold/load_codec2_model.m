@@ -6,7 +6,7 @@
 %  $ ./c2sim ../raw/big_dog.raw --modelout big_dog_model.bin
 %  octave> model=load_codec2_model('big_dog_model.bin');
 %
-% model retuned is compatable with "c2sim --dump" sample_model.txt dump file
+% model returned is compatable with "c2sim --dump" sample_model.txt dump file
 
 function model = load_codec2_model(fn)
   max_amp = 160; f = 1;

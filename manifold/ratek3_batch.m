@@ -39,7 +39,7 @@ function B = ratek3_batch_tool(samname, varargin)
   Kst=0; Ken=K-1; dec = 1; scatter_en = 0; noise_var = 0;
   w = ones(1,K); w_en = 0; dec_lin = 1; pre_en = 0; logfn=""; mic_eq = 0;
   plot_mic_eq = 0; vq_en = 0; norm_en = 0; compress_en = 0; limit_mean = 0;
-  quant_e4 = 0; Y_out_fn = ""; w1 = ones(1,K);
+  quant_e4 = 0; Y_out_fn = ""; w1 = ones(1,K); unit_en = 0; append_Wo_v = 0;
 
   lower = 10;             % only consider vectors above this mean
   dynamic_range = 100;     % restrict dynamic range of vectors
@@ -107,6 +107,10 @@ function B = ratek3_batch_tool(samname, varargin)
       plot_mic_eq = 1;    
     elseif strcmp(varargin{i},"norm_en") 
       norm_en = 1;    
+    elseif strcmp(varargin{i},"unit_en") 
+      unit_en = 1;    
+    elseif strcmp(varargin{i},"append_Wo_v") 
+      append_Wo_v = 1;    
     elseif strcmp(varargin{i},"Nb")
       Nb = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"logfn") 
@@ -438,8 +442,15 @@ function B = ratek3_batch_tool(samname, varargin)
   if length(B_out_fn)
     fb = fopen(B_out_fn,"wb");
     for f=1:frames
-      Bfloat = B(f,:);
+      if unit_en
+        Bfloat = unit_energy(B(f,:));
+      else
+        Bfloat = B(f,:);
+      end
       fwrite(fb, Bfloat, "float32");
+      if append_Wo_v
+        fwrite(fb,[model(f,1) model(f,end)], "float32");
+      end
     end
     fclose(fb);
   end
@@ -448,7 +459,11 @@ function B = ratek3_batch_tool(samname, varargin)
   if length(Y_out_fn)
     fy = fopen(Y_out_fn,"wb");
     for f=1:frames
-      Yfloat = YdB(f,:);
+      if unit_en
+        Yfloat = unit_energy(YdB(f,:));
+      else
+        Yfloat = YdB(f,:);
+      end
       fwrite(fy, Yfloat, "float32");
     end
     fclose(fy);

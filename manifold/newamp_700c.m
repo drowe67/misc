@@ -566,6 +566,12 @@ function test_norm_energy
   end
 end
 
+% return unit (linear) energy version of input vector, input/output in dB
+function x_dB_norm = unit_energy(x_dB)
+  c = sum(10 .^ (x_dB/10));
+  x_dB_norm = x_dB - 10*log10(c);
+end
+
 % Returns mu-law compressed frame energy. F_dB is scaled to 0dB when E_db = E_max_dB
 function F_dB = mulaw_comp(E_dB)
   E_lin = 10 .^ (E_dB/10);

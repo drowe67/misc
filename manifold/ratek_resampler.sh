@@ -26,6 +26,9 @@ stage2="${stage2:-yes}"
 stage3="${stage3:-no}"
 Nb=20
 
+which c2sim || { printf "\n**** Can't find c2sim - check CODEC2_PATH **** \n\n"; exit 1; }
+which vqtrain || { printf "\n**** Can't find vqtrain, build codec2-dev with cmake -DUNITTEST=1 .. **** \n\n"; exit 1; }
+
 function batch_process {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -124,7 +127,7 @@ function gen_train_b() {
   filename="${filename%.*}"
   filename_b=$2
  
-  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin ${options}
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
         'K',20,'norm_en'); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
@@ -153,12 +156,40 @@ function gen_train_y() {
   filename="${filename%.*}"
   filename_y=$2
 
-  c2sim $fullfile --hpf --modelout ${filename}_model.bin
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin ${options}
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'Y_out',\"${filename_y}\", \
         'norm_en','Nb',100); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
       
+# generate rate K=20, Nb=20 training data for ML experiment
+function gen_train_b_ml() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  filename_b=$2
+ 
+  c2sim $fullfile --hpf --prede --modelout ${filename}_model.bin ${options}
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
+        'K',20,'unit_en','append_Wo_v'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+}
+
+# Generate oversampled K=80 (79 element vectors) training material for ML experiment
+function gen_train_y_ml() {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  extension="${filename##*.}"
+  filename="${filename%.*}"
+  filename_y=$2
+
+  c2sim $fullfile --hpf --prede --modelout ${filename}_model.bin ${options}
+  echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'Y_out',\"${filename_y}\", \
+        'norm_en','Nb',100,'unit_en'); quit;" \
+  | octave -p ${CODEC2_PATH}/octave -qf
+}
+
 function log2 {
     local x=0
     for (( y=$1-1 ; $y > 0; y >>= 1 )) ; do
@@ -222,7 +253,13 @@ if [ $# -gt 0 ]; then
     gen_train_y)
         gen_train_y $2 $3
         ;;
-    train_lbg)
+    gen_train_b_ml)
+        gen_train_b_ml $2 $3
+        ;;
+    gen_train_y_ml)
+        gen_train_y_ml $2 $3
+        ;;
+     train_lbg)
         train_lbg $2 $3
         ;;
     vq_test_231028)

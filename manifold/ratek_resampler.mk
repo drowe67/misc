@@ -21,7 +21,6 @@ TRAIN ?= train_120
 M ?= 512
 
 SHELL  := /bin/bash
-CODEC2 := $(HOME)/codec2
 TRAIN_FULL := ~/Downloads/$(TRAIN).spc
 
 PLOT_DATA := $(TRAIN)_k20_res1.txt $(TRAIN)_k40_res1.txt $(TRAIN)_k80_res1.txt 
@@ -53,6 +52,8 @@ $(TRAIN)_k40_res1.txt: $(TRAIN)_b40.f32
 $(TRAIN)_k80_res1.txt: $(TRAIN)_y80.f32
 	K=79 Kst=0 Ken=78 M=$(M) ./ratek_resampler.sh train_lbg $(TRAIN)_y80.f32 $(TRAIN)_k80
 
+# training data for VQ experiment
+
 $(TRAIN)_b20.f32:
 	./ratek_resampler.sh gen_train_b $(TRAIN_FULL) $(TRAIN)_b20.f32
 
@@ -62,6 +63,13 @@ $(TRAIN)_b40.f32:
 $(TRAIN)_y80.f32:
 	./ratek_resampler.sh gen_train_y $(TRAIN_FULL) $(TRAIN)_y80.f32
 
+# training data for ML experiment
+
+$(TRAIN)_b20_ml.f32:
+	./ratek_resampler.sh gen_train_b_ml $(TRAIN_FULL) $(TRAIN)_b20_ml.f32
+
+$(TRAIN)_y80_ml.f32:
+	./ratek_resampler.sh gen_train_y_ml $(TRAIN_FULL) $(TRAIN)_y80_ml.f32
 
 clean:
 	rm -f $(PLOT_DATA)

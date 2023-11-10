@@ -9,6 +9,7 @@ import torch
 from torch import nn
 import numpy as np
 import argparse
+from matplotlib import pyplot as plt
 
 class f32Dataset(torch.utils.data.Dataset):
     def __init__(self,
@@ -19,7 +20,7 @@ class f32Dataset(torch.utils.data.Dataset):
                 target_dim):
 
         self.sequence_length = sequence_length
- 
+
         self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, features_dim))
         self.targets = np.reshape(np.fromfile(target_file, dtype=np.float32), (-1, target_dim))
         self.num_sequences = self.features.shape[0]
@@ -27,7 +28,14 @@ class f32Dataset(torch.utils.data.Dataset):
         print(f"num_sequences: {self.num_sequences}")
         assert(self.features.shape[0] == self.targets.shape[0])
 
-        # TODO: /10 and unit energy
+        # b and y vectors are in x_dB = 20*log10(x), scale down to log10(x).  We don't need to scale
+        # Wo and voicing (last two floats in feature vector)
+        for i in range(self.num_sequences):
+            self.features[i,:20] = self.features[i,:20]/20
+            self.targets[i,] = self.targets[i,]/20
+
+        # TODO Each vector should have unit (linear) energy
+        # TODO remove low energy vectors so we don't train on noise
 
     def __len__(self):
         return self.num_sequences
@@ -47,7 +55,7 @@ target_file = args.target
 feature_dim = 22
 target_dim = 79
 sequence_length=1
-batch_size = 2
+batch_size = 4
 
 dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
@@ -83,7 +91,7 @@ class NeuralNetwork(nn.Module):
 model = NeuralNetwork(feature_dim, target_dim).to(device)
 print(model)
 
-# TODO: custom loss function
+# TODO custom loss function
 # criterion to computes the loss between input and target
 loss_fn = nn.MSELoss()
 
@@ -94,11 +102,11 @@ epochs = 1
 for epoch in range(epochs):
     running_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):
-        print(y)
+        #print(y)
         f = f.to(device)
         y = y.to(device)
         y_hat = model(f)
-        print(y_hat.cpu())
+        #print(y_hat.cpu())
         loss = loss_fn(y, y_hat)   
         loss.backward() 
         optimizer.step()
@@ -108,3 +116,23 @@ for epoch in range(epochs):
     print(f'Epochs:{epoch + 1:5d} | ' \
           f'Batches per epoch: {batch + 1:3d} | ' \
           f'Loss: {running_loss / (batch + 1):.10f}')
+
+model.eval()
+plt.figure(1)
+with torch.no_grad():
+    for f,y in dataloader:
+        f = f.to(device)
+        y = y.to(device)
+        y_hat = model(f)
+        for b in range(f.shape[0]):
+            f_plot = f[b,0,].cpu()
+            y_plot = y[b,0,].cpu()
+            y_hat_plot = y_hat[b,0,].cpu()
+            plt.clf()
+            plt.subplot(211)
+            plt.plot(f_plot)
+            plt.subplot(212)
+            plt.plot(y_plot,'g')
+            plt.plot(y_hat_plot,'r')
+            plt.show(block=False)
+            loop = plt.waitforbuttonpress(0)

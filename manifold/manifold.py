@@ -34,11 +34,12 @@ class f32Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         features = self.features[index * self.sequence_length: (index + 1) * self.sequence_length, :]
-        return features
+        targets = self.targets[index * self.sequence_length: (index + 1) * self.sequence_length, :]
+        return features, targets
     
 parser = argparse.ArgumentParser()
-parser.add_argument('features', type=str, help='path to feature file in .f32 format')
-parser.add_argument('target', type=str, help='path to target file in .f32 format')
+parser.add_argument('features', type=str, help='path to feature file [b[22] Wo v] .f32 format')
+parser.add_argument('target', type=str, help='path to target file [y[79]] in .f32 format')
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
@@ -46,13 +47,13 @@ target_file = args.target
 feature_dim = 22
 target_dim = 79
 sequence_length=1
-batch_size = 32
+batch_size = 2
 
 dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
-for f in dataloader:
-    print(f"Shape of features: {f.shape}")
+for f,y in dataloader:
+    print(f"Shape of features: {f.shape} targets: {y.shape}")
     break
 
 # Get cpu, gpu or mps device for training.
@@ -82,21 +83,23 @@ class NeuralNetwork(nn.Module):
 model = NeuralNetwork(feature_dim, target_dim).to(device)
 print(model)
 
-"""
+# TODO: custom loss function
 # criterion to computes the loss between input and target
 loss_fn = nn.MSELoss()
-TODO: custom loss function
 
 # optimizer that will be used to update weights and biases
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 
-epochs = 10
+epochs = 1
 for epoch in range(epochs):
     running_loss = 0.0
-    for batch, x in enumerate(dataloader):
-        x = x.to(device)
-        y = model(x)
-        loss = loss_fn(x, y)   
+    for batch,(f,y) in enumerate(dataloader):
+        print(y)
+        f = f.to(device)
+        y = y.to(device)
+        y_hat = model(f)
+        print(y_hat.cpu())
+        loss = loss_fn(y, y_hat)   
         loss.backward() 
         optimizer.step()
         optimizer.zero_grad()
@@ -105,4 +108,3 @@ for epoch in range(epochs):
     print(f'Epochs:{epoch + 1:5d} | ' \
           f'Batches per epoch: {batch + 1:3d} | ' \
           f'Loss: {running_loss / (batch + 1):.10f}')
-"""

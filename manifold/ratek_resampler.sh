@@ -172,7 +172,7 @@ function gen_train_b_ml() {
  
   c2sim $fullfile --hpf --prede --modelout ${filename}_model.bin ${options}
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'B_out',\"${filename_b}\", \
-        'K',20,'unit_en','append_Wo_v'); quit;" \
+        'K',20,'norm_en','append_Wo_v'); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 
@@ -186,7 +186,7 @@ function gen_train_y_ml() {
 
   c2sim $fullfile --hpf --prede --modelout ${filename}_model.bin ${options}
   echo "ratek3_batch; ratek3_batch_tool(\"${filename}\",'Y_out',\"${filename_y}\", \
-        'norm_en','Nb',100,'unit_en'); quit;" \
+        'Nb',100,'norm_en'); quit;" \
   | octave -p ${CODEC2_PATH}/octave -qf
 }
 

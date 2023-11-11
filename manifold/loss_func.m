@@ -30,13 +30,12 @@ function loss_func(y_fn,gamma=0.5,frame=165,epslatex=0)
       Y = sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1));
       ydB_hat(m) = 10*log10(Y);
     end
-    %ydB_hat += 10;
 
     %ydB_hat = ydB + 6*(rand(1,Lhigh-1)-0.5) + 0;
     %ydB_hat = ydB + 6*(rand(1,Lhigh-1)-0.5) + 0;
 
     ylin = 10.^(ydB/10); ylin_hat = 10.^(ydB_hat/10);
-    wdB = -(1-gamma)*ydB; wlin = 10.^(wdB/10);
+    wdB = -(1-gamma)*ydB; wdB = min(30,wdB); wlin = 10.^(wdB/10);
     figure(1); clf; subplot(211); hold on;
     plot(rate_Lhigh_sample_freqs_kHz,ydB,'b;y;')
     plot(rate_Lhigh_sample_freqs_kHz,ydB_hat,'g;y hat;')

@@ -32,13 +32,24 @@ class f32Dataset(torch.utils.data.Dataset):
         print(f"num_sequences: {self.num_sequences}")
         assert(self.features.shape[0] == self.targets.shape[0])
 
-        # b and y vectors are in x_dB = 20*log10(x), scale down to log10(x).  We don't need to scale
-        # Wo and voicing (last two floats in feature vector)
+        # TODO combine energy norm and /20  steps
+
         for i in range(self.num_sequences):
+            # normalise energy in each vector to 1.0: (a) we are interested NN matching shape, not gain (b)
+            # keeps each loss on a similar scale to help gradients (c) a gain difference has a large
+            # impact on loss
+            e = np.sum(10**(self.features[i,:20]/10))
+            edB_feature = 10*np.log10(e)
+            self.features[i,:20] -= edB_feature
+            e = np.sum(10**(self.targets[i,]/10))
+            edB_target = 10*np.log10(e)
+            self.targets[i,] -= edB_target
+
+            # b and y vectors are in x_dB = 20*log10(x), scale down to log10(x).  We don't need to scale
+            # Wo and voicing (last two floats in feature vector)
             self.features[i,:20] = self.features[i,:20]/20
             self.targets[i,] = self.targets[i,]/20
 
-        # TODO Each vector should have unit (linear) energy
         # TODO remove low energy vectors so we don't train on noise
 
     def __len__(self):
@@ -102,7 +113,7 @@ def my_loss_mse(y_hat, y):
     loss = torch.mean((y_hat - y)**2)
     return loss
  
-gamma = 0.9
+gamma = 0.5
  
 # custom loss function that operates in the weighted linear domain
 def my_loss(y_hat, y):
@@ -110,7 +121,9 @@ def my_loss(y_hat, y):
     ten = ten.to(device)
     y_lin = torch.pow(ten,y)
     y_hat_lin = torch.pow(ten,y_hat)
-    w_lin = torch.pow(ten,-(1-gamma)*y)
+    w = -(1-gamma)*y
+    w = torch.clamp(w,max=30)
+    w_lin = torch.pow(ten,w)
     weighted_error = (y_hat_lin - y_lin)*w_lin
     loss = torch.mean(weighted_error**2)
     #print(loss)
@@ -120,6 +133,7 @@ def my_loss(y_hat, y):
 x = np.ones(2)
 y = 2*np.ones(2)
 w = 10**(-(1-gamma)*y)
+w = np.clip(w,None,30)
 result = my_loss(torch.from_numpy(x).to(device),torch.from_numpy(y).to(device)).cpu()
 expected_result = np.mean(((10**x - 10**y)*w)**2)
 if np.abs(result - expected_result) > expected_result*1E-3:
@@ -131,9 +145,9 @@ else:
 loss_fn = my_loss
 
 # optimizer that will be used to update weights and biases
-optimizer = torch.optim.SGD(model.parameters(), lr=1E-7)
+optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
 
-epochs = 100
+epochs = 60
 for epoch in range(epochs):
     sum_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):
@@ -162,6 +176,13 @@ plt.figure(1)
 dataloader_infer = torch.utils.data.DataLoader(dataset, batch_size=1)
 print("Click on plot to advance, any key to quit")
 
+b_f_kHz = np.array([0.1998, 0.2782, 0.3635, 0.4561, 0.5569, 0.6664, 0.7855, 0.9149, 1.0556, 1.2086, 1.3749, 1.5557,
+1.7523, 1.9659, 2.1982, 2.4508, 2.7253, 3.0238, 3.3483, 3.7011])
+Fs = 8000
+Lhigh = 80
+F0high = (Fs/2)/Lhigh
+y_f_kHz = np.arange(F0high,Lhigh*F0high, F0high)/1000
+
 with torch.no_grad():
     for b,(f,y) in enumerate(dataloader_infer):
         # TODO: must be an easier way to access data at a given index and run on .to(device)
@@ -170,18 +191,17 @@ with torch.no_grad():
             f = f.to(device)
             y = y.to(device)
             y_hat = model(f)
-            f_plot = f[0,0,].cpu()
-            y_plot = y[0,0,].cpu()
-            y_hat_plot = y_hat[0,0,].cpu()
+            f_plot = 20*f[0,0,].cpu()
+            y_plot = 20*y[0,0,].cpu()
+            y_hat_plot = 20*y_hat[0,0,].cpu()
             # TODO: compute a distortion metric like SD or MSE (linear)
             plt.clf()
-            plt.subplot(211)
-            plt.plot(f_plot)
+            plt.plot(b_f_kHz,f_plot[0:20])
             t = f"f: {b}"
             plt.title(t)
-            plt.subplot(212)
-            plt.plot(y_plot,'g')
-            plt.plot(y_hat_plot,'r')
+            plt.plot(y_f_kHz,y_plot,'g')
+            plt.plot(y_f_kHz,y_hat_plot,'r')
+            plt.axis([0, 4, -60, 0])
             plt.show(block=False)
             loop = plt.waitforbuttonpress(0)
             if loop == True:

@@ -101,24 +101,30 @@ print(model)
 def my_loss_mse(y_hat, y):
     loss = torch.mean((y_hat - y)**2)
     return loss
-
+ 
+gamma = 0.9
+ 
 # custom loss function that operates in the weighted linear domain
 def my_loss(y_hat, y):
     ten = 10*torch.ones(y.shape)
     ten = ten.to(device)
     y_lin = torch.pow(ten,y)
     y_hat_lin = torch.pow(ten,y_hat)
-    loss = torch.mean((y_hat_lin - y_lin)**2)
+    w_lin = torch.pow(ten,-(1-gamma)*y)
+    weighted_error = (y_hat_lin - y_lin)*w_lin
+    loss = torch.mean(weighted_error**2)
     #print(loss)
     return loss
 
 # test for our custom loss function
 x = np.ones(2)
 y = 2*np.ones(2)
-test_result = my_loss(torch.from_numpy(x).to(device),torch.from_numpy(y).to(device)).cpu()
-expected_result = np.mean((10**x - 10**y)**2)
-if test_result != expected_result:
+w = 10**(-(1-gamma)*y)
+result = my_loss(torch.from_numpy(x).to(device),torch.from_numpy(y).to(device)).cpu()
+expected_result = np.mean(((10**x - 10**y)*w)**2)
+if np.abs(result - expected_result) > expected_result*1E-3:
     print("my_loss() test: fail")
+    print(f"my_loss(): {result} expected: {expected_result}")
     quit()
 else:
     print("my_loss() test: pass ")
@@ -127,7 +133,7 @@ loss_fn = my_loss
 # optimizer that will be used to update weights and biases
 optimizer = torch.optim.SGD(model.parameters(), lr=1E-7)
 
-epochs = 10
+epochs = 100
 for epoch in range(epochs):
     sum_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):

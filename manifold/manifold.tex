@@ -111,10 +111,10 @@ Let the $K=20$ $N_b$ filtered vector $\mathbf{b} = \begin{bmatrix} B_1, B_2, \ld
 \begin{split}
 \hat{\mathbf{y}} &= F(\mathbf{b},\omega_0) \\
 L(\mathbf{y},\hat{\mathbf{y}}) &= \sum_{k=1}^{K=80}|(10^{Y_k}-10^{\hat{Y_k}})W(k)|^2 \\
-      &= \sum_{k=1}^{K=80}|(10^{Y_k}-10^{\hat{Y_k}})10^{-Y_k \gamma}|^2
+      &= \sum_{k=1}^{K=80}|(10^{Y_k}-10^{\hat{Y_k}})10^{-Y_k (1-\gamma)}|^2
 \end{split}
 \end{equation}
-where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra peaks and emphasises spectral valleys, with $0<\gamma<1$ chosen by experiment.  The loss function compares the spectrally weighted linear energy. This candidate has the following features:
+where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra peaks and emphasises spectral valleys, with $0<\gamma<1$ chosen by experiment ($\gamma =1$ is unweighted).  The loss function compares the spectrally weighted linear energy. This candidate has the following features:
 \begin{enumerate}
 \item Experience has shown us that if formant bandwidths are preserved, the $K=80$ spectrum can be used to generate speech with a good energy distribution using phase obtained by a minimum phase (Hilbert) transform.
 \item Operating in the magnitude domain with fixed $K=80$ avoids the problems around dealing with phase and time varying number of phases in the network and loss function.
@@ -187,6 +187,8 @@ Further work:
 \item A linear transformation (like a DCT or PCA) followed by VQ is a good idea - truncating DCT coeffs will reduce the dimension, making storage easier, and VQ will capture any non-linear dependencies.  Smaller dimension will help residual error problem in multistage VQ. Trade off between truncation and VQ distortion.
 \item Can we avoid gradient shift/tendancy towards Gaussians with multistage VQ?  Does mbest help?
 \item Scripts supporting this study need refactoring.
+\item It would be useful to look at LPCNet excitation and LPC filter spectra to see how males are handled, as that has a fairly coarse spectral represesntation.  So we would expect excitation for males to have notches either side of formants.
+\item Consider a model that represnts a 2D time-freq formant "blob".  This is what the ear detects - energy at a certain freq for a certain amount of time.  This works suggests time-freq distribution should be considered together, rather than a frame-frame breakdown.
 \end{enumerate}
 
 \appendix
@@ -268,7 +270,7 @@ arg\{X(\omega_f + \alpha)\} &= -atan\left[\frac{1}{X(\omega_f+\alpha)}\right] \\
 Figure \ref{fig:sec_order} illustrates the second order system for various values of $\alpha$. We can observe that if the energy in the formant is declines slowly over time (small $\alpha$), the magnitude of the peak is high, the bandwidth narrow, and the rate of change of phase wrt frequency is greater.
  	
 \begin{figure}
-\caption{Second order simulation for various values of $\alpha$. Top is $Re\{x(n)\}$ time domain.}
+\caption{Second order simulation for various values of $\alpha$. Top is $Re\{x(n)\}$ time domain for 100 samples, e.g. one pitch period with $F_s=8000$ Hz and $F_0=80$ Hz.}
 \label{fig:sec_order}
 \begin{center}
 \input sec_order.tex

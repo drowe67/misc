@@ -115,8 +115,9 @@ def my_loss(y_hat, y):
 # test for our custom loss function
 x = np.ones(2)
 y = 2*np.ones(2)
-test_result = my_loss(torch.ones(2).to(device),2*torch.ones(2).to(device)).cpu()
-if test_result != 8100:
+test_result = my_loss(torch.from_numpy(x).to(device),torch.from_numpy(y).to(device)).cpu()
+expected_result = np.mean((10**x - 10**y)**2)
+if test_result != expected_result:
     print("my_loss() test: fail")
     quit()
 else:

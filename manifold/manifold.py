@@ -48,6 +48,7 @@ class f32Dataset(torch.utils.data.Dataset):
 parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file [b[22] Wo v] .f32 format')
 parser.add_argument('target', type=str, help='path to target file [y[79]] in .f32 format')
+parser.add_argument('--frame', type=int, default=165, help='frames to start veiwing')
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
@@ -55,7 +56,7 @@ target_file = args.target
 feature_dim = 22
 target_dim = 79
 sequence_length=1
-batch_size = 4
+batch_size = 8
 
 dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
@@ -119,20 +120,30 @@ for epoch in range(epochs):
 
 model.eval()
 plt.figure(1)
+dataloader_infer = torch.utils.data.DataLoader(dataset, batch_size=1)
+print("Click on plot to advance, any key to quit")
+
 with torch.no_grad():
-    for f,y in dataloader:
-        f = f.to(device)
-        y = y.to(device)
-        y_hat = model(f)
-        for b in range(f.shape[0]):
-            f_plot = f[b,0,].cpu()
-            y_plot = y[b,0,].cpu()
-            y_hat_plot = y_hat[b,0,].cpu()
+    for b,(f,y) in enumerate(dataloader_infer):
+        # TODO: must be an easier way to access data at a given index and run on .to(device)
+        # Maybe we run on CPU?
+        if b >= args.frame:
+            f = f.to(device)
+            y = y.to(device)
+            y_hat = model(f)
+            f_plot = f[0,0,].cpu()
+            y_plot = y[0,0,].cpu()
+            y_hat_plot = y_hat[0,0,].cpu()
+            # TODO: compute a distortion metric like SD or MSE (linear)
             plt.clf()
             plt.subplot(211)
             plt.plot(f_plot)
+            t = f"f: {b}"
+            plt.title(t)
             plt.subplot(212)
             plt.plot(y_plot,'g')
             plt.plot(y_hat_plot,'r')
             plt.show(block=False)
             loop = plt.waitforbuttonpress(0)
+            if loop == True:
+                quit()

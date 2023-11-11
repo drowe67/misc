@@ -3,6 +3,10 @@ Manifold ML experiment - training script.
 
 Train a model to generate low pitched speech with good time domain energy distribution over a
 pitch cycle.
+
+make -f ratek_resampler.mk train_120_b20_ml.f32 train_120_y80_ml.f32
+python3 manifold.py train_120_b20_ml.f32 train_120_y80_ml.f32 --noplot
+
 """
 
 import torch
@@ -49,6 +53,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file [b[22] Wo v] .f32 format')
 parser.add_argument('target', type=str, help='path to target file [y[79]] in .f32 format')
 parser.add_argument('--frame', type=int, default=165, help='frames to start veiwing')
+parser.add_argument('--noplot', action='store_true', help='disable plots after training')
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
@@ -56,7 +61,7 @@ target_file = args.target
 feature_dim = 22
 target_dim = 79
 sequence_length=1
-batch_size = 8
+batch_size = 32
 
 dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
@@ -92,32 +97,59 @@ class NeuralNetwork(nn.Module):
 model = NeuralNetwork(feature_dim, target_dim).to(device)
 print(model)
 
-# TODO custom loss function
-# criterion to computes the loss between input and target
-loss_fn = nn.MSELoss()
+# prototype custom loss function
+def my_loss_mse(y_hat, y):
+    loss = torch.mean((y_hat - y)**2)
+    return loss
+
+# custom loss function that operates in the weighted linear domain
+def my_loss(y_hat, y):
+    ten = 10*torch.ones(y.shape)
+    ten = ten.to(device)
+    y_lin = torch.pow(ten,y)
+    y_hat_lin = torch.pow(ten,y_hat)
+    loss = torch.mean((y_hat_lin - y_lin)**2)
+    #print(loss)
+    return loss
+
+# test for our custom loss function
+x = np.ones(2)
+y = 2*np.ones(2)
+test_result = my_loss(torch.ones(2).to(device),2*torch.ones(2).to(device)).cpu()
+if test_result != 8100:
+    print("my_loss() test: fail")
+    quit()
+else:
+    print("my_loss() test: pass ")
+loss_fn = my_loss
 
 # optimizer that will be used to update weights and biases
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+optimizer = torch.optim.SGD(model.parameters(), lr=1E-7)
 
-epochs = 1
+epochs = 10
 for epoch in range(epochs):
-    running_loss = 0.0
+    sum_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):
         #print(y)
         f = f.to(device)
         y = y.to(device)
         y_hat = model(f)
         #print(y_hat.cpu())
-        loss = loss_fn(y, y_hat)   
+        loss = loss_fn(y, y_hat)
+        #print(loss, loss.item())
         loss.backward() 
         optimizer.step()
         optimizer.zero_grad()
- 
-    running_loss += loss.item()
+        if np.isnan(loss.item()):
+            quit()
+        sum_loss += loss.item()
+
     print(f'Epochs:{epoch + 1:5d} | ' \
           f'Batches per epoch: {batch + 1:3d} | ' \
-          f'Loss: {running_loss / (batch + 1):.10f}')
+          f'Loss: {sum_loss / (batch + 1):.10f}')
 
+if args.noplot:
+    quit()
 model.eval()
 plt.figure(1)
 dataloader_infer = torch.utils.data.DataLoader(dataset, batch_size=1)

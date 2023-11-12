@@ -98,6 +98,8 @@ class NeuralNetwork(nn.Module):
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(input_dim, 512),
             nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
             nn.Linear(512, output_dim)
        )
 
@@ -106,7 +108,7 @@ class NeuralNetwork(nn.Module):
         return y
 
 model = NeuralNetwork(feature_dim, target_dim).to(device)
-print(model)
+print(model,sum(p.numel() for p in model.parameters()))
 
 # prototype custom loss function
 def my_loss_mse(y_hat, y):
@@ -147,7 +149,7 @@ loss_fn = my_loss
 # optimizer that will be used to update weights and biases
 optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
 
-epochs = 60
+epochs = 200
 for epoch in range(epochs):
     sum_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):

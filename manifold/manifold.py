@@ -149,17 +149,14 @@ loss_fn = my_loss
 # optimizer that will be used to update weights and biases
 optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
 
-epochs = 1
+epochs = 100
 for epoch in range(epochs):
     sum_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):
-        #print(y)
         f = f.to(device)
         y = y.to(device)
         y_hat = model(f)
-        #print(y_hat.cpu())
         loss = loss_fn(y, y_hat)
-        #print(loss, loss.item())
         loss.backward() 
         optimizer.step()
         optimizer.zero_grad()
@@ -173,10 +170,10 @@ for epoch in range(epochs):
 
 if args.noplot:
     quit()
+
 model.eval()
-plt.figure(1)
-dataloader_infer = torch.utils.data.DataLoader(dataset, batch_size=1)
-print("Click on plot to advance, any key to quit")
+
+print("[click or n]-next [b]-back [q]-quit")
 
 b_f_kHz = np.array([0.1998, 0.2782, 0.3635, 0.4561, 0.5569, 0.6664, 0.7855, 0.9149, 1.0556, 1.2086, 1.3749, 1.5557,
 1.7523, 1.9659, 2.1982, 2.4508, 2.7253, 3.0238, 3.3483, 3.7011])
@@ -185,13 +182,13 @@ Lhigh = 80
 F0high = (Fs/2)/Lhigh
 y_f_kHz = np.arange(F0high,Lhigh*F0high, F0high)/1000
 
-
 # called when we press a key on the plot
 akey = ''
 def on_press(event):
     global akey
     akey = event.key
 
+plt.figure(1)
 fig, ax = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', on_press)
 

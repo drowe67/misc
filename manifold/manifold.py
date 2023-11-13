@@ -21,15 +21,16 @@ class f32Dataset(torch.utils.data.Dataset):
                 target_file,
                 sequence_length, 
                 features_dim,
-                target_dim):
+                target_dim,
+                num_test = 0):
 
         self.sequence_length = sequence_length
 
-        self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, features_dim))
-        self.targets = np.reshape(np.fromfile(target_file, dtype=np.float32), (-1, target_dim))
+        self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32,offset=4*num_test*features_dim), (-1, features_dim))
+        self.targets = np.reshape(np.fromfile(target_file, dtype=np.float32,offset=4*num_test*target_dim), (-1, target_dim))
         self.num_sequences = self.features.shape[0]
 
-        print(f"num_sequences: {self.num_sequences}")
+        print(f"test: {num_test} train: {self.num_sequences}")
         assert(self.features.shape[0] == self.targets.shape[0])
 
         # TODO combine energy norm and /20  steps
@@ -63,8 +64,10 @@ class f32Dataset(torch.utils.data.Dataset):
 parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file [b[22] Wo v] .f32 format')
 parser.add_argument('target', type=str, help='path to target file [y[79]] in .f32 format')
-parser.add_argument('--frame', type=int, default=165, help='frames to start veiwing')
+parser.add_argument('--frame', type=int, default=165, help='frame # to start viewing')
 parser.add_argument('--noplot', action='store_true', help='disable plots after training')
+parser.add_argument('--num_test', type=int, default=60*100, help='number of vectors reserved for testing')
+parser.add_argument('--epochs', type=int, default=10, help='number of training epochs')
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
@@ -74,7 +77,7 @@ target_dim = 79
 sequence_length=1
 batch_size = 32
 
-dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim)
+dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
 for f,y in dataloader:
@@ -108,7 +111,9 @@ class NeuralNetwork(nn.Module):
         return y
 
 model = NeuralNetwork(feature_dim, target_dim).to(device)
-print(model,sum(p.numel() for p in model.parameters()))
+print(model)
+num_weights = sum(p.numel() for p in model.parameters())
+print(f"weights: {num_weights} memory: {num_weights*4}")
 
 # prototype custom loss function
 def my_loss_mse(y_hat, y):
@@ -149,8 +154,7 @@ loss_fn = my_loss
 # optimizer that will be used to update weights and biases
 optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
 
-epochs = 100
-for epoch in range(epochs):
+for epoch in range(args.epochs):
     sum_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):
         f = f.to(device)
@@ -161,6 +165,7 @@ for epoch in range(epochs):
         optimizer.step()
         optimizer.zero_grad()
         if np.isnan(loss.item()):
+            print("NAN encountered - quitting (try reducing lr)!")
             quit()
         sum_loss += loss.item()
 
@@ -172,6 +177,7 @@ if args.noplot:
     quit()
 
 model.eval()
+dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim)
 
 print("[click or n]-next [b]-back [q]-quit")
 
@@ -188,7 +194,7 @@ def on_press(event):
     global akey
     akey = event.key
 
-plt.figure(1)
+#plt.figure(1)
 fig, ax = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', on_press)
 
@@ -196,8 +202,8 @@ with torch.no_grad():
     b = args.frame
     loop = True
     while loop:
-        (f,y) = dataset.__getitem__(b)
-        y_hat = model(torch.from_numpy(f))
+        (f,y) = dataset_eval.__getitem__(b)
+        y_hat = model(torch.from_numpy(f).to(device))
         f_plot = 20*f[0,]
         y_plot = 20*y[0,]
         y_hat_plot = 20*y_hat[0,].cpu()

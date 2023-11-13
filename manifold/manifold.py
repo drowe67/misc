@@ -5,7 +5,7 @@ Train a model to generate low pitched speech with good time domain energy distri
 pitch cycle.
 
 make -f ratek_resampler.mk train_120_b20_ml.f32 train_120_y80_ml.f32
-python3 manifold.py train_120_b20_ml.f32 train_120_y80_ml.f32 --noplot
+python3 manifold.py train_120_b20_ml.f32 train_120_y80_ml.f32
 
 """
 
@@ -45,7 +45,7 @@ class f32Dataset(torch.utils.data.Dataset):
             e = np.sum(10**(self.targets[i,]/10))
             edB_target = 10*np.log10(e)
             self.targets[i,] -= edB_target
-
+            
             # b and y vectors are in x_dB = 20*log10(x), scale down to log10(x).  We don't need to scale
             # Wo and voicing (last two floats in feature vector)
             self.features[i,:20] = self.features[i,:20]/20
@@ -95,15 +95,16 @@ device = (
 print(f"Using {device} device")
 
 # Define model
+w=512
 class NeuralNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_dim, 512),
+            nn.Linear(input_dim, w),
             nn.ReLU(),
-            nn.Linear(512, 512),
+            nn.Linear(w, w),
             nn.ReLU(),
-            nn.Linear(512, output_dim)
+            nn.Linear(w, output_dim)
        )
 
     def forward(self, x):
@@ -179,7 +180,7 @@ if args.noplot:
 model.eval()
 dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim)
 
-print("[click or n]-next [b]-back [q]-quit")
+print("[click or n]-next [j]-jump [b]-back [q]-quit")
 
 b_f_kHz = np.array([0.1998, 0.2782, 0.3635, 0.4561, 0.5569, 0.6664, 0.7855, 0.9149, 1.0556, 1.2086, 1.3749, 1.5557,
 1.7523, 1.9659, 2.1982, 2.4508, 2.7253, 3.0238, 3.3483, 3.7011])
@@ -187,6 +188,10 @@ Fs = 8000
 Lhigh = 80
 F0high = (Fs/2)/Lhigh
 y_f_kHz = np.arange(F0high,Lhigh*F0high, F0high)/1000
+
+# some interesting frames male1,male1,male2,female, use 'j' to jump to them
+test_frames = np.array([61, 165, 434, 550])
+test_frames_ind = 0
 
 # called when we press a key on the plot
 akey = ''
@@ -222,5 +227,9 @@ with torch.no_grad():
             b -= 1
         if akey == 'n' or button == False:
             b += 1
+        if akey == 'j':
+            b = test_frames[test_frames_ind]
+            test_frames_ind += 1
+            test_frames_ind = np.mod(test_frames_ind,4)
         if akey == 'q':
             loop = False

@@ -196,32 +196,28 @@ fig, ax = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', on_press)
 
 with torch.no_grad():
-    for b,(f,y) in enumerate(dataloader_infer):
-        # TODO: must be an easier way to access data at a given index and run on .to(device)
-        # Maybe we run on CPU?
-        if b >= args.frame:
-            #f = f.to(device)
-            #y = y.to(device)
-            y_hat = model(f)
-            f_plot = 20*f[0,0,].cpu()
-            y_plot = 20*y[0,0,].cpu()
-            y_hat_plot = 20*y_hat[0,0,].cpu()
-            # TODO: compute a distortion metric like SD or MSE (linear)
-            plt.clf()
-            plt.plot(b_f_kHz,f_plot[0:20])
-            t = f"f: {b}"
-            plt.title(t)
-            plt.plot(y_f_kHz,y_plot,'g')
-            plt.plot(y_f_kHz,y_hat_plot,'r')
-            plt.axis([0, 4, -60, 0])
-            plt.show(block=False)
-            plt.pause(0.01)
-            print(b)
-            loop = plt.waitforbuttonpress(0)
-            print(loop,akey)
-            if akey == 'b':
-                b -= 1
-            if akey == 'n':
-                b += 1
-            if akey == 'q':
-                quit()
+    b = args.frame
+    loop = True
+    while loop:
+        (f,y) = dataset.__getitem__(b)
+        y_hat = model(torch.from_numpy(f))
+        f_plot = 20*f[0,]
+        y_plot = 20*y[0,]
+        y_hat_plot = 20*y_hat[0,].cpu()
+        # TODO: compute a distortion metric like SD or MSE (linear)
+        plt.clf()
+        plt.plot(b_f_kHz,f_plot[0:20])
+        t = f"f: {b}"
+        plt.title(t)
+        plt.plot(y_f_kHz,y_plot,'g')
+        plt.plot(y_f_kHz,y_hat_plot,'r')
+        plt.axis([0, 4, -60, 0])
+        plt.show(block=False)
+        plt.pause(0.01)
+        button = plt.waitforbuttonpress(0)
+        if akey == 'b':
+            b -= 1
+        if akey == 'n' or button == False:
+            b += 1
+        if akey == 'q':
+            loop = False

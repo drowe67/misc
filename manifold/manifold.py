@@ -12,7 +12,7 @@ python3 manifold.py train_120_b20_ml.f32 train_120_y80_ml.f32 --noplot
 import torch
 from torch import nn
 import numpy as np
-import argparse
+import argparse,sys
 from matplotlib import pyplot as plt
 
 class f32Dataset(torch.utils.data.Dataset):
@@ -149,7 +149,7 @@ loss_fn = my_loss
 # optimizer that will be used to update weights and biases
 optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
 
-epochs = 200
+epochs = 1
 for epoch in range(epochs):
     sum_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):
@@ -185,13 +185,23 @@ Lhigh = 80
 F0high = (Fs/2)/Lhigh
 y_f_kHz = np.arange(F0high,Lhigh*F0high, F0high)/1000
 
+
+# called when we press a key on the plot
+akey = ''
+def on_press(event):
+    global akey
+    akey = event.key
+
+fig, ax = plt.subplots()
+fig.canvas.mpl_connect('key_press_event', on_press)
+
 with torch.no_grad():
     for b,(f,y) in enumerate(dataloader_infer):
         # TODO: must be an easier way to access data at a given index and run on .to(device)
         # Maybe we run on CPU?
         if b >= args.frame:
-            f = f.to(device)
-            y = y.to(device)
+            #f = f.to(device)
+            #y = y.to(device)
             y_hat = model(f)
             f_plot = 20*f[0,0,].cpu()
             y_plot = 20*y[0,0,].cpu()
@@ -205,6 +215,13 @@ with torch.no_grad():
             plt.plot(y_f_kHz,y_hat_plot,'r')
             plt.axis([0, 4, -60, 0])
             plt.show(block=False)
+            plt.pause(0.01)
+            print(b)
             loop = plt.waitforbuttonpress(0)
-            if loop == True:
+            print(loop,akey)
+            if akey == 'b':
+                b -= 1
+            if akey == 'n':
+                b += 1
+            if akey == 'q':
                 quit()

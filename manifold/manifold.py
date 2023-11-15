@@ -170,7 +170,7 @@ class NeuralNetwork3(nn.Module):
         y = self.linear_relu_stack(x)
         return y
 
-model = NeuralNetwork3(feature_dim, target_dim).to(device)
+model = NeuralNetwork1(feature_dim, target_dim).to(device)
 
 print(model)
 num_weights = sum(p.numel() for p in model.parameters())
@@ -198,12 +198,12 @@ def my_loss(y_hat, y):
 
 # vanilla numpy version of weighted loss function
 def my_loss_np(y_hat,y):
-    print(y_hat.shape,y.shape)
     w = 10**(-(1-gamma)*y)
     w = np.clip(w,None,30)
+    w_dB = 20*np.log10(w)
     loss_f = ((10**y_hat - 10**y)*w)**2
     loss = np.mean(loss_f)
-    return loss, loss_f
+    return loss, loss_f, w_dB
 
 # test for our custom loss function
 x = np.ones(2)
@@ -211,7 +211,7 @@ y = 2*np.ones(2)
 w = 10**(-(1-gamma)*y)
 w = np.clip(w,None,30)
 result = my_loss(torch.from_numpy(x).to(device),torch.from_numpy(y).to(device)).cpu()
-(expected_result, tmp) = my_loss_np(x,y)
+(expected_result, tmp1, tmp2) = my_loss_np(x,y)
 if np.abs(result - expected_result) > expected_result*1E-3:
     print("my_loss() test: fail")
     print(f"my_loss(): {result} expected: {expected_result}")
@@ -221,7 +221,7 @@ else:
 loss_fn = my_loss
 
 # optimizer that will be used to update weights and biases
-optimizer = torch.optim.SGD(model.parameters(), lr=2E-2)
+optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
 
 for epoch in range(args.epochs):
     sum_loss = 0.0
@@ -250,7 +250,7 @@ model.eval()
 # num_test == 0 switches off energy and V filtering, so we get all frames in test data.
 dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0)
 
-print("[click or n]-next [j]-jump [b]-back [q]-quit")
+print("[click or n]-next [b]-back [j]-jump [w]-weighting [q]-quit")
 
 b_f_kHz = np.array([0.1998, 0.2782, 0.3635, 0.4561, 0.5569, 0.6664, 0.7855, 0.9149, 1.0556, 1.2086, 1.3749, 1.5557,
 1.7523, 1.9659, 2.1982, 2.4508, 2.7253, 3.0238, 3.3483, 3.7011])
@@ -268,10 +268,11 @@ akey = ''
 def on_press(event):
     global akey
     akey = event.key
+show_weighting = False
 
-
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(2, 1, height_ratios=[2, 1])
 fig.canvas.mpl_connect('key_press_event', on_press)
+ax_b = ax[0].twinx()
 
 with torch.no_grad():
     b = args.frame
@@ -283,17 +284,20 @@ with torch.no_grad():
         y_plot = 20*y[0,]
         y_hat_plot = 20*y_hat[0,].cpu().numpy()
         # TODO: compute a distortion metric like SD or MSE (linear)
-        plt.clf()
-        plt.plot(b_f_kHz,f_plot[0:20])
+        (loss, loss_f, w_dB) = my_loss_np(y_hat_plot/20,y_plot/20)
+        ax[0].cla()
+        ax[0].plot(b_f_kHz,f_plot[0:20])
         t = f"f: {b}"
-        plt.title(t)
-        plt.plot(y_f_kHz,y_plot,'g')
-        plt.plot(y_f_kHz,y_hat_plot,'r')
-        plt.axis([0, 4, -60, 0])
-        plt.figure(2)
-        (loss, loss_f) = my_loss_np(y_hat_plot/20,y_plot/20)
-        plt.plot(y_f_kHz,loss_f)
-        plt.figure(1)
+        ax[0].set_title(t)
+        ax[0].plot(y_f_kHz,y_plot,'g')
+        ax[0].plot(y_f_kHz,y_hat_plot,'r')
+        ax[0].axis([0, 4, -60, 0])
+        ax_b.cla()
+        if show_weighting:
+            ax_b.plot(y_f_kHz,w_dB,'m')
+            ax_b.axis([0, 4, 0, 60])
+        ax[1].cla()
+        ax[1].plot(y_f_kHz,loss_f)
 
         plt.show(block=False)
         plt.pause(0.01)
@@ -306,5 +310,8 @@ with torch.no_grad():
             b = test_frames[test_frames_ind]
             test_frames_ind += 1
             test_frames_ind = np.mod(test_frames_ind,4)
+        if akey == 'w':
+            show_weighting = not show_weighting
         if akey == 'q':
             loop = False
+        akey = ''

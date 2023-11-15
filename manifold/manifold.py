@@ -22,41 +22,60 @@ class f32Dataset(torch.utils.data.Dataset):
                 sequence_length, 
                 features_dim,
                 target_dim,
-                num_test = 0):
+                num_test = 0,
+                thresh_dB=10):
 
         self.sequence_length = sequence_length
 
-        self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32,offset=4*num_test*features_dim), (-1, features_dim))
-        self.targets = np.reshape(np.fromfile(target_file, dtype=np.float32,offset=4*num_test*target_dim), (-1, target_dim))
-        self.num_sequences = self.features.shape[0]
+        features_in = np.reshape(np.fromfile(feature_file, dtype=np.float32,offset=4*num_test*features_dim), (-1, features_dim))
+        targets_in = np.reshape(np.fromfile(target_file, dtype=np.float32,offset=4*num_test*target_dim), (-1, target_dim))
+        num_sequences_in = features_in.shape[0]
 
-        print(f"test: {num_test} train: {self.num_sequences}")
-        assert(self.features.shape[0] == self.targets.shape[0])
+        print(f"Input test: {num_test} train: {num_sequences_in}")
+        assert(features_in.shape[0] == targets_in.shape[0])
+        print(features_in.shape)
+        
+        self.features = np.zeros(features_in.shape,dtype=np.float32)
+        self.targets = np.zeros(targets_in.shape,dtype=np.float32)
+        print(self.features.shape)
+ 
+        # normalise energy in each vector to 1.0: (a) we are interested NN matching shape, not gain (b)
+        # keeps each loss on a similar scale to help gradients (c) a gain difference has a large
+        # impact on loss
 
-        # TODO combine energy norm and /20  steps
-
-        for i in range(self.num_sequences):
-            # normalise energy in each vector to 1.0: (a) we are interested NN matching shape, not gain (b)
-            # keeps each loss on a similar scale to help gradients (c) a gain difference has a large
-            # impact on loss
-            e = np.sum(10**(self.features[i,:20]/10))
+        j = 0
+        for i in range(num_sequences_in):
+            e = np.sum(10**(features_in[i,:20]/10))
             edB_feature = 10*np.log10(e)
-            self.features[i,:20] -= edB_feature
-            e = np.sum(10**(self.targets[i,]/10))
-            edB_target = 10*np.log10(e)
-            self.targets[i,] -= edB_target
-            
-            # b and y vectors are in x_dB = 20*log10(x), scale down to log10(x).  We don't need to scale
-            # Wo and voicing (last two floats in feature vector)
-            self.features[i,:20] = self.features[i,:20]/20
-            self.targets[i,] = self.targets[i,]/20
+            # Just use vectors above edB_thresh, to avoid training on noise
+            #print(i,j,edB_feature)
+            if edB_feature > thresh_dB and features_in[i,21]:
+                self.features[j,] = features_in[i,]
+                #print(self.features[j,])
+                self.features[j,:20] -= edB_feature
+                self.targets[j,] = targets_in[i,]
+                e = np.sum(10**(targets_in[i,]/10))
+                edB_target = 10*np.log10(e)
+                self.targets[j,] -= edB_target
+                #print(self.targets[j,])
+ 
+                # b and y vectors are in x_dB = 20*log10(x), scale down to log10(x).  We don't need to scale
+                # Wo and voicing (last two floats in feature vector)
+                self.features[j,:20] = self.features[j,:20]/20
+                self.targets[j,] = self.targets[j,]/20
 
-        # TODO remove low energy vectors so we don't train on noise
+                j += 1
+        self.num_sequences = j
+        print(self.features.shape)
+        print(f"Input test: {num_test} train: {num_sequences_in} {self.num_sequences}")
+        print(self.features[1000,:])
 
     def __len__(self):
         return self.num_sequences
 
     def __getitem__(self, index):
+        #print(self.features[1000,:])
+        #quit()
         features = self.features[index * self.sequence_length: (index + 1) * self.sequence_length, :]
         targets = self.targets[index * self.sequence_length: (index + 1) * self.sequence_length, :]
         return features, targets
@@ -68,16 +87,18 @@ parser.add_argument('--frame', type=int, default=165, help='frame # to start vie
 parser.add_argument('--noplot', action='store_true', help='disable plots after training')
 parser.add_argument('--num_test', type=int, default=60*100, help='number of vectors reserved for testing')
 parser.add_argument('--epochs', type=int, default=10, help='number of training epochs')
+parser.add_argument('--thresh', type=float, default=10, help='energy threshold for training data in dB')
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
+thresh_dB = args.thresh
 
 feature_dim = 22
 target_dim = 79
 sequence_length=1
 batch_size = 32
 
-dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test)
+dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test, thresh_dB=thresh_dB)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
 for f,y in dataloader:
@@ -95,23 +116,49 @@ device = (
 print(f"Using {device} device")
 
 # Define model
-w=512
-class NeuralNetwork(nn.Module):
+w1=512
+class NeuralNetwork1(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_dim, w),
+            nn.Linear(input_dim, w1),
             nn.ReLU(),
-            nn.Linear(w, w),
+            nn.Linear(w1, w1),
             nn.ReLU(),
-            nn.Linear(w, output_dim)
+            nn.Linear(w1, output_dim)
        )
 
     def forward(self, x):
         y = self.linear_relu_stack(x)
         return y
 
-model = NeuralNetwork(feature_dim, target_dim).to(device)
+nf=32
+w2=128
+class NeuralNetwork2(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.c1 = nn.Conv1d(1, nf, 5)
+        self.f1 = nn.Flatten()
+        self.r1 = nn.ReLU()
+        self.l1 = nn.Linear(nf*(input_dim-4), w2)
+        self.r2 = nn.ReLU()
+        self.l2 = nn.Linear(w2, output_dim)
+
+    def forward(self, x):
+        #print(x.shape)
+        # TODO ignore Wo and voicing
+        x = self.c1(x)
+        #print(x.shape)
+        x = self.f1(x)
+        #print(x.shape)
+        x = self.r1(x)
+        x = self.l1(x)
+        x = self.r2(x)
+        x = self.l2(x)
+        return x
+
+model = NeuralNetwork1(feature_dim, target_dim).to(device)
+
 print(model)
 num_weights = sum(p.numel() for p in model.parameters())
 print(f"weights: {num_weights} memory: {num_weights*4}")
@@ -158,6 +205,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
 for epoch in range(args.epochs):
     sum_loss = 0.0
     for batch,(f,y) in enumerate(dataloader):
+        #print(f,y)
         f = f.to(device)
         y = y.to(device)
         y_hat = model(f)
@@ -178,7 +226,7 @@ if args.noplot:
     quit()
 
 model.eval()
-dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim)
+dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0, thresh_dB=-100)
 
 print("[click or n]-next [j]-jump [b]-back [q]-quit")
 

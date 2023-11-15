@@ -31,13 +31,10 @@ class f32Dataset(torch.utils.data.Dataset):
         targets_in = np.reshape(np.fromfile(target_file, dtype=np.float32,offset=4*num_test*target_dim), (-1, target_dim))
         num_sequences_in = features_in.shape[0]
 
-        print(f"Input test: {num_test} train: {num_sequences_in}")
         assert(features_in.shape[0] == targets_in.shape[0])
-        print(features_in.shape)
         
         self.features = np.zeros(features_in.shape,dtype=np.float32)
         self.targets = np.zeros(targets_in.shape,dtype=np.float32)
-        print(self.features.shape)
  
         # normalise energy in each vector to 1.0: (a) we are interested NN matching shape, not gain (b)
         # keeps each loss on a similar scale to help gradients (c) a gain difference has a large
@@ -47,9 +44,9 @@ class f32Dataset(torch.utils.data.Dataset):
         for i in range(num_sequences_in):
             e = np.sum(10**(features_in[i,:20]/10))
             edB_feature = 10*np.log10(e)
-            # Just use vectors above edB_thresh, to avoid training on noise
-            #print(i,j,edB_feature)
-            if edB_feature > thresh_dB and features_in[i,21]:
+            # when training, just use voiced vectors above edB_thresh, to avoid training on noise
+            
+            if (edB_feature > thresh_dB and features_in[i,21]) or num_test == 0:
                 self.features[j,] = features_in[i,]
                 #print(self.features[j,])
                 self.features[j,:20] -= edB_feature
@@ -66,9 +63,10 @@ class f32Dataset(torch.utils.data.Dataset):
 
                 j += 1
         self.num_sequences = j
-        print(self.features.shape)
-        print(f"Input test: {num_test} train: {num_sequences_in} {self.num_sequences}")
-        print(self.features[1000,:])
+        if num_test:
+            print(f"Training: First {num_test} reserved for testing, {self.num_sequences}/{num_sequences_in} voiced vectors with energy > {thresh_dB} used")
+        else:
+            print(f"Testing: {self.num_sequences} loaded")
 
     def __len__(self):
         return self.num_sequences
@@ -157,11 +155,26 @@ class NeuralNetwork2(nn.Module):
         x = self.l2(x)
         return x
 
-model = NeuralNetwork1(feature_dim, target_dim).to(device)
+class NeuralNetwork3(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(input_dim, 40),
+            nn.ReLU(),
+            nn.Linear(40, output_dim),
+            nn.ReLU(),
+            nn.Linear(output_dim, output_dim)
+       )
+
+    def forward(self, x):
+        y = self.linear_relu_stack(x)
+        return y
+
+model = NeuralNetwork3(feature_dim, target_dim).to(device)
 
 print(model)
 num_weights = sum(p.numel() for p in model.parameters())
-print(f"weights: {num_weights} memory: {num_weights*4}")
+print(f"weights: {num_weights} float32 memory: {num_weights*4}")
 
 # prototype custom loss function
 def my_loss_mse(y_hat, y):
@@ -170,7 +183,7 @@ def my_loss_mse(y_hat, y):
  
 gamma = 0.5
  
-# custom loss function that operates in the weighted linear domain
+# PyTorch custom loss function that operates in the weighted linear domain
 def my_loss(y_hat, y):
     ten = 10*torch.ones(y.shape)
     ten = ten.to(device)
@@ -181,8 +194,16 @@ def my_loss(y_hat, y):
     w_lin = torch.pow(ten,w)
     weighted_error = (y_hat_lin - y_lin)*w_lin
     loss = torch.mean(weighted_error**2)
-    #print(loss)
     return loss
+
+# vanilla numpy version of weighted loss function
+def my_loss_np(y_hat,y):
+    print(y_hat.shape,y.shape)
+    w = 10**(-(1-gamma)*y)
+    w = np.clip(w,None,30)
+    loss_f = ((10**y_hat - 10**y)*w)**2
+    loss = np.mean(loss_f)
+    return loss, loss_f
 
 # test for our custom loss function
 x = np.ones(2)
@@ -190,7 +211,7 @@ y = 2*np.ones(2)
 w = 10**(-(1-gamma)*y)
 w = np.clip(w,None,30)
 result = my_loss(torch.from_numpy(x).to(device),torch.from_numpy(y).to(device)).cpu()
-expected_result = np.mean(((10**x - 10**y)*w)**2)
+(expected_result, tmp) = my_loss_np(x,y)
 if np.abs(result - expected_result) > expected_result*1E-3:
     print("my_loss() test: fail")
     print(f"my_loss(): {result} expected: {expected_result}")
@@ -200,7 +221,7 @@ else:
 loss_fn = my_loss
 
 # optimizer that will be used to update weights and biases
-optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
+optimizer = torch.optim.SGD(model.parameters(), lr=2E-2)
 
 for epoch in range(args.epochs):
     sum_loss = 0.0
@@ -226,7 +247,8 @@ if args.noplot:
     quit()
 
 model.eval()
-dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0, thresh_dB=-100)
+# num_test == 0 switches off energy and V filtering, so we get all frames in test data.
+dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0)
 
 print("[click or n]-next [j]-jump [b]-back [q]-quit")
 
@@ -238,7 +260,7 @@ F0high = (Fs/2)/Lhigh
 y_f_kHz = np.arange(F0high,Lhigh*F0high, F0high)/1000
 
 # some interesting frames male1,male1,male2,female, use 'j' to jump to them
-test_frames = np.array([61, 165, 434, 550])
+test_frames = np.array([61, 165, 4190, 5500])
 test_frames_ind = 0
 
 # called when we press a key on the plot
@@ -247,7 +269,7 @@ def on_press(event):
     global akey
     akey = event.key
 
-#plt.figure(1)
+
 fig, ax = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', on_press)
 
@@ -259,7 +281,7 @@ with torch.no_grad():
         y_hat = model(torch.from_numpy(f).to(device))
         f_plot = 20*f[0,]
         y_plot = 20*y[0,]
-        y_hat_plot = 20*y_hat[0,].cpu()
+        y_hat_plot = 20*y_hat[0,].cpu().numpy()
         # TODO: compute a distortion metric like SD or MSE (linear)
         plt.clf()
         plt.plot(b_f_kHz,f_plot[0:20])
@@ -268,6 +290,11 @@ with torch.no_grad():
         plt.plot(y_f_kHz,y_plot,'g')
         plt.plot(y_f_kHz,y_hat_plot,'r')
         plt.axis([0, 4, -60, 0])
+        plt.figure(2)
+        (loss, loss_f) = my_loss_np(y_hat_plot/20,y_plot/20)
+        plt.plot(y_f_kHz,loss_f)
+        plt.figure(1)
+
         plt.show(block=False)
         plt.pause(0.01)
         button = plt.waitforbuttonpress(0)

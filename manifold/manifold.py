@@ -14,6 +14,7 @@ from torch import nn
 import numpy as np
 import argparse,sys
 from matplotlib import pyplot as plt
+import torch.nn.functional as F
 
 class f32Dataset(torch.utils.data.Dataset):
     def __init__(self,
@@ -61,6 +62,9 @@ class f32Dataset(torch.utils.data.Dataset):
                 self.features[j,:20] = self.features[j,:20]/20
                 self.targets[j,] = self.targets[j,]/20
 
+                # log10(Wo) probably more useful - but results don't change when this feature is unused
+                self.features[j,20] = np.log10(self.features[j,20])
+
                 j += 1
         self.num_sequences = j
         if num_test:
@@ -86,6 +90,7 @@ parser.add_argument('--noplot', action='store_true', help='disable plots after t
 parser.add_argument('--num_test', type=int, default=60*100, help='number of vectors reserved for testing')
 parser.add_argument('--epochs', type=int, default=10, help='number of training epochs')
 parser.add_argument('--thresh', type=float, default=10, help='energy threshold for training data in dB')
+parser.add_argument('--lr', type=float, default=5E-2, help='learning rate')
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
@@ -95,7 +100,8 @@ feature_dim = 22
 target_dim = 79
 sequence_length=1
 batch_size = 32
-
+gamma = 0.5
+ 
 dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test, thresh_dB=thresh_dB)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
@@ -136,22 +142,19 @@ class NeuralNetwork2(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.c1 = nn.Conv1d(1, nf, 5)
-        self.f1 = nn.Flatten()
-        self.r1 = nn.ReLU()
-        self.l1 = nn.Linear(nf*(input_dim-4), w2)
-        self.r2 = nn.ReLU()
+        self.l1 = nn.Linear(nf*(input_dim-4-2), w2)
         self.l2 = nn.Linear(w2, output_dim)
 
     def forward(self, x):
-        #print(x.shape)
         # TODO ignore Wo and voicing
-        x = self.c1(x)
-        #print(x.shape)
-        x = self.f1(x)
-        #print(x.shape)
-        x = self.r1(x)
-        x = self.l1(x)
-        x = self.r2(x)
+        (b,Wo,v) = torch.split(f,(20,1,1),-1)
+        print(b.shape)
+        x = F.relu(self.c1(b))
+        print(x.shape)
+        #x = torch.flatten(x)
+        x = F.relu(self.l1(x))
+        print(x.shape)
+        quit()
         x = self.l2(x)
         return x
 
@@ -160,6 +163,8 @@ class NeuralNetwork3(nn.Module):
         super().__init__()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(input_dim, 40),
+            nn.ReLU(),
+            nn.Linear(40, 40),
             nn.ReLU(),
             nn.Linear(40, output_dim),
             nn.ReLU(),
@@ -170,19 +175,69 @@ class NeuralNetwork3(nn.Module):
         y = self.linear_relu_stack(x)
         return y
 
+# Try a few layers of Wo processing, as using it may require a complex
+# function
+class NeuralNetwork4(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        
+        # Wo processing
+        self.Wol1 = nn.Linear(1,32)
+        self.Wor1 = nn.ReLU()
+        self.Wol2 = nn.Linear(32,32)
+        self.Wor2 = nn.ReLU()
+
+        # smoothed spectrum processing
+        self.l1 = nn.Linear(input_dim-2+32,512)
+        self.r1 = nn.ReLU()
+        self.l2 = nn.Linear(32+512, 512)
+        self.r2 = nn.ReLU()
+        self.l3 = nn.Linear(512, output_dim)
+
+    def forward(self, f):
+        #print(f.shape)
+        (b,Wo,v) = torch.split(f,(20,1,1),-1)
+        #print(b.shape, Wo.shape)
+        Wo = self.Wol1(Wo)
+        Wo = self.Wor1(Wo)
+        Wo = self.Wol2(Wo)
+        Wo = self.Wor2(Wo)
+        #print(Wo.shape)
+        x = torch.cat((b,Wo),-1)
+        #print(x.shape)
+        x = self.l1(x)
+        x = self.r1(x)
+        x = torch.cat((x,Wo),-1)
+        x = self.l2(x)
+        x = self.r2(x)
+        x = self.l3(x)
+        return x
+
+# combine sequence of 3 in the time domain
+class NeuralNetwork5(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        
+        self.l1 = nn.Linear(input_dim,512)
+        self.r1 = nn.ReLU()
+        self.l2 = nn.Linear(512, 512)
+        self.r2 = nn.ReLU()
+        self.l3 = nn.Linear(512, output_dim)
+
+    def forward(self, f):
+        x = self.l1(f)
+        x = self.r1(x)
+        x = self.l2(x)
+        x = self.r2(x)
+        x = self.l3(x)
+        return x
+
 model = NeuralNetwork1(feature_dim, target_dim).to(device)
 
 print(model)
 num_weights = sum(p.numel() for p in model.parameters())
 print(f"weights: {num_weights} float32 memory: {num_weights*4}")
 
-# prototype custom loss function
-def my_loss_mse(y_hat, y):
-    loss = torch.mean((y_hat - y)**2)
-    return loss
- 
-gamma = 0.5
- 
 # PyTorch custom loss function that operates in the weighted linear domain
 def my_loss(y_hat, y):
     ten = 10*torch.ones(y.shape)
@@ -221,7 +276,7 @@ else:
 loss_fn = my_loss
 
 # optimizer that will be used to update weights and biases
-optimizer = torch.optim.SGD(model.parameters(), lr=5E-2)
+optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
 
 for epoch in range(args.epochs):
     sum_loss = 0.0

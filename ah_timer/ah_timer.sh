@@ -2,7 +2,10 @@
 # Lithium battery Amp-hour timer
 # April 2022
 #
-# ref: https://simonprickett.dev/controlling-raspberry-pi-gpio-pins-from-bash-scripts-traffic-lights/
+# Refs:
+# [1] https://simonprickett.dev/controlling-raspberry-pi-gpio-pins-from-bash-scripts-traffic-lights/
+# [2] ah_timer_circuit.jpg
+# [3] Litium BMS that circuit was derived from: https://www.rowetel.com/?p=141
 #
 # Pi header
 #
@@ -16,6 +19,8 @@
 #
 # usage:
 #   sudo ./ah_timer.sh
+# If you'd like to logout of the Pi and come back later:
+#   sudo ./ah_timer.sh > test.txt &
 
 # Common path for all GPIO access
 BASE_GPIO_PATH=/sys/class/gpio

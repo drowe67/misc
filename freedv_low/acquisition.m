@@ -117,8 +117,8 @@ function sim_out = acq_test(sim_in)
     rand_freq = 0; rand_time = 0;
   end
 
-  nFreqSteps = length(fmin_Rs:freqStep:fmax_Rs)
-  nTimeSteps = nsymb/timeStep
+  nFreqSteps = length(fmin_Rs:freqStep:fmax_Rs);
+  nTimeSteps = nsymb/timeStep;
  
   [tx_bits tx P] = ofdm_modulator(Ns,Nc,Nd,M,Ncp,Winv,nbitsperframe,nframes,nsymb);
 
@@ -162,11 +162,16 @@ function sim_out = acq_test(sim_in)
     noise = sqrt(variance*0.5/M)*(randn(1,nsam) + j*randn(1,nsam));
     rx_noise = rx + noise;
 
-    if isfield(sim_in,"add_sine")
-      sin_rms = sim_in.add_sine;
-      w_sin = 2*pi*1000/Fs;
-      rx_noise += sin_rms*exp(j*w_sin*(0:nsam-1));
-      printf("sin/noise: %5.2f dB sin/tx: %5.2f dB\n", 20*log10(sin_rms/sqrt(variance)), 20*log10(sin_rms/std(tx)));
+    % random additive sine wave
+    if isfield(sim_in,"sineci") || isfield(sim_in,"sinein") 
+      if isfield(sim_in,"sineci"), sin_rms = std(tx)/(10^(sim_in.sineci/10)); end
+      if isfield(sim_in,"sinein"), sin_rms = (10^(sim_in.sinein/10))*sqrt(variance); end
+      
+      for n=1:Fs:length(rx_noise)
+        omega_sin = (w(Nc+2)-w(1))*rand(1,1) + w(1);
+        st = n; en = min(length(rx_noise),st+Fs-1);
+        rx_noise(st:en) += sin_rms*exp(j*omega_sin*(0:(en-st)));
+      end
     end
 
     % Sample Dt on grid of time and freq steps
@@ -182,7 +187,7 @@ function sim_out = acq_test(sim_in)
 
       % random freq offset every modem frame
       if mod(s,Ns) == 1
-        f_target_Rs = 0;
+        f_target_Rs = 0.0;
         if rand_freq 
           f_target_Rs = fmin_Rs + rand(1,1)*(fmax_Rs-fmin_Rs);
         end
@@ -192,7 +197,7 @@ function sim_out = acq_test(sim_in)
 
       % random target timing offset +/-Rs/2 for every modem frame
       if mod(s,Ns) == 1
-        t_offset_Rs = 0;
+        t_offset_Rs = 0.0;
         if rand_time
           t_offset_Rs = 0.5 - rand(1,1);
         end
@@ -200,7 +205,7 @@ function sim_out = acq_test(sim_in)
       end
       t_target_log(t_ind) = Ns*floor(s/Ns)+1 + timeOffsetSymbols + t_offset_Rs;
       if (s > 2) && (s < (nsymb-1))
-        st += t_offset_ind; en += t_offset_ind;
+        st -= t_offset_ind; en -= t_offset_ind;
       end
 
       for f_Rs=fmin_Rs:freqStep:fmax_Rs;
@@ -215,7 +220,7 @@ function sim_out = acq_test(sim_in)
     % count successful acquisitions
     Ncorrect = 0; Nfalse = 0; Ndetect = 0;
     Dtmax_log = [];
-    t_max_log = [];
+    t_max_log = []; f_fine_log = [];
     stats_log = [];
     for s=1:Ns:nsymb
 
@@ -250,12 +255,11 @@ function sim_out = acq_test(sim_in)
       
       t_ind = s/timeStep-1/timeStep+1;
 
-      if verbose == 2
-        printf("t_targ: %6.2f t_max: %6.2f f_targ: %5.2f f_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f \n", t_target_log(t_ind), 
-               t_max, f_target_log(t_ind), f_max, abs(Dtmax), Dthresh);
-      end
-
+      f_fine_max = 0;
       if abs(Dtmax) > Dthresh
+
+        % Evaluate candidate
+
         Ndetect++;
         t_error = t_max-t_target_log(t_ind);
         f_error = f_max-f_target_log(t_ind);
@@ -266,7 +270,44 @@ function sim_out = acq_test(sim_in)
         else
           Nfalse++;
         end
+ 
+        % Attempt to refine freq estimate at chosen timing est
+        
+        % Reconstruct freq and time offset (messy - not the best simulation design!)
+        omega = 2*pi*f_target_log(t_ind)*Rs/Fs;
+        t_offset_Rs = t_target_log(t_ind) - Ns*floor(t_max/Ns)-1 - timeOffsetSymbols;
+        t_offset_ind = round(t_offset_Rs*(M+Ncp));
+        st = (t_max-1)*(M+Ncp)+1;
+        en = st+M+Ncp-1;
+        if (t_max > 2) && (t_max < (nsymb-1))
+          st -= t_offset_ind; en -= t_offset_ind;
+        end
+
+        % Correlate over a fine freq grid
+        fmin_fine_Rs = f_max - freqStep;
+        fmax_fine_Rs = f_max + freqStep;
+        Dtmax1 = 0;
+        for f_Rs=fmin_fine_Rs:0.01:fmax_fine_Rs
+          f_Hz = f_Rs*Rs;
+          omega_hat = 2*pi*f_Hz/Fs;
+          r(:,1) = exp(j*(omega-omega_hat)*(0:M-1)).*rx_noise(st+Ncp:en);
+          Dt1 = r'*p;
+          if abs(Dt1) > abs(Dtmax1)
+            Dtmax1 = Dt1;
+            f_fine_max = f_Rs;
+          end
+        end
+        
+        if correct
+          f_fine_error = f_fine_max-f_target_log(t_ind);
+          f_fine_log = [f_fine_log f_fine_error];
+        end
         stats_log = [stats_log; t_target_log(t_ind) correct t_error f_error];
+      end
+
+      if verbose == 2
+        printf("t_targ: %6.2f t_max: %6.2f f_targ: %5.2f f_max: %5.2f f_fine_max: %5.2f Dtmax: %5.2f Dthresh: %5.2f\n", 
+               t_target_log(t_ind), t_max, f_target_log(t_ind), f_max, f_fine_max, abs(Dtmax), Dthresh);
       end
 
       Dtmax_log = [Dtmax_log Dtmax];
@@ -281,13 +322,15 @@ function sim_out = acq_test(sim_in)
         % prob of 1 or more detections per second if we just have noise at the input
         PnoisePerFrame = 1 - binopdf(0,nSamplesPerModemFrame,Pthresh);
         Tf = (Ts+Tcp)*Ns;
-        printf("EbNodB: %4.0f Nfr: %4d Ndet: %4d Ncor: %4d Nfls: %4d Pcor: %4.3f Pfls: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f\n", 
-                EbNodB, nframes, Ndetect, Ncorrect, Nfalse, Ncorrect/nframes, Nfalse/nframes, Tdet, PnoisePerFrame, Tf/PnoisePerFrame);
+        printf("EbNodB: %4.0f Nfr: %4d Ndet: %4d Ncor: %4d Nfls: %4d Pcor: %4.3f Pfls: %4.3f Tdet/Tnoise: %4.3f Pnoise %4.3f Tnoise (theory): %4.2f f_freq std: %4.3f\n", 
+                EbNodB, nframes, Ndetect, Ncorrect, Nfalse, Ncorrect/nframes, Nfalse/nframes, Tdet, PnoisePerFrame, Tf/PnoisePerFrame,std(f_fine_log));
      end
 
     sim_out.Pcorrect(ne) = Ncorrect/nframes;
     sim_out.Pfalse(ne) = Nfalse/nframes;
     sim_out.Tdet(ne) = Tdet;
+    % note we just store latest here - only usable for single points
+    sim_out.f_fine_log = f_fine_log;
 
     if verbose == 2
       if epslatex
@@ -358,43 +401,10 @@ function sim_out = acq_test(sim_in)
         axis([0 nsymb*(Ts+Tcp) fmin_Rs-0.001 fmax_Rs+0.001]); xlabel('Time(s)');
       end
       
-      proto_post_proc = 0;
-      if proto_post_proc
-        % Prototype post processing - are "bit errors" in pilots meaningful?
-        % plot scatter of pilots, treating them like demodulated BPSK 
-        % usage:
-        %   acquisition; run_single(nbits=1E4,ch='awgn',-3,'norand','Pthresh',1E-4
-        % Results were unsatisfactory, even when correct==0, number of correct bits high.
-        % This kind of makes sense, as correllation sum is like soft decision version of bits.
-        % So leaving this for now .... looks like we need a unique word.
-        figure(7); clf; hold on;
-        for i=1:length(stats_log)
-          
-          % extract received samples for candidate
-          % TODO - make this work for random time and freq (use 'norand' option for now)
-          s = stats_log(i,1);
-          st = (s-1)*(M+Ncp)+1;
-          en = st+M+Ncp-1;
-          r(:,1) = rx_noise(st+Ncp:en);
-
-          % back to a set of freq domain symbols
-          P_hat = Wfwd*r;
-
-          % equalise - use simple linear average of adjacent pilots for now
-          H = zeros(Nc+2,1);
-          for c=2:Nc+1
-            H(c) = mean(P_hat(c-1:c+1)./P(c-1:c+1));
-          end
-          H(1) = H(2); H(Nc+2) = H(Nc+1);
-
-          P_eq = P_hat .* exp(-j*angle(H));
-          plot(P_eq,'+');
-
-          % count errors
-          printf("%6.2f %d %2d\n", s, stats_log(i,2), sum(real(P_eq.*P)>0));
-        end
-        hold off; mx = 1.5*max(abs(P_hat(:)));
-        axis([-mx mx -mx mx])
+      % Histogram of fine freq errors
+      figure(7); clf;
+      if length(f_fine_log)
+        hist(f_fine_log);
       end
     end
 
@@ -434,8 +444,12 @@ function run_single(nbits = 1000, ch='awgn',EbNodB=100, varargin)
         sim_in.timeOffsetSymbols = varargin{i+1}; i++;    
       elseif strcmp(varargin{i},"norand")
         sim_in.norand = 1;    
-      elseif strcmp(varargin{i},"addsine")
-        sim_in.add_sine = varargin{i+1}; i++;   
+      elseif strcmp(varargin{i},"sinecidB")
+        % carrier to sinusoidal interferer ratio 
+        sim_in.sineci = varargin{i+1}; i++;   
+      elseif strcmp(varargin{i},"sineindB")
+        % sinusoidal interferer to noise ratio
+        sim_in.sinein = varargin{i+1}; i++;   
       else
         printf("\nERROR unknown argument: %s\n", varargin{i});
         return;
@@ -473,7 +487,7 @@ function run_curves(runtime_scale=0,epslatex=0)
       [textfontsize linewidth] = set_fonts();
     end
 
-    figure(6); clf; hold on;
+    figure(8); clf; hold on;
     plot(EbNovec,awgn.Pcorrect,'b+-;Pcorrect AWGN;');
     plot(EbNovec,awgn.Pfalse,'b+-;Pfalse AWGN;');
     plot(EbNovec,mpp.Pcorrect,'g+-;Pcorrect MPP;');
@@ -487,6 +501,102 @@ function run_curves(runtime_scale=0,epslatex=0)
 
     if epslatex
       fn = "acq_curves.tex";
+      print(fn,"-depslatex","-S350,250");
+      printf("printing... %s\n", fn);
+      restore_fonts(textfontsize,linewidth);
+    end
+   
+endfunction
+
+% acquisition performance with additive sine wave interferer
+% usage: acquisition; run_curves_sin
+function run_curves_sin(nbits=1E5, epslatex=0)
+    sim_in.verbose     = 1;
+    sim_in.ch_phase    = 0;
+    sim_in.resampler   = "lin2";
+    sim_in.ls_pilots   = 1;
+    sim_in.Nd          = 1;
+    sim_in.combining   = 'mrc';
+    sim_in.Pthresh     = 3E-5;
+    sim_in.nbits       = nbits;
+       
+    sim_in.EbNovec = 4; sim_in.ch = 'awgn'; 
+    awgn.P = [];
+    ci_vec = -3:1:10;
+    for n = 1:length(ci_vec)
+      sim_in.sineci = ci_vec(n);
+      sim_out = acq_test(sim_in);
+      awgn.Pcorrect(n) = sim_out.Pcorrect;
+      awgn.Pfalse(n) = sim_out.Pfalse;
+    end
+
+    sim_in.EbNovec = 7; sim_in.ch = 'mpp'; 
+    for n = 1:length(ci_vec)
+      sim_in.sineci = ci_vec(n);
+      sim_out = acq_test(sim_in);
+      mpp.Pcorrect(n) = sim_out.Pcorrect;
+      mpp.Pfalse(n) = sim_out.Pfalse;
+    end
+
+    if epslatex
+      [textfontsize linewidth] = set_fonts();
+    end
+
+    figure(8); clf; hold on;
+    plot(ci_vec,awgn.Pcorrect,'b+-;Pcorrect AWGN;');
+    plot(ci_vec,awgn.Pfalse,'b+-;Pfalse AWGN;');
+    plot(ci_vec,mpp.Pcorrect,'g+-;Pcorrect MPP;');
+    plot(ci_vec,mpp.Pfalse,'g+-;Pfalse MPP;');
+    hold off; axis([min(ci_vec) max(ci_vec) 0 1]); grid;
+    xlabel('C/I (dB)'); legend('boxoff'); legend('location','east');
+
+    if epslatex
+      fn = "acq_curves_sin.tex";
+      print(fn,"-depslatex","-S350,250");
+      printf("printing... %s\n", fn);
+      restore_fonts(textfontsize,linewidth);
+    end
+   
+endfunction
+
+% Histograms of fine freq error
+% usage: acquisition; fine_freq_hist
+function fine_freq_hist(nbits=1E5, epslatex=0)
+    sim_in.verbose     = 1;
+    sim_in.ch_phase    = 0;
+    sim_in.resampler   = "lin2";
+    sim_in.ls_pilots   = 1;
+    sim_in.Nd          = 1;
+    sim_in.combining   = 'mrc';
+    sim_in.Pthresh     = 3E-5;
+    sim_in.nbits       = nbits;
+       
+    sim_in.EbNovec = 100; sim_in.ch = 'awgn';
+    awgn_out1 = acq_test(sim_in);
+    sim_in.EbNovec = 2; sim_in.ch = 'awgn';
+    awgn_out2 = acq_test(sim_in);
+    sim_in.EbNovec = 7; sim_in.ch = 'mpp'; 
+    mpp_out = acq_test(sim_in);
+
+    if epslatex
+      [textfontsize linewidth] = set_fonts();
+    end
+
+    figure(8); clf; hold on;
+    [h1 x]=hist(awgn_out1.f_fine_log);
+    %h1 = h1/trapz(x,h);
+    plot(x,h1,'r;AWGN $E_b/N_0=100$ dB;'); 
+    [h2 x]=hist(awgn_out2.f_fine_log);
+    %h2 = h2/trapz(x,h);
+    plot(x,h2,'b;AWGN $E_b/N_0=2$ dB;'); 
+    [h3 x]=hist(mpp_out.f_fine_log);
+    %h3 = h3/trapz(x,h);
+    plot(x,h3,'g;MPP $E_b/N_0=7$ dB;'); 
+    hold off; grid; axis([-0.2 0.2 0 max([h1 h2 h3])]);
+    xlabel('Freq Error ($R_s$)'); legend('boxoff');
+
+    if epslatex
+      fn = "acq_fine_hist.tex";
       print(fn,"-depslatex","-S350,250");
       printf("printing... %s\n", fn);
       restore_fonts(textfontsize,linewidth);
@@ -518,6 +628,11 @@ function spot_checks(nbits=1E4)
     printf("---- Noise only Tdet: %4.2f", sim_out.Tdet);  
     tests++;
     if sim_out.Tdet > 1.5, printf(" [PASS]\n");  passes++; else printf(" [FAIL]\n"); end
+
+    sim_in.ch = 'awgn'; sim_in.EbNovec = 4;  sim_in.sineci = 3; sim_out = acq_test(sim_in);
+    printf("---- Sine interferer C/I = 3dB Pcorrect: %4.2f"), sim_out.Pcorrect;  
+    tests++;
+    if sim_out.Pcorrect > 0.8, printf(" [PASS]\n");  passes++; else printf(" [FAIL]\n"); end
 
     printf("\nPASSED %d/%d\n",passes,tests)
 endfunction

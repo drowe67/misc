@@ -13,6 +13,7 @@ Some small projects on miscellaneous topics.
 | July 2023 | freedv_low | Low SNR FreeDV waveform study |
 | Sep 2023 | folded_balun | Folded balun (Pawsey Stub) |
 | Oct 2023 | analog | Analog Transmission of Vocoder Features |
+| Oct 2023 | manifold | Experiments with non-linear dependencies with Codec 2 spectral magnitude vectors |
 
 I build the Latex documents using Texmaker:
 

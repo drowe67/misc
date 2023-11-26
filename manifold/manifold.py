@@ -36,7 +36,8 @@ class f32Dataset(torch.utils.data.Dataset):
         
         self.features = np.zeros(features_in.shape,dtype=np.float32)
         self.targets = np.zeros(targets_in.shape,dtype=np.float32)
- 
+        self.edB_target = np.zeros(targets_in.shape[0],dtype=np.float32)
+
         # normalise energy in each vector to 1.0: (a) we are interested NN matching shape, not gain (b)
         # keeps each loss on a similar scale to help gradients (c) a gain difference has a large
         # impact on loss
@@ -53,8 +54,8 @@ class f32Dataset(torch.utils.data.Dataset):
                 self.features[j,:20] -= edB_feature
                 self.targets[j,] = targets_in[i,]
                 e = np.sum(10**(targets_in[i,]/10))
-                edB_target = 10*np.log10(e)
-                self.targets[j,] -= edB_target
+                self.edB_target[j] = 10*np.log10(e)
+                self.targets[j,] -= self.edB_target[j]
                 #print(self.targets[j,])
  
                 # b and y vectors are in x_dB = 20*log10(x), scale down to log10(x).  We don't need to scale
@@ -62,7 +63,7 @@ class f32Dataset(torch.utils.data.Dataset):
                 self.features[j,:20] = self.features[j,:20]/20
                 self.targets[j,] = self.targets[j,]/20
 
-                # log10(Wo) probably more useful - but results don't change when this feature is unused
+                # log10(Wo) probably more useful - but have found results don't change when this feature is unused
                 self.features[j,20] = np.log10(self.features[j,20])
 
                 j += 1
@@ -76,12 +77,13 @@ class f32Dataset(torch.utils.data.Dataset):
         return self.num_sequences
 
     def __getitem__(self, index):
-        #print(self.features[1000,:])
-        #quit()
         features = self.features[index * self.sequence_length: (index + 1) * self.sequence_length, :]
         targets = self.targets[index * self.sequence_length: (index + 1) * self.sequence_length, :]
         return features, targets
-    
+
+    def get_edB_target(self, index):
+        return self.edB_target[index]
+   
 parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file [b[22] Wo v] .f32 format')
 parser.add_argument('target', type=str, help='path to target file [y[79]] in .f32 format')
@@ -320,7 +322,8 @@ if len(args.inference):
         for b in range(len_out):
             (f,y) = dataset_eval.__getitem__(b)
             y_hat = model(torch.from_numpy(f).to(device))
-            y_hat_np[b,] = y_hat[0,].cpu().numpy()
+            # restore energy, express in dB
+            y_hat_np[b,] = 20*y_hat[0,].cpu().numpy() + dataset_eval.get_edB_target(b)
     if len(args.out_file):
         print(y_hat_np.shape)
         y_hat_np = y_hat_np.reshape((-1))

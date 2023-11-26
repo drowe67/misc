@@ -9,6 +9,9 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
 | ratek_resampler.sh | Ties C and Octave code together to automate experiment |
 | ratek3_batch.m | Octave batch processing tool |
 | ratek3_fbf.m | Octave frame by frame processing/visualisation tool |
+| manifold.py  | PyTorch ML experiment, training and inference modes |
+
+# VQ Experiment
 
 1. Build C tools from ~/codec2-dev dr-papr branch, Git hash e430c433bcb34c6:
 
@@ -22,7 +25,7 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
    ```
 1. After building VQs, run an experiment to generate speech files for listening
    ```
-   ./ratek_resampler.sh vq_test_23102
+   ./ratek_resampler.sh vq_test_231028
    ```
 1. Frame by frame version of K=20:
    ```
@@ -31,6 +34,16 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
 1. Frame by frame version of K=80:
    ```
    ratek3_fbf("big_dog",165,"train_k80_vq1.f32","train_k80_vq2.f32",79,100)
+   ```
+# ML Experiment
+
+1. Generate ML training data:
+   ```
+   TRAIN=train make -f ratek_resampler.mk train_b20_ml.f32 train_y80_ml.f32
+   ```
+1. Run ML training:
+   ```
+   python3 manifold.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 0.2
    ```
 
    # Samples in `vq_20_80`

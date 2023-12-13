@@ -321,9 +321,20 @@ if len(args.inference):
     with torch.no_grad():
         for b in range(len_out):
             (f,y) = dataset_eval.__getitem__(b)
+            print(f.shape, f[0,21])
+            f[0,21] = 1
             y_hat = model(torch.from_numpy(f).to(device))
+            y_hat = 20*y_hat[0,].cpu().numpy()
             # restore energy, express in dB
-            y_hat_np[b,] = 20*y_hat[0,].cpu().numpy() + dataset_eval.get_edB_target(b)
+            e_y = np.sum(10**(20*y/10))
+            edB_y = 10*np.log10(e_y)
+            e_y_hat = np.sum(10**(y_hat/10))
+            edB_y_hat = 10*np.log10(e_y_hat)
+            e_dB_adj = 10*np.log10(1/e_y_hat)
+            #print(f"edB_y: {e_y} {e_y_hat} {e_dB_adj}\n")
+            y_hat_np[b,] = y_hat + dataset_eval.get_edB_target(b)
+            #y_hat_np[b,] = 20*y + dataset_eval.get_edB_target(b)
+
     if len(args.out_file):
         print(y_hat_np.shape)
         y_hat_np = y_hat_np.reshape((-1))

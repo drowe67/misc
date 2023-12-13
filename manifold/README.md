@@ -45,8 +45,12 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
    ```
    python3 manifold.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 0.2
    ```
+1. Run ML inference:
+   ```
+   python3 manifold.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --inference model1.pt --noplot --out_file test_y80.f32
+   ```
 
-   # Samples in `vq_20_80`
+# Samples in `vq_20_80`
 
    | Index | Processing |
    | ---- | ---- |

@@ -1,8 +1,8 @@
 #!/bin/bash -x
 # ratek_resampler.sh
-# David Rowe Sep 2022
+# David Rowe Oct 2023
 #
-# Support for rate K resampler experiments see doc/ratek_resampler
+# Support for manifold experiments see misc/manifold
 
 CODEC2_PATH=$HOME/codec2-dev
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
@@ -51,6 +51,56 @@ function batch_process {
   ${c2sim_opt} | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
 }
+
+function batch_process_k80 {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  batch_opt=$2
+  outname=$3
+  c2sim_opt=$4
+  tmp=$(mktemp)
+
+  # if something bombs make sure we rm previous sample to indicate problem
+  rm -f ${out_dir}/${filename}_${outname}.wav
+
+  echo "ratek3_batch;" \
+       "ratek80_batch_tool(\"${filename}\", "\
+                          "'A_out',\"${filename}_a.f32\"," \
+                          "'H_out',\"${filename}_h.f32\"," \
+                          "${batch_opt}); quit;" \
+  | octave-cli -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - \
+  ${c2sim_opt} | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
+}
+
+
+# 231126: Testing K=80 ML experiment from manifold.py
+function vq_test_231126 {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  extension="${filename##*.}"
+  mkdir -p $out_dir
+ : <<'END' 
+  c2sim $fullfile --hpf --prede --modelout ${filename}_model.bin 
+
+  # orig amp and phase
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
+  sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
+ 
+  # Amps Nb=20 filtered, phase0, rate K=20 resampling, normalise energy
+  batch_process $fullfile "'K',20,'norm_en'" "2_k20"  
+
+  # No filtering, phase0, rate K=80 resampling, normalise energy
+  batch_process_k80 $fullfile "'norm_en','Nb',100,'Y_out','y_tmp.f32'" "3_k80"  
+END
+  # As above but us ML inference to recover rate K=80 y from rate K=20 b
+  batch_process_k80 $fullfile "'norm_en','Nb',100,'Y_in','test_nv_y80.f32'"  "5_k80_ml" "--prede"
+
+  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_3200.wav 
+}
+
 
 # 231031: Testing a few different K, no decimation in time (10ms frames)
 function vq_test_231031() {
@@ -270,6 +320,9 @@ if [ $# -gt 0 ]; then
         vq_test_231031 ${CODEC2_PATH}/raw/big_dog.raw
         vq_test_231031 ${CODEC2_PATH}/raw/two_lines.raw
         ;;   
+    vq_test_231126)
+        vq_test_231126 ${CODEC2_PATH}/raw/big_dog.raw
+        ;;
     esac
 else
   echo "usage:

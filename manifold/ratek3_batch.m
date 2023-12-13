@@ -525,3 +525,147 @@ function B = ratek3_batch_tool(samname, varargin)
   end
 endfunction
 
+% Supports K=80 output processing for ML experiment, ratek80_batch_tool() above is getting
+% unwieldy
+function ratek80_batch_tool(samname, varargin)
+  more off;
+
+  newamp_700c;
+  Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
+  
+  K=79; rateK_en = 0; verbose = 1; norm_en = 1; Nb = 100; verbose = 0;
+  Y_in_fn = ""; Y_out_fn = ""; A_out_fn = ""; H_out_fn = ""; 
+
+  i = 1;
+  while i<=length(varargin)
+    if strcmp(varargin{i},"Y_in") 
+      Y_in_fn = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"Y_out")
+      Y_out_fn = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"A_out") 
+      A_out_fn = varargin{i+1}; i++;
+     elseif strcmp(varargin{i},"H_out")
+      H_out_fn = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"norm_en") 
+      norm_en = 1;    
+    elseif strcmp(varargin{i},"Nb")
+      Nb = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"verbose") 
+      verbose = 1;
+     else
+      printf("\nERROR unknown argument: %s\n", varargin{i});
+      return;
+    end
+    i++;      
+  end  
+  printf("Y_in_fn: %s norm_en: %d Nb: %d\n", Y_in_fn, norm_en, Nb);
+
+  model_name = strcat(samname,"_model.bin");
+  model = load_codec2_model(model_name);
+  [frames tmp] = size(model);
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
+  B = zeros(frames,K);
+  YdB = zeros(frames,Lhigh-1); YdB_ = zeros(frames,Lhigh-1);
+  
+  if length(Y_in_fn)
+    fy_hat = fopen(Y_in_fn,"rb");
+  end
+
+  % precompute filters at rate Lhigh. Note range of harmonics is 1:Lhigh-1, as
+  % we don't use Lhigh-th harmonic as it's on Fs/2
+
+  h = zeros(Lhigh, Lhigh);
+  F0high = (Fs/2)/Lhigh;
+  for m=1:Lhigh-1
+    h(m,:) = generate_filter(m,F0high,Lhigh,Nb);
+  end
+  rate_Lhigh_sample_freqs_kHz = (F0high:F0high:(Lhigh-1)*F0high)/1000;
+  sum_Eq = 0; nEq = 0;
+
+  for f=1:frames
+    Wo = model(f,1); F0 = Fs*Wo/(2*pi); L = model(f,2);
+    Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
+    rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
+       
+    % resample from rate L to rate Lhigh (both linearly spaced)
+    AmdB_rate_Lhigh = interp1([0 rate_L_sample_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
+    if norm_en
+      AmdB_rate_Lhigh = norm_energy(AmdB, AmdB_rate_Lhigh);
+    end
+    
+    % Filter at rate Lhigh, y = F(R(a)). Note we filter in linear energy domain, and Lhigh are linearly spaced
+    for m=1:Lhigh-1
+      Am_rate_Lhigh = 10.^(AmdB_rate_Lhigh/20);
+      Y = sum(Am_rate_Lhigh.^2 .* h(m,1:Lhigh-1));
+      YdB(f,m) = 10*log10(Y);
+    end
+    
+    % Optionally read in Y from file, e.g. output of ML code
+    if length(Y_in_fn)
+      YdB_(f,:) = fread(fy_hat, Lhigh-1, "float32");
+    else
+      YdB_(f,:) = YdB(f,:);
+    end
+    if verbose
+      printf("%f %f \n",mean(YdB(f,:)),mean(YdB_(f,:)))
+    end
+    sum_Eq += mean(YdB(f,:)-YdB_(f,:)).^2;
+    nEq++;
+
+    % back to rate L
+    AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB_(f,:) 0], rate_L_sample_freqs_kHz, "spline", "extrap");
+    if norm_en
+      AmdB_ = norm_energy(YdB_(f,:), AmdB_);
+    end
+    Am_(f,1:L) = 10.^(AmdB_/20);
+    
+    if length(H_out_fn)
+      H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB(f,:), Fs, Wo, L, 0);
+    end
+
+    printf("%d/%d %3.0f%%\r", f,frames, (f/frames)*100);
+  end
+  printf("\n");
+  
+  % optionally write Y (rate Lhigh unfiltered) to a .f32 file for external VQ training
+  if length(Y_out_fn)
+    fy = fopen(Y_out_fn,"wb");
+    for f=1:frames
+      Yfloat = YdB(f,:);
+      fwrite(fy, Yfloat, "float32");
+    end
+    fclose(fy);
+  end
+  
+  % optionally write Am, so we can listen using:
+  %   ./src/c2sim ../raw/big_dog.raw --amread ../octave/big_dog_am.f32 -o - | aplay -f S16_LE
+  if length(A_out_fn)
+    fam = fopen(A_out_fn,"wb");
+    for f=1:frames
+      Afloat_ = zeros(1,max_amp);
+      L = model(f,2);
+      Afloat_(2:L+1) = Am_(f,1:L);
+      fwrite(fam, Afloat_, "float32");
+    end
+    fclose(fam);
+  end
+  
+  if length(H_out_fn)
+    max_amp = 160;
+    fhm = fopen(H_out_fn,"wb");
+    for f=1:frames
+      Hfloat = zeros(1,2*max_amp);
+      L = model(f,2);
+      for m=1:L
+        Hfloat(2*m+1) = cos(H(f,m));
+        Hfloat(2*m+2) = sin(H(f,m));
+      end
+      fwrite(fhm, Hfloat, "float32");
+    end
+    fclose(fhm);
+  end
+
+  sd = sum_Eq/nEq;
+  printf("mean Eq: %4.2f dB^2 %4.2f dB\n", sd, sqrt(sd));
+endfunction
+

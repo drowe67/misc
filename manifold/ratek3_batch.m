@@ -525,7 +525,7 @@ function B = ratek3_batch_tool(samname, varargin)
   end
 endfunction
 
-% Supports K=80 output processing for ML experiment, ratek80_batch_tool() above is getting
+% Supports K=80 output processing for ML experiment, ratek_batch_tool() above is getting
 % unwieldy
 function ratek80_batch_tool(samname, varargin)
   more off;
@@ -533,13 +533,15 @@ function ratek80_batch_tool(samname, varargin)
   newamp_700c;
   Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
   
-  K=79; rateK_en = 0; verbose = 1; norm_en = 1; Nb = 100; verbose = 0;
-  Y_in_fn = ""; Y_out_fn = ""; A_out_fn = ""; H_out_fn = ""; 
+  K=20; verbose = 1; norm_en = 1; Nb = 100; verbose = 0; prede_en = 0;
+  Y_in_fn = ""; B_out_fn = ""; Y_out_fn = ""; A_out_fn = ""; H_out_fn = ""; 
 
   i = 1;
   while i<=length(varargin)
     if strcmp(varargin{i},"Y_in") 
       Y_in_fn = varargin{i+1}; i++;
+    elseif strcmp(varargin{i},"B_out")
+      B_out_fn = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"Y_out")
       Y_out_fn = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"A_out") 
@@ -552,13 +554,15 @@ function ratek80_batch_tool(samname, varargin)
       Nb = varargin{i+1}; i++;
     elseif strcmp(varargin{i},"verbose") 
       verbose = 1;
-     else
+    elseif strcmp(varargin{i},"prede") 
+      prede_en = 1;
+    else
       printf("\nERROR unknown argument: %s\n", varargin{i});
       return;
     end
     i++;      
   end  
-  printf("Y_in_fn: %s norm_en: %d Nb: %d\n", Y_in_fn, norm_en, Nb);
+  printf("Nb: %d norm_en: %d prede: %d Y_in_fn: %s \n", Nb, norm_en, prede_en, Y_in_fn);
 
   model_name = strcat(samname,"_model.bin");
   model = load_codec2_model(model_name);
@@ -587,6 +591,13 @@ function ratek80_batch_tool(samname, varargin)
     Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     rate_L_sample_freqs_kHz = ((1:L)*F0)/1000;
        
+    % optional preemphasis 
+    if prede_en
+      w = Wo*(1:L);
+      Hpre = 2-2*cos(w);
+      AmdB += 10*log10(Hpre);
+    end
+
     % resample from rate L to rate Lhigh (both linearly spaced)
     AmdB_rate_Lhigh = interp1([0 rate_L_sample_freqs_kHz 4], [0 AmdB 0], rate_Lhigh_sample_freqs_kHz, "spline", "extrap");
     if norm_en
@@ -612,10 +623,22 @@ function ratek80_batch_tool(samname, varargin)
     sum_Eq += mean(YdB(f,:)-YdB_(f,:)).^2;
     nEq++;
 
+    % Resample from rate Lhigh to rate K b=R(Y), note K are non-linearly spaced (warped freq axis)
+    B(f,:) = interp1(rate_Lhigh_sample_freqs_kHz, YdB(f,:), rate_K_sample_freqs_kHz, "spline", "extrap");
+    if norm_en
+      B(f,:) = norm_energy(YdB(f,:), B(f,:));
+    end
+
     % back to rate L
     AmdB_ = interp1([0 rate_Lhigh_sample_freqs_kHz 4], [0 YdB_(f,:) 0], rate_L_sample_freqs_kHz, "spline", "extrap");
     if norm_en
       AmdB_ = norm_energy(YdB_(f,:), AmdB_);
+    end
+    % optional deemphasis 
+    if prede_en
+      w = Wo*(1:L);
+      Hpre = 2-2*cos(w);
+      AmdB_ -= 10*log10(Hpre);
     end
     Am_(f,1:L) = 10.^(AmdB_/20);
     
@@ -627,7 +650,18 @@ function ratek80_batch_tool(samname, varargin)
   end
   printf("\n");
   
-  % optionally write Y (rate Lhigh unfiltered) to a .f32 file for external VQ training
+   % optionally write b to a .f32 file for external VQ training
+  if length(B_out_fn)
+    fb = fopen(B_out_fn,"wb");
+    for f=1:frames
+      Bfloat = B(f,:);
+      fwrite(fb, Bfloat, "float32");
+      fwrite(fb,[model(f,1) model(f,end)], "float32");
+    end
+    fclose(fb);
+  end
+
+   % optionally write Y (rate Lhigh unfiltered) to a .f32 file for external VQ training
   if length(Y_out_fn)
     fy = fopen(Y_out_fn,"wb");
     for f=1:frames

@@ -61,6 +61,8 @@ function batch_process_k80 {
   c2sim_opt=$4
   tmp=$(mktemp)
 
+  echo "batch_process_k80 ------------------------------"
+
   # if something bombs make sure we rm previous sample to indicate problem
   rm -f ${out_dir}/${filename}_${outname}.wav
 
@@ -82,21 +84,24 @@ function vq_test_231126 {
   filename="${filename%.*}"
   extension="${filename##*.}"
   mkdir -p $out_dir
- : <<'END' 
-  c2sim $fullfile --hpf --prede --modelout ${filename}_model.bin 
+#: <<'END'
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin 
 
   # orig amp and phase
   c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
   sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
  
-  # Amps Nb=20 filtered, phase0, rate K=20 resampling, normalise energy
-  batch_process $fullfile "'K',20,'norm_en'" "2_k20"  
+  # Nb=20 filtered (smoothed), rate K=20 resampling, b for inference test
+  batch_process_k80 $fullfile "'norm_en','Nb',20,'prede','B_out','big_dog_b.f32'" "2_k20"  
 
-  # No filtering, phase0, rate K=80 resampling, normalise energy
-  batch_process_k80 $fullfile "'norm_en','Nb',100,'Y_out','y_tmp.f32'" "3_k80"  
-END
-  # As above but us ML inference to recover rate K=80 y from rate K=20 b
-  batch_process_k80 $fullfile "'norm_en','Nb',100,'Y_in','test_nv_y80.f32'"  "5_k80_ml" "--prede"
+  # No filtering, rate K=80 resampling to get y out for ideal y test below
+  batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_out','big_dog_y.f32'" "3_k80"  
+
+  # Test with ideal y
+  batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_in','big_dog_y.f32'" "4_k80_y"  
+#END
+  # Use ML inference to recover y from b
+  batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_in','big_dog_y_hat.f32'" "5_k80_y_hat"
 
   cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_3200.wav 
 }

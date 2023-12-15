@@ -107,12 +107,13 @@ sequence_length=1
 batch_size = 32
 gamma = 0.5
  
-dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test, thresh_dB=thresh_dB)
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
+if len(args.inference) == 0:
+    dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test, thresh_dB=thresh_dB)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
-for f,y in dataloader:
-    print(f"Shape of features: {f.shape} targets: {y.shape}")
-    break
+    for f,y in dataloader:
+        print(f"Shape of features: {f.shape} targets: {y.shape}")
+        break
 
 # Get cpu, gpu or mps device for training.
 device = (
@@ -316,7 +317,7 @@ if len(args.inference):
     model.eval()
     # num_test == 0 switches off energy and V filtering, so we get all frames in test data.
     dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0)
-    len_out = 300
+    len_out = 250
     y_hat_np = np.zeros([len_out,target_dim],dtype=np.float32)
     with torch.no_grad():
         for b in range(len_out):
@@ -343,6 +344,7 @@ if len(args.inference):
 
 # interactive frame-frame visualisation of running model on test data
 if args.noplot == False:
+
     # we may have already loaded test data if in inference mode
     if len(args.inference) == 0:
         model.eval()

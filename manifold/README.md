@@ -47,7 +47,8 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
    ```
 1. Run ML inference:
    ```
-   python3 manifold.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --inference model1.pt --noplot --out_file test_y80.f32
+   ./ratek_resampler.sh vq_test_231126
+   python3 manifold.py big_dog_b.f32 big_dog_y.f32 --inference model1.pt --noplot --out_file big_dog_y_hat.f32
    ```
 
 # Samples in `vq_20_80`

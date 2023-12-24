@@ -650,7 +650,7 @@ function ratek80_batch_tool(samname, varargin)
   end
   printf("\n");
   
-   % optionally write b to a .f32 file for external VQ training
+  % optionally write b to a .f32 file for external VQ training
   if length(B_out_fn)
     fb = fopen(B_out_fn,"wb");
     for f=1:frames

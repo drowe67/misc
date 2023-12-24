@@ -2,10 +2,24 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usetikzlibrary{calc,arrows,shapes,positioning}
+\usepackage{tkz-euclide}
 \usepackage{epigraph}
 \usepackage{float}
 
 \begin{document}
+
+% Tikz code used to support block diagrams
+% credit: https://tex.stackexchange.com/questions/175969/block-diagrams-using-tikz
+
+\tikzset{
+block/.style = {draw, fill=white, rectangle, minimum height=3em, minimum width=3em},
+tmp/.style  = {coordinate}, 
+circ/.style= {draw, fill=white, circle, node distance=1cm, minimum size=0.6cm},
+input/.style = {coordinate},
+output/.style= {coordinate},
+pinstyle/.style = {pin edge={to-,thin,black}}
+}
 
 \title{Unwrapping Codec 2 Data Manifolds}
 \maketitle
@@ -94,15 +108,14 @@ The problem remains - higher pitched speakers sound acceptable at low spectral r
 
 \section{ML Design}
 
-In order to develop a ML system, we need to develop network model and loss functions. To gain some insight into the energy distribution of speech across a pitch period a damped second order system was studied (appendix \ref{sec:second_order}).
+In order to develop a ML system, we need to develop network model and loss functions. To gain some insight into the energy distribution of speech across a pitch period a damped second order system was studied (Appendix \ref{sec:second_order}).
 
 Our problem is more complex that the second order example:
 \begin{enumerate}
 \item Rather that a transfer function we have a smoothed (wide bandwidth formant) version of the amplitude spectrum $B_k,k=1..K$ and pitch $F_0$ available.
 \item From $\{B_k\}$ we wish to obtain a set of amplitude and phase spectra $\{A_m\}, \{\theta_m\},m=1..L$ such that the energy distribution across the pitch period is similar to the input speech.
 \end{enumerate}
-However the second order example gives us some hints on what we would expectto see from a viable ML system: a narrowing of formants for males, an increase in phase shift across each formant, and energy distributed across the pitch cycle.
-
+However the second order example gives us some hints on what we would expect to see from a viable ML system: a narrowing of formants for males, an increase in phase shift across each formant, and energy distributed across the pitch cycle.
 
 \subsection{ML Design candidate}
 
@@ -125,6 +138,56 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra p
 \item For synthesis we could choose to use the amplitudes as well as the phases derived from $\hat{\mathbf{y}}$, or just the phases.
 \item The weighting filter means energies will be matched in the weighted domain.  This may not be the same as matching energy in the synthesised speech. A loss term could be introduced to ensure an energy match is mantained, despite modification of the spectral shape.
 \end{enumerate}
+
+\begin{figure}[H]
+\caption{ML Experiment Block Diagram. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the rate $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  It can be viewed as an autoencoder with the bottleneck being the smoothed rate $K=20$ vector $\mathbf{b}$.}
+
+\label{fig:ml_experiment}
+\begin{center}
+\begin{tikzpicture}[auto, node distance=2cm,>=triangle 45,x=1.0cm,y=1.0cm, align=center]
+
+\node [input] (rinput) {};
+\node [tmp, right of=rinput,node distance=0.5cm] (z) {};
+\node [block, right of=z,node distance=1.5cm] (window) {Window};
+\node [block, right of=window,node distance=2.5cm] (dft) {DFT};
+\node [block, above of=dft,node distance=2cm,text width=2cm] (nlp) {Est Pitch};
+\node [block, right of=dft,node distance=3cm,text width=1.5cm] (est) {Est Amp};
+\node [block, right of=est,node distance=3cm,text width=1.5cm] (voicing) {Est Voicing};
+\node [block, below of=est,node distance=2cm,text width=2cm] (resample_k80) {Resample Rate $K=80$};
+\node [block, below of=dft,node distance=2cm,text width=2cm] (filter) {Filter $N_b=20$};
+\node [block, below of=filter,node distance=2cm,text width=2cm] (resample_k20) {Resample Rate $K=20$};
+\node [block, below of=resample_k80,node distance=2cm] (nn) {$F(\mathbf{b},\omega_0,v)$};
+\node [block, below of=nn,node distance=2cm,text width=2cm] (resample_l) {Resample Rate $L$};
+\node [block, below of=resample_k20,node distance=2cm,text width=2cm] (hilbert) {Hilbert Transform};
+\node [block, right of=nn,node distance=3cm,text width=2cm] (loss) {$L(\mathbf{y},\hat{\mathbf{y}})$};
+\node [tmp, below of=loss,node distance=1cm] (z1) {};
+\node [output, below of=resample_l,node distance=2cm] (output1) {};
+\node [output, below of=hilbert,node distance=2cm] (output2) {};
+\node [output, right of=nlp,node distance=2cm] (output3) {};
+\node [output, below of=voicing,node distance=1cm] (output4) {};
+
+\draw [->] node[align=left,text width=2cm] {$s(n)$} (rinput) -- (window);
+\draw [->] (z) |- (nlp);
+\draw [->] (nlp) --  node[text width=2cm] {$\omega_0$}(output3);
+\draw [->] (window) -- node[below] {$s_w(n)$} (dft);
+\draw [->] (dft) -- node[below] {$S_\omega(k)$} (est);
+\draw [->] (est) -- node[left] {$\mathbf{a}$} (resample_k80);
+\draw [->] (est) -- node[above] {$\mathbf{a}$} (voicing);
+\draw [->] (voicing) -- node[left] {$v$} (output4);
+\draw [->] (resample_k80) -- node[above] {$\mathbf{y}$} (filter);
+\draw [->] (filter) -- (resample_k20);
+\draw [->] (resample_k20) -- node[above] {$\mathbf{b}$} (nn);
+\draw [->] (resample_k80) -| node[above] {$\mathbf{y}$} (loss);
+\draw [->] (nn) -- node[left] {$\hat{\mathbf{y}}$} (resample_l);
+\draw [->] (nn) |- (z1) -- (loss);
+\draw [->] (resample_l) -- node[above] {$\hat{\mathbf{a}}$} (hilbert);
+\draw [dotted] (loss) -- (nn);
+\draw [->] (resample_l) -- node[left] {$\hat{\mathbf{a}}$} (output1);
+\draw [->] (hilbert) -- node[left] {$arg[H(e^{j\omega_0 m})]$} (output2);
+
+\end{tikzpicture}
+\end{center}
+\end{figure}
 
 \subsection{ML Design Notes}
 

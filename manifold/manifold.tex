@@ -139,8 +139,10 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra p
 \item The weighting filter means energies will be matched in the weighted domain.  This may not be the same as matching energy in the synthesised speech. A loss term could be introduced to ensure an energy match is mantained, despite modification of the spectral shape.
 \end{enumerate}
 
+Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal processing. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the rate $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  Pre-emphasis and de-emphasis is applied in the frequency domain. The ML network $F$ and loss function $L$ operates on normalised energy vectors as we are interested in matching spectral shape, not gain (see also manifold.py comments). It can be viewed as an autoencoder with the bottleneck being the smoothed rate $K=20$ vector $\mathbf{b}$.
+ 
 \begin{figure}[H]
-\caption{ML Experiment Block Diagram. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the rate $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  It can be viewed as an autoencoder with the bottleneck being the smoothed rate $K=20$ vector $\mathbf{b}$.}
+\caption{ML Experiment Block Diagram.}
 
 \label{fig:ml_experiment}
 \begin{center}
@@ -151,38 +153,61 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra p
 \node [block, right of=z,node distance=1.5cm] (window) {Window};
 \node [block, right of=window,node distance=2.5cm] (dft) {DFT};
 \node [block, above of=dft,node distance=2cm,text width=2cm] (nlp) {Est Pitch};
-\node [block, right of=dft,node distance=3cm,text width=1.5cm] (est) {Est Amp};
+\node [block, right of=dft,node distance=3cm,text width=1.5cm] (est) {Est Rate $L$ Amp};
 \node [block, right of=est,node distance=3cm,text width=1.5cm] (voicing) {Est Voicing};
-\node [block, below of=est,node distance=2cm,text width=2cm] (resample_k80) {Resample Rate $K=80$};
-\node [block, below of=dft,node distance=2cm,text width=2cm] (filter) {Filter $N_b=20$};
-\node [block, below of=filter,node distance=2cm,text width=2cm] (resample_k20) {Resample Rate $K=20$};
-\node [block, below of=resample_k80,node distance=2cm] (nn) {$F(\mathbf{b},\omega_0,v)$};
-\node [block, below of=nn,node distance=2cm,text width=2cm] (resample_l) {Resample Rate $L$};
-\node [block, below of=resample_k20,node distance=2cm,text width=2cm] (hilbert) {Hilbert Transform};
+\node [block, below of=est,node distance=2cm,text width=2cm] (pre) {Pre-emphasis};
+\node [block, below of=pre,node distance=1.5cm,text width=2cm] (resample_k80) {Resample Rate $K=80$};
+
+\node [circ,  right of=resample_k80,node distance=3cm] (sub1) {$-$};
+\node [input, above of=sub1, node distance=1cm] (y_bar1) {};
+
+\node [block, below of=resample_k80,node distance=1.5cm] (nn) {$F(\mathbf{b},\omega_0,v)$};
+
+\node [circ,  left of=nn,node distance=2cm] (sub2) {$-$};
+\node [input, above of=sub2, node distance=0.75cm] (y_bar3) {};
+
+\node [block, left of=sub2,node distance=2.5cm,text width=2cm] (resample_k20) {Resample Rate $K=20$};
+\node [block, above of=resample_k20,node distance=1.5cm,text width=2cm] (filter) {Filter $N_b=20$};
+
+\node [circ,  below of=nn,node distance=2cm] (add1) {$+$};
+\node [input, right of=add1, node distance=1cm] (y_bar2) {};
+
+\node [block, left of=add1,node distance=3cm,text width=2cm] (resample_l) {Resample Rate $L$};
+\node [block, below of=resample_l,node distance=1.5cm] (de) {De-emphasis};
+\node [block, right of=de,node distance=3cm,text width=2cm] (hilbert) {Hilbert Transform};
 \node [block, right of=nn,node distance=3cm,text width=2cm] (loss) {$L(\mathbf{y},\hat{\mathbf{y}})$};
 \node [tmp, below of=loss,node distance=1cm] (z1) {};
-\node [output, below of=resample_l,node distance=2cm] (output1) {};
-\node [output, below of=hilbert,node distance=2cm] (output2) {};
+\node [output, below of=de,node distance=1.5cm] (output1) {};
+\node [output, below of=hilbert,node distance=1.5cm] (output2) {};
 \node [output, right of=nlp,node distance=2cm] (output3) {};
 \node [output, below of=voicing,node distance=1cm] (output4) {};
 
 \draw [->] node[align=left,text width=2cm] {$s(n)$} (rinput) -- (window);
 \draw [->] (z) |- (nlp);
-\draw [->] (nlp) --  node[text width=2cm] {$\omega_0$}(output3);
+\draw [->] (nlp) --  node[right of=output3,node distance=0.75cm] {$\omega_0$}(output3);
 \draw [->] (window) -- node[below] {$s_w(n)$} (dft);
-\draw [->] (dft) -- node[below] {$S_\omega(k)$} (est);
-\draw [->] (est) -- node[left] {$\mathbf{a}$} (resample_k80);
+\draw [->] (dft) -- node[above] {$S_\omega(k)$} (est);
+\draw [->] (est) -- node[left] {$\mathbf{a}$} (pre);
+\draw [->] (pre) -- (resample_k80);
 \draw [->] (est) -- node[above] {$\mathbf{a}$} (voicing);
-\draw [->] (voicing) -- node[left] {$v$} (output4);
+\draw [->] (voicing) -- node[below of=output4,,node distance=0.5cm] {$v$} (output4);
 \draw [->] (resample_k80) -- node[above] {$\mathbf{y}$} (filter);
 \draw [->] (filter) -- (resample_k20);
-\draw [->] (resample_k20) -- node[above] {$\mathbf{b}$} (nn);
-\draw [->] (resample_k80) -| node[above] {$\mathbf{y}$} (loss);
-\draw [->] (nn) -- node[left] {$\hat{\mathbf{y}}$} (resample_l);
+\draw [->] (resample_k20) -- node[above] {$\mathbf{b}$} (sub2);
+\draw [->] (sub2) -- (nn);
+\draw [->] (y_bar3) -- node[above of=y_bar3, node distance=0.5cm] {$\bar{\mathbf{b}}$} (sub2);
+
+\draw [->] (resample_k80) -- node[above] {$\mathbf{y}$} (sub1);
+\draw [->] (y_bar1) -- node[above of=y_bar1, node distance=0.5cm] {$\bar{\mathbf{y}}$} (sub1);
+\draw [->] (sub1) -- (loss);
+\draw [->] (nn) -- (add1);
+\draw [->] (add1) -- node[above] {$\hat{\mathbf{y}}$} (resample_l);
+\draw [->] (y_bar2) -- node[right of=y_bar2, node distance=0.5cm] {$\bar{\mathbf{y}}$} (add1);
+\draw [->] (resample_l) -- (de);
 \draw [->] (nn) |- (z1) -- (loss);
-\draw [->] (resample_l) -- node[above] {$\hat{\mathbf{a}}$} (hilbert);
+\draw [->] (de) -- node[above] {$\hat{\mathbf{a}}$} (hilbert);
 \draw [dotted] (loss) -- (nn);
-\draw [->] (resample_l) -- node[left] {$\hat{\mathbf{a}}$} (output1);
+\draw [->] (de) -- node[left] {$\hat{\mathbf{a}}$} (output1);
 \draw [->] (hilbert) -- node[left] {$arg[H(e^{j\omega_0 m})]$} (output2);
 
 \end{tikzpicture}

@@ -317,12 +317,13 @@ if len(args.inference):
     model.eval()
     # num_test == 0 switches off energy and V filtering, so we get all frames in test data.
     dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0)
-    len_out = 250
+    len_out = dataset_eval.__len__()
     y_hat_np = np.zeros([len_out,target_dim],dtype=np.float32)
     with torch.no_grad():
         for b in range(len_out):
             (f,y) = dataset_eval.__getitem__(b)
-            print(f.shape, f[0,21])
+            #print(f.shape, f[0,21])
+            # force all voiced like training data
             f[0,21] = 1
             y_hat = model(torch.from_numpy(f).to(device))
             y_hat = 20*y_hat[0,].cpu().numpy()

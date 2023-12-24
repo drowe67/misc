@@ -634,6 +634,7 @@ function ratek80_batch_tool(samname, varargin)
     if norm_en
       AmdB_ = norm_energy(YdB_(f,:), AmdB_);
     end
+ 
     % optional deemphasis 
     if prede_en
       w = Wo*(1:L);

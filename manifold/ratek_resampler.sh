@@ -52,7 +52,7 @@ function batch_process {
   printf "%-10s %-20s %4.2f\n" ${filename} ${outname} $(cat ${tmp}) >> ${out_dir}/zlog.txt
 }
 
-function batch_process_k80 {
+function batch_process_ml {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   filename="${filename%.*}"
@@ -61,7 +61,7 @@ function batch_process_k80 {
   c2sim_opt=$4
   tmp=$(mktemp)
 
-  echo "batch_process_k80 ------------------------------"
+  echo "batch_process_ml ------------------------------"
 
   # if something bombs make sure we rm previous sample to indicate problem
   rm -f ${out_dir}/${filename}_${outname}.wav
@@ -76,6 +76,29 @@ function batch_process_k80 {
   ${c2sim_opt} | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
 }
 
+function batch_process_ml2 {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  batch_opt=$2
+  outname=$3
+  c2sim_opt=$4
+  tmp=$(mktemp)
+
+  echo "batch_process_ml2 ------------------------------"
+
+  # if something bombs make sure we rm previous sample to indicate problem
+  rm -f ${out_dir}/${filename}_${outname}.wav
+
+  echo "ratek3_batch;" \
+       "ratek80_batch_ml_out(\"${filename}\", "\
+                          "'A_out',\"${filename}_a.f32\"," \
+                          "'H_out',\"${filename}_h.f32\"," \
+                          "${batch_opt}); quit;" \
+  | octave-cli -qf
+  c2sim $fullfile --hpf --phase0 --postfilter --amread ${filename}_a.f32 --hmread ${filename}_h.f32 -o - \
+  ${c2sim_opt} | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
+}
 
 # 231126: Testing K=80 ML experiment from manifold.py
 function ml_test_231126 {
@@ -92,17 +115,24 @@ function ml_test_231126 {
   sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
  
   # Nb=20 filtered (smoothed), rate K=20 resampling, input b for inference test
-  batch_process_k80 $fullfile "'norm_en','Nb',20,'prede','B_out','${filename}_b.f32'" "2_k20"  
+  batch_process_ml $fullfile "'norm_en','Nb',20,'prede','B_out','${filename}_b.f32'" "2_k20"  
 
   # No filtering, rate K=80 resampling to get y out for ideal y test 4_k80_y below
-  batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_out','${filename}_y.f32'" "3_k80"  
+  batch_process_ml $fullfile "'norm_en','Nb',100,'prede','Y_out','${filename}_y.f32'" "3_k80"  
 
   # Test with ideal y, should be identical to 3_k80 
-  batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_in','${filename}_y.f32'" "4_k80_y"  
-#END
+  batch_process_ml $fullfile "'norm_en','Nb',100,'prede','Y_in','${filename}_y.f32'" "4_k80_y"  
+
   # Use ML inference to recover y_hat from b, note ${filename}_y.f32 is not used (non-optional cmd line arg)
   python3 manifold.py ${filename}_b.f32 ${filename}_y.f32 --inference model1.pt --noplot --out_file ${filename}_y_hat.f32
-  batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_in','${filename}_y_hat.f32'" "5_k80_y_hat"
+  batch_process_ml $fullfile "'norm_en','Nb',100,'prede','Y_in','${filename}_y_hat.f32'" "5_k80_y_hat"
+#END
+  # Use seprate batch process functions for enc and dec to double check results, should be identical to 5
+  echo "ratek3_batch;" \
+       "ratek80_batch_ml_in(\"${filename}\", 'B_out', \"${filename}_b.f32\"); quit;" \
+  | octave-cli -qf
+  python3 manifold.py ${filename}_b.f32 ${filename}_y.f32 --inference model1.pt --noplot --out_file ${filename}_y_hat.f32
+  batch_process_ml2 $fullfile "'Y_in','${filename}_y_hat.f32'" "6_k80_y_hat"
 
   cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_3200.wav 
 }

@@ -644,7 +644,7 @@ function ratek80_batch_tool(samname, varargin)
     Am_(f,1:L) = 10.^(AmdB_/20);
     
     if length(H_out_fn)
-      H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB(f,:), Fs, Wo, L, 0);
+      H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB_(f,:), Fs, Wo, L, 0);
     end
 
     printf("%d/%d %3.0f%%\r", f,frames, (f/frames)*100);
@@ -662,7 +662,7 @@ function ratek80_batch_tool(samname, varargin)
     fclose(fb);
   end
 
-   % optionally write Y (rate Lhigh unfiltered) to a .f32 file for external VQ training
+   % optionally write Y (rate Lhigh unfiltered) to a .f32 file for external VQ/ML training
   if length(Y_out_fn)
     fy = fopen(Y_out_fn,"wb");
     for f=1:frames

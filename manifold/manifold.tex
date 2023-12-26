@@ -28,9 +28,9 @@ pinstyle/.style = {pin edge={to-,thin,black}}
 
 Speech coding can be defined as the art of representing speech using a small number of parameters that can be efficiently sent over a channel.
 
-Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $20log_{10}(A_m), m=1..L$ to a set of fixed length $K=20$ samples $B_k,k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phase is recovered using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
+Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $20log_{10}(A_m), m=1..L$ to a set of fixed length $K=20$ samples $B_k,k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phases are synthesised using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
 
-There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, the formant energy must be spread in time.  As Codec 2 recover phase using a minimum phase model - this implies narrow formant bandwidths must be maintained \footnote{Other ways of spreading time domain energy are possible, for example generating phases through heuristics, non-minimum phase models, or time domain compression \cite{rowe2023_ratek_study}}.  Narrow formant bandwidths lead to long decay times for filters ``ringing`` with formant energy. When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Speech with a short pitch period (e.g. female) has less time to decay between pitch cycles so is less sensitive to formant bandwidths, the short pitch period naturally leads to a more uniform distribution of energy over time.
+There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, the formant energy must be spread in time.  As Codec 2 synthesises phase using a minimum phase model - this implies narrow formant bandwidths must be maintained \footnote{Other ways of spreading time domain energy are possible, for example generating phases through heuristics, non-minimum phase models, or time domain compression \cite{rowe2023_ratek_study}}.  Narrow formant bandwidths lead to long decay times for filters ``ringing`` with formant energy. When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Speech with a short pitch period (e.g. female) has less time to decay between pitch cycles so is less sensitive to formant bandwidths, the short pitch period naturally leads to a more uniform distribution of energy over time.
 
 At the Codec 2 receiver, a post filter $P()$ is applied which improves the perceptual quality, in particular for low pitched (male) speakers. The post filter is a form of ad-hoc non-linear filtering, using experimentally derived constants.  It raises formants and lowers anti-formants, effectively reducing formant bandwidth and more widely distributing energy in time (each formant ``rings" longer).
 
@@ -94,7 +94,7 @@ Visual inspection of the male time domain synthesised waveforms and measurement 
 \end{figure}
 
 \begin{figure}
-\caption{Voiced frame 165 time domain synthesised speech from male speaker.  Plots 1 and 3 are the speech synthesised with original harmonic magnitudes and phases, presented as a control.  Plot 2 is speech synthesised from the $K=20$ model, plot 4 $K=80$. The difference in energy distribution over the pitch cycle is clear.  The objective PAPR measure ranks the samples correctly but appears only weekly related to energy distribution.}
+\caption{Voiced frame 165 time domain synthesised speech from male speaker.  Plots 1 and 3 are the speech synthesised with original harmonic magnitudes and phases, presented as a control.  Plot 2 is speech synthesised from the $K=20$ model, plot 4 $K=80$. The difference in energy distribution over the pitch cycle is clear.  The objective PAPR measure ranks the samples correctly but appears only weakly related to energy distribution.}
 \label{fig:big_dog_f165_time}
 \begin{center}
 \input big_dog_f165_k20_all.tex
@@ -132,15 +132,13 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra p
 \item Experience has shown us that if formant bandwidths are preserved, the $K=80$ spectrum can be used to generate speech with a good energy distribution using phase obtained by a minimum phase (Hilbert) transform.
 \item Operating in the magnitude domain with fixed $K=80$ avoids the problems around dealing with phase and time varying number of phases in the network and loss function.
 \item Features in the network $F()$ are in the $log_{10}()$ domain to reduce dynamic range. 
-\item A loss function in the linear (rather than $log()$) domain will emphasise spectral match (and hence formant bandwidth preservation) in the high energy formants.
+\item A loss function in the linear (rather than $log_{10}()$) domain will emphasise spectral match (and hence formant bandwidth preservation) in the high energy formants.
 \item Weighting means it will pay some attention to interformant regions and less to very low energy regions at low and high frequencies (due to input filtering of the source speech).
 \item Using pre-emphasised speech to extract $\{A_m\}$ will also help formant matching and energy distribution of higher frequency formants (assuming the input speech has flat filtering).
 \item For synthesis we could choose to use the amplitudes as well as the phases derived from $\hat{\mathbf{y}}$, or just the phases.
 \item The weighting filter means energies will be matched in the weighted domain.  This may not be the same as matching energy in the synthesised speech. A loss term could be introduced to ensure an energy match is mantained, despite modification of the spectral shape.
 \end{enumerate}
 
-Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal processing. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the rate $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  Pre-emphasis and de-emphasis is applied in the frequency domain. The ML network $F$ and loss function $L$ operates on normalised energy vectors as we are interested in matching spectral shape, not gain (see also manifold.py comments). It can be viewed as an autoencoder with the bottleneck being the smoothed rate $K=20$ vector $\mathbf{b}$.
- 
 \begin{figure}[H]
 \caption{ML Experiment Block Diagram.}
 
@@ -153,26 +151,26 @@ Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal pr
 \node [block, right of=z,node distance=1.5cm] (window) {Window};
 \node [block, right of=window,node distance=2.5cm] (dft) {DFT};
 \node [block, above of=dft,node distance=2cm,text width=2cm] (nlp) {Est Pitch};
-\node [block, right of=dft,node distance=3cm,text width=1.5cm] (est) {Est Rate $L$ Amp};
+\node [block, right of=dft,node distance=3cm,text width=1.5cm] (est) {Est dim $L$ Amp};
 \node [block, right of=est,node distance=3cm,text width=1.5cm] (voicing) {Est Voicing};
 \node [block, below of=est,node distance=2cm,text width=2cm] (pre) {Pre-emphasis};
-\node [block, below of=pre,node distance=1.5cm,text width=2cm] (resample_k80) {Resample Rate $K=80$};
+\node [block, below of=pre,node distance=1.5cm,text width=2cm] (resample_k80) {Resample dim $K=80$};
 
 \node [circ,  right of=resample_k80,node distance=3cm] (sub1) {$-$};
 \node [input, above of=sub1, node distance=1cm] (y_bar1) {};
 
-\node [block, below of=resample_k80,node distance=1.5cm] (nn) {$F(\mathbf{b},\omega_0,v)$};
+\node [block, below of=resample_k80,node distance=1.5cm] (nn) {$F(\mathbf{b},\omega_0)$};
 
 \node [circ,  left of=nn,node distance=2cm] (sub2) {$-$};
 \node [input, above of=sub2, node distance=0.75cm] (y_bar3) {};
 
-\node [block, left of=sub2,node distance=2.5cm,text width=2cm] (resample_k20) {Resample Rate $K=20$};
+\node [block, left of=sub2,node distance=2.5cm,text width=2cm] (resample_k20) {Resample dim $K=20$};
 \node [block, above of=resample_k20,node distance=1.5cm,text width=2cm] (filter) {Filter $N_b=20$};
 
 \node [circ,  below of=nn,node distance=2cm] (add1) {$+$};
 \node [input, right of=add1, node distance=1cm] (y_bar2) {};
 
-\node [block, left of=add1,node distance=3cm,text width=2cm] (resample_l) {Resample Rate $L$};
+\node [block, left of=add1,node distance=3cm,text width=2cm] (resample_l) {Resample dim $L$};
 \node [block, below of=resample_l,node distance=1.5cm] (de) {De-emphasis};
 \node [block, right of=de,node distance=3cm,text width=2cm] (hilbert) {Hilbert Transform};
 \node [block, right of=nn,node distance=3cm,text width=2cm] (loss) {$L(\mathbf{y},\hat{\mathbf{y}})$};
@@ -185,7 +183,7 @@ Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal pr
 \draw [->] node[align=left,text width=2cm] {$s(n)$} (rinput) -- (window);
 \draw [->] (z) |- (nlp);
 \draw [->] (nlp) --  node[right of=output3,node distance=0.75cm] {$\omega_0$}(output3);
-\draw [->] (window) -- node[below] {$s_w(n)$} (dft);
+\draw [->] (window) -- node[above] {$s_w(n)$} (dft);
 \draw [->] (dft) -- node[above] {$S_\omega(k)$} (est);
 \draw [->] (est) -- node[left] {$\mathbf{a}$} (pre);
 \draw [->] (pre) -- (resample_k80);
@@ -213,6 +211,51 @@ Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal pr
 \end{tikzpicture}
 \end{center}
 \end{figure}
+
+Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal processing. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the dimension $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  Pre-emphasis and de-emphasis is applied in the frequency domain. The ML network $F$ and loss function $L$ operates on normalised energy vectors as we are interested in matching spectral shape, not gain (see also manifold.py comments and implementation). It can be viewed as an autoencoder with the bottleneck being the smoothed dimension $K=20$ vector $\mathbf{b}$.
+
+Table \ref{tab:ml_network} describes the simple neural network that implements $F$.  The 22 input features are the vector $\mathbf{b}$, $log_{10}(\omega_0)$, and the binary voicing decision $v$. The training results we unchanged when $log_{10}(\omega_0)$ was removed, suggested the information on formant bandwidths can be described adequately by the smoothed vector $\mathbf{b}$ alone.  Training was performed on voiced vectors ($v=1$) above an energy threshold to remove silence frames.
+
+\begin{table}[H]
+\label{tab:ml_network}
+\centering
+\begin{tabular}{l l l l}
+\hline
+Layer & Input Features & Output Features & Output Activation \\
+\hline
+1 & 22 & 512 & ReLU  \\
+2 & 512 & 512 & ReLU  \\
+3 & 512 & 79 & ReLU  \\
+\hline
+\end{tabular}
+\caption{The function $F$ consists of three fully connected layers, the size and topology was arrived at by experiment.}
+\end{table}
+
+Table \ref{tab:ml_sd} presents an objective results for 4 samples outside of the training data.  Spectral distortion between $\mathbf{y}$ and $\hat{\mathbf{y}}$ is defined as:
+\begin{equation}
+E_q = \frac{1}{K}\sum_{k=0}^K |Y_k - \hat{Y}_k |^2
+\end{equation}
+The four samples were subjectively evaluated using headphones and a laptop speaker.  All male samples synthesised with the ML network sounded better than the reference $K=20$ and Codec 2 3200 samples.  The female sounded the same.  These results demonstrate successful inference outside of the training data and with varying recording (source filtering) conditions. These results support the theory that $\hat{\mathbf{y}}$ can be expressed as a (probably non-linear) function of $\mathbf{b}$.
+
+\begin{table}[H]
+\label{tab:ml_sd}
+\centering
+\begin{tabular}{l l l l}
+\hline
+Sample & Gender & $E_q \: dB^2$ & $\sqrt{E_q} \: dB$  \\
+\hline
+big\_dog & M & 1.38 & 1.18  \\
+two\_lines & F & 1.02 & 1.01 \\
+hts1a & M & 0.40 & 0.64 \\
+kristoff & M & 0.37 & 0.61  \\
+\hline
+\end{tabular}
+\caption{Objective results with one female and 3 low pitched male samples.  All samples were outside of the training data, however the first two were part of the same database and shared the same recording conditions as the training data.}
+\end{table}
+
+\section{Conculsions}
+
+Significance. Ties together ML vocoder and earlier DSP based models.  Alternatives for internal representations in NNs.  Low complexity communications quality speech using ML. Autoencoder with $\mathbf{b}$ as the bottleneck. Doesn't matter for high pitched speakers. Inference working outside training database. $\omega_0$ in network didn't help much, indicating spectra alone has enough information. 
 
 \subsection{ML Design Notes}
 

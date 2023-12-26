@@ -78,29 +78,29 @@ function batch_process_k80 {
 
 
 # 231126: Testing K=80 ML experiment from manifold.py
-function vq_test_231126 {
+function ml_test_231126 {
   fullfile=$1
   filename=$(basename -- "$fullfile")
   filename="${filename%.*}"
   extension="${filename##*.}"
   mkdir -p $out_dir
-: <<'END'
+#: <<'END'
   c2sim $fullfile --hpf --modelout ${filename}_model.bin 
 
   # orig amp and phase
   c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
   sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
  
-  # Nb=20 filtered (smoothed), rate K=20 resampling, b for inference test
+  # Nb=20 filtered (smoothed), rate K=20 resampling, input b for inference test
   batch_process_k80 $fullfile "'norm_en','Nb',20,'prede','B_out','${filename}_b.f32'" "2_k20"  
 
-  # No filtering, rate K=80 resampling to get y out for ideal y test below
+  # No filtering, rate K=80 resampling to get y out for ideal y test 4_k80_y below
   batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_out','${filename}_y.f32'" "3_k80"  
 
-  # Test with ideal y
+  # Test with ideal y, should be identical to 3_k80 
   batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_in','${filename}_y.f32'" "4_k80_y"  
-END
-  # Use ML inference to recover y from b, note ${filename}_y.f32 is not used for inference
+#END
+  # Use ML inference to recover y_hat from b, note ${filename}_y.f32 is not used (non-optional cmd line arg)
   python3 manifold.py ${filename}_b.f32 ${filename}_y.f32 --inference model1.pt --noplot --out_file ${filename}_y_hat.f32
   batch_process_k80 $fullfile "'norm_en','Nb',100,'prede','Y_in','${filename}_y_hat.f32'" "5_k80_y_hat"
 
@@ -326,9 +326,11 @@ if [ $# -gt 0 ]; then
         vq_test_231031 ${CODEC2_PATH}/raw/big_dog.raw
         vq_test_231031 ${CODEC2_PATH}/raw/two_lines.raw
         ;;   
-    vq_test_231126)
-        vq_test_231126 ${CODEC2_PATH}/raw/big_dog.raw
-        vq_test_231126 ${CODEC2_PATH}/raw/two_lines.raw
+    ml_test_231126)
+        ml_test_231126 ${CODEC2_PATH}/raw/big_dog.raw
+        ml_test_231126 ${CODEC2_PATH}/raw/two_lines.raw
+        ml_test_231126 ${CODEC2_PATH}/raw/hts1a.raw
+        ml_test_231126 ${CODEC2_PATH}/raw/kristoff.raw
       ;;
     esac
 else

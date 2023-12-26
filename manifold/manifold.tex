@@ -170,7 +170,7 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra p
 \node [circ,  below of=nn,node distance=2cm] (add1) {$+$};
 \node [input, right of=add1, node distance=1cm] (y_bar2) {};
 
-\node [block, left of=add1,node distance=3cm,text width=2cm] (resample_l) {Resample dim $L$};
+\node [block, below of=resample_k20,node distance=2cm,text width=2cm] (resample_l) {Resample dim $L$};
 \node [block, below of=resample_l,node distance=1.5cm] (de) {De-emphasis};
 \node [block, right of=de,node distance=3cm,text width=2cm] (hilbert) {Hilbert Transform};
 \node [block, right of=nn,node distance=3cm,text width=2cm] (loss) {$L(\mathbf{y},\hat{\mathbf{y}})$};
@@ -198,13 +198,14 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra p
 \draw [->] (resample_k80) -- node[above] {$\mathbf{y}$} (sub1);
 \draw [->] (y_bar1) -- node[above of=y_bar1, node distance=0.5cm] {$\bar{\mathbf{y}}$} (sub1);
 \draw [->] (sub1) -- (loss);
+\draw [->] (nn) |- (z1) -- (loss);
+\draw [dotted] (loss) -- (nn);
+
 \draw [->] (nn) -- (add1);
 \draw [->] (add1) -- node[above] {$\hat{\mathbf{y}}$} (resample_l);
 \draw [->] (y_bar2) -- node[right of=y_bar2, node distance=0.5cm] {$\bar{\mathbf{y}}$} (add1);
 \draw [->] (resample_l) -- (de);
-\draw [->] (nn) |- (z1) -- (loss);
-\draw [->] (de) -- node[above] {$\hat{\mathbf{a}}$} (hilbert);
-\draw [dotted] (loss) -- (nn);
+\draw [->] (add1) -| (hilbert);
 \draw [->] (de) -- node[left] {$\hat{\mathbf{a}}$} (output1);
 \draw [->] (hilbert) -- node[left] {$arg[H(e^{j\omega_0 m})]$} (output2);
 
@@ -235,8 +236,15 @@ Table \ref{tab:ml_sd} presents an objective results for 4 samples outside of the
 \begin{equation}
 E_q = \frac{1}{K}\sum_{k=0}^K |Y_k - \hat{Y}_k |^2
 \end{equation}
-The four samples were subjectively evaluated using headphones and a laptop speaker.  All male samples synthesised with the ML network sounded better than the reference $K=20$ and Codec 2 3200 samples.  The female sounded the same.  These results demonstrate successful inference outside of the training data and with varying recording (source filtering) conditions. These results support the theory that $\hat{\mathbf{y}}$ can be expressed as a (probably non-linear) function of $\mathbf{b}$.
-
+The four samples were subjectively evaluated using headphones and laptop speakers.  Samples included speech synthesised with;
+\begin{enumerate}
+\item original amplitude and phases, the best case Codec 2 speech.
+\item phase0 model, $Nb=20$ filtering, equivalent to speech synthesised directly from the $\mathbf{b}$ vectors.
+\item phase0 model, $\mathbf{y}$, i.e. ideal output from the ML network.
+\item phase0 model, $\hat{\mathbf{y}}$, from the ML network.
+\item the fully quantised Codec 2 3200 mode.
+\end{enumerate}
+All male samples synthesised with the ML network sounded better than the $N_b=20$ and Codec 2 3200 samples, and through the laptop speakers they were hard to distinguish from the original amplitudes/phases.  The female $N_b=20$ and  $\hat{\mathbf{y}}$ sounded the same.  A slight amount of buzziness could be heard when comparing the output from $\mathbf{y}$ and $\hat{\mathbf{y}}$ through headphones, but not the laptop speakers. These results support the theory that $\hat{\mathbf{y}}$ can be expressed as a (probably non-linear) function of $\mathbf{b}$. 
 \begin{table}[H]
 \label{tab:ml_sd}
 \centering
@@ -250,12 +258,12 @@ hts1a & M & 0.40 & 0.64 \\
 kristoff & M & 0.37 & 0.61  \\
 \hline
 \end{tabular}
-\caption{Objective results with one female and 3 low pitched male samples.  All samples were outside of the training data, however the first two were part of the same database and shared the same recording conditions as the training data.}
+\caption{Objective results with one female and 3 low pitched male samples.  All samples were outside of the training data, however the first two were part of the same database and shared the same recording conditions as the training data. These results demonstrate successful inference outside of the training data and with varying recording (source filtering) conditions.}
 \end{table}
 
 \section{Conculsions}
 
-Significance. Ties together ML vocoder and earlier DSP based models.  Alternatives for internal representations in NNs.  Low complexity communications quality speech using ML. Autoencoder with $\mathbf{b}$ as the bottleneck. Doesn't matter for high pitched speakers. Inference working outside training database. $\omega_0$ in network didn't help much, indicating spectra alone has enough information. 
+Significance. Ties together ML vocoder and earlier DSP based models.  Alternatives for internal representations in NNs.  Low complexity communications quality speech using ML. Autoencoder with $\mathbf{b}$ as the bottleneck. Doesn't matter for high pitched speakers. Inference working outside training database. $\omega_0$ in network didn't help much, indicating spectra alone has enough information. Weighted energy for VQ search
 
 \subsection{ML Design Notes}
 
@@ -363,7 +371,7 @@ for large $M$.  We can sample at $X(\omega_0 m)$ to obtain the phase and amplitu
 \begin{equation}
 H(\omega_f) = \frac{1}{1-e^{-\alpha}}	
 \end{equation}
-The bandwidth can be found be by solving for the half power frequency:
+The bandwidth can be found by solving for the half power frequency:
 \begin{equation}
 \begin{split}
 |H(\omega)|^2 &= \frac{1}{2}|H(\omega_f)|^2 \\

@@ -7,10 +7,12 @@ Experiments with non-linear Codec 2 dependencies and low F0 speech.
 | manifold.tex | Latex write up of experiments |
 | ratek_resampler.mk | Makefile to build training data and VQs |
 | ratek_resampler.sh | Ties C and Octave code together to automate experiment |
-| ratek3_batch.m | Octave batch processing tool |
+| ratek3_batch.m | Octave batch processing tools |
 | ratek3_fbf.m | Experiment 1 (VQ) Octave frame by frame processing/visualisation tool, generates .tex plots |
 | manifold.py  | PyTorch ML experiment, training and inference modes |
 | ml_fbf.m | Experiment 2 (ML) Octave frame by frame processing/visualisation tool, generates .tex plots |
+| sec_order.m | Second order system Octave script to explore problem |
+| loss_func.m | Octave script to explore proposed weighted loss function |
 
 # VQ Experiment
 

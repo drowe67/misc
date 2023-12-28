@@ -108,7 +108,7 @@ function ml_test_231126 {
   extension="${filename##*.}"
   mkdir -p $out_dir
 #: <<'END'
-  c2sim $fullfile --hpf --modelout ${filename}_model.bin 
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin --dump ${filename}
 
   # orig amp and phase
   c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
@@ -358,9 +358,10 @@ if [ $# -gt 0 ]; then
         ;;   
     ml_test_231126)
         ml_test_231126 ${CODEC2_PATH}/raw/big_dog.raw
-        ml_test_231126 ${CODEC2_PATH}/raw/two_lines.raw
-        ml_test_231126 ${CODEC2_PATH}/raw/hts1a.raw
-        ml_test_231126 ${CODEC2_PATH}/raw/kristoff.raw
+        #ml_test_231126 ${CODEC2_PATH}/raw/two_lines.raw
+        #ml_test_231126 ${CODEC2_PATH}/raw/hts1a.raw
+        #ml_test_231126 ${CODEC2_PATH}/raw/kristoff.raw
+        #ml_test_231126 ${CODEC2_PATH}/raw/mmt1.raw
       ;;
     esac
 else

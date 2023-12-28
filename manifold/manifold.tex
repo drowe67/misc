@@ -57,7 +57,7 @@ We will include pitch as a feature (perhaps via an embedding network), arguing t
 
 We argue that essentially the same information (in the form of MFCCs) is used for high quality speech synthesis with neural vocoders, therefore these networks must be performing a similar non-linear mapping of coarsely sampled, smoothed spectral information to speech spectra that includes narrow bandwidth formants.  A counter argument is a simple neural network may not be capable of representing the non-linear function that maps between the two vectors.  However we are not trying to synthesise speech here - just the speech spectral envelope.  Other differences: the network proposed here outputs linear values using regression, more sophisticated neural vocoders employ sophisticated conditional probability models and output a PDF; this network considers just one frame, rather than utilising an autoregressive design that considers many past samples.
 
-\section{Evaluation}
+\section{Evaluation Plan}
 
 Evaluation methods considered:
 \begin{enumerate}
@@ -127,7 +127,7 @@ L(\mathbf{y},\hat{\mathbf{y}}) &= \sum_{k=1}^{K=80}|(10^{Y_k}-10^{\hat{Y_k}})W(k
       &= \sum_{k=1}^{K=80}|(10^{Y_k}-10^{\hat{Y_k}})10^{-Y_k (1-\gamma)}|^2
 \end{split}
 \end{equation}
-where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra peaks and emphasises spectral valleys, with $0<\gamma<1$ chosen by experiment ($\gamma =1$ is unweighted).  The loss function compares the spectrally weighted linear energy. This candidate has the following features:
+where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectral peaks and emphasises spectral valleys, with $0<\gamma<1$ chosen by experiment ($\gamma =1$ is unweighted).  The loss function compares the spectrally weighted linear energy. This candidate has the following features:
 \begin{enumerate}
 \item Experience has shown us that if formant bandwidths are preserved, the $K=80$ spectrum can be used to generate speech with a good energy distribution using phase obtained by a minimum phase (Hilbert) transform.
 \item Operating in the magnitude domain with fixed $K=80$ avoids the problems around dealing with phase and time varying number of phases in the network and loss function.
@@ -140,7 +140,7 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra p
 \end{enumerate}
 
 \begin{figure}[H]
-\caption{ML Experiment Block Diagram.}
+\caption{ML Experiment Block Diagram. All operations (including $F$) operate at the sinusoidal vocoder 10ms frame rate.}
 
 \label{fig:ml_experiment}
 \begin{center}
@@ -215,7 +215,9 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectra p
 
 Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal processing. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the dimension $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  Pre-emphasis and de-emphasis is applied in the frequency domain. The ML network $F$ and loss function $L$ operates on normalised energy vectors as we are interested in matching spectral shape, not gain (see also manifold.py comments and implementation). It can be viewed as an autoencoder with the bottleneck being the smoothed dimension $K=20$ vector $\mathbf{b}$.
 
-Table \ref{tab:ml_network} describes the simple neural network that implements $F$.  The 22 input features are the vector $\mathbf{b}$, $log_{10}(\omega_0)$, and the binary voicing decision $v$. The training results we unchanged when $log_{10}(\omega_0)$ was removed, suggested the information on formant bandwidths can be described adequately by the smoothed vector $\mathbf{b}$ alone.  Training was performed on voiced vectors ($v=1$) above an energy threshold to remove silence frames.
+\subsection{ML Results}
+
+Table \ref{tab:ml_network} describes the simple neural network that implements $F$.  The 22 input features are the vector $\mathbf{b}$, $log_{10}(\omega_0)$, and the binary voicing decision $v$. After some experimentation, training was performed on voiced vectors ($v=1$) above an energy threshold to remove silence frames.  It was found that removing the pitch feature $log_{10}(\omega_0)$ made little difference to the final loss, suggesting $\mathbf{b}$ alone is sufficient.  
 
 \begin{table}[H]
 \label{tab:ml_network}
@@ -229,22 +231,24 @@ Layer & Input Features & Output Features & Output Activation \\
 3 & 512 & 79 & ReLU  \\
 \hline
 \end{tabular}
-\caption{The function $F$ consists of three fully connected layers, the size and topology was arrived at by experiment.}
+\caption{The function $F$ consists of three fully connected layers, the size and topology was arrived at by experiment. It has around 300,000 floating point weights.}
 \end{table}
+
+Figures \ref{fig:big_dog_f165_ml_freq} and \ref{fig:big_dog_f165_ml_time} show the ML system operating in the time and frequency domain.
 
 Table \ref{tab:ml_sd} presents an objective results for 4 samples outside of the training data.  Spectral distortion between $\mathbf{y}$ and $\hat{\mathbf{y}}$ is defined as:
 \begin{equation}
-E_q = \frac{1}{K}\sum_{k=0}^K |Y_k - \hat{Y}_k |^2
+E_q = \frac{1}{K}\sum_{k=0}^{K-1} |Y_k - \hat{Y}_k |^2
 \end{equation}
 The four samples were subjectively evaluated using headphones and laptop speakers.  Samples included speech synthesised with;
 \begin{enumerate}
 \item original amplitude and phases, the best case Codec 2 speech.
-\item phase0 model, $Nb=20$ filtering, equivalent to speech synthesised directly from the $\mathbf{b}$ vectors.
-\item phase0 model, $\mathbf{y}$, i.e. ideal output from the ML network.
-\item phase0 model, $\hat{\mathbf{y}}$, from the ML network.
+\item phase0 model, $N_b=20$ filtering, equivalent to speech synthesised directly from the $\mathbf{b}$ vectors.
+\item phase0 model, $\mathbf{y}$,  equivalent to ideal output from the ML network.
+\item phase0 model, $\hat{\mathbf{y}}$, output from the ML network.
 \item the fully quantised Codec 2 3200 mode.
 \end{enumerate}
-All male samples synthesised with the ML network sounded better than the $N_b=20$ and Codec 2 3200 samples, and through the laptop speakers they were hard to distinguish from the original amplitudes/phases.  The female $N_b=20$ and  $\hat{\mathbf{y}}$ sounded the same.  A slight amount of buzziness could be heard when comparing the output from $\mathbf{y}$ and $\hat{\mathbf{y}}$ through headphones, but not the laptop speakers. These results support the theory that $\hat{\mathbf{y}}$ can be expressed as a (probably non-linear) function of $\mathbf{b}$. 
+All male samples synthesised with the ML network sounded better than the $N_b=20$ and Codec 2 3200 samples, and through laptop speakers they were hard to distinguish from the original amplitudes/phases.  The female $N_b=20$ and  $\hat{\mathbf{y}}$ sounded the same.  A slight amount of buzziness could be heard when comparing the output from $\mathbf{y}$ and $\hat{\mathbf{y}}$ through headphones, but not the laptop speakers. The subjective results support the theory that $\hat{\mathbf{y}}$ can be expressed as a (probably non-linear) function of $\mathbf{b}$, and that the information of formant bandwidths is somehow encoded in $\mathbf{b}$.
 \begin{table}[H]
 \label{tab:ml_sd}
 \centering
@@ -258,76 +262,35 @@ hts1a & M & 0.40 & 0.64 \\
 kristoff & M & 0.37 & 0.61  \\
 \hline
 \end{tabular}
-\caption{Objective results with one female and 3 low pitched male samples.  All samples were outside of the training data, however the first two were part of the same database and shared the same recording conditions as the training data. These results demonstrate successful inference outside of the training data and with varying recording (source filtering) conditions.}
+\caption{Objective results with one female and 3 low pitched male samples.  The low $Eq$ values suggest the formant bandwidth information in $\mathbf{y}$ is represented in the lower dimension vector $\mathbf{b}$, despite the smoothing and undersampling. All samples were outside of the training data, however the first two were part of the same database and shared the same recording conditions as the training data. These results demonstrate successful inference outside of the training data and with varying recording (source filtering) conditions.}
 \end{table}
 
-\section{Conculsions}
+\begin{figure}
+\caption{Voiced frame 165 frequency domain from male speaker for ML experiment. The neral network output $\hat{\mathbf{y}}$ has significantly narrower formants that the smoothed, dimension $K=20$ $\mathbf{b}$.}
+\label{fig:big_dog_f165_ml_freq}
+\begin{center}
+\input big_dog_f165_ml.tex
+\end{center}
+\end{figure}
 
-Significance. Ties together ML vocoder and earlier DSP based models.  Alternatives for internal representations in NNs.  Low complexity communications quality speech using ML. Autoencoder with $\mathbf{b}$ as the bottleneck. Doesn't matter for high pitched speakers. Inference working outside training database. $\omega_0$ in network didn't help much, indicating spectra alone has enough information. Weighted energy for VQ search
+\begin{figure}
+\caption{Voiced frame 165 time domain synthesised speech from male speaker.  The upper plot is speech synthesised with original harmonic magnitudes and phases, presented as a control.  The lower plot is speech synthesised from the ML model, which actually has a lower peak/average ratio (CPAPR) indicating satisfactory energy distribution.}
+\label{fig:big_dog_f165_ml_time}
+\begin{center}
+\input big_dog_f165_ml_all.tex
+\end{center}
+\end{figure}
 
-\subsection{ML Design Notes}
+\section{Conclusions}
 
-Notes:
+This work ties together modern neural vocoders and earlier sinusoidal vocoders, by showing how low pitched speech with a suitable energy distribution can be extracted from smoothed, low dimension feature vectors.  The ML experiment is trained as an autoencoder with the smoothed, low dimension vector $\mathbf{b}$ as the bottleneck. The output is a high resolution spectra, that is used to generate a suitable phase spectra via a Hilbert Transform. Inference has been demonstrated working outside of the training database. It was found that the inclusion of pitch feature wasn't significant, suggesting the formant bandwidths are encoded by the smoothed spectral information alone. By extending the autoencoder to include quantisation, this suggests a way forward for low complexity communications quality speech using small neural networks.
+
 \begin{enumerate}
-\item A first choice is $K=80$ vectors as a target, and MSE between log spectra as the cost function.  However like VQ, this will try to minimise the error across the entire spectra, and not focus on the critical formant bandwidths.
-\item The VQ search uses MSE between log spectra, and often removes/rounds off spectral peaks and broadens formant bandwidths.  
-\item VQ training using kmeans also encourages averaging which de-emphasises vectors with tight spectral peaks (VQ doesn't consider $F_0$).
-\item Matching the time domain waveform (or equivalently frequency domain amplitude and phase) is not critical, it's the time domain envelope that counts.
-\item Lets separate the problem of quantisation from energy distribution.  Use a low dimension, unquantised $K=20$ or MFCC vector as input, and focus on reasonable quality low pitched speech as the output.
-\item We are not tied to the current Codec 2 algorithm of converting magnitude spectra to phase spectra via a minimum phase Hilbert Transform.  We can generate phase spectra using other means.
-\item The cost function should be weighted against energy being confined to short time durations (clicks) in the synthesised speech.  This implies we need a function $X(\{A_m\},\{\theta_m\})$ that measures energy distribution.
-\item PAPR does not appear to be satisfactory (confirm/explore why).
-\item We would like formant bandwidth to be a function of $F_0$, as it matters for low pitched speakers (e.g. males) than females.  Having said that - females undersample the spectra which just one harmonic per formant so formant bandwidth is perhaps irrelevant to females.  We do want to preserve the power of the harmonic(s) in that formant (something the current ad-hoc post filter doesn't explicitly do).  A narrow bandwidth formant may work for both male and female speech.
-\item Smooth post filtering across frames is important, we don't want abrupt changes in formant energy or discontinuous phases.
-\item For UV speech mistakenly classified at V, we should also have energy distributed - we should never synthesise clicks.  UV speech tends to have broad, flat spectra with no sharp peaks, so if synthesised as V will have noticeable clicks.
-\item When formants are broadened, multiple harmonics of similar level are synthesised, creating a "two tone" time domain waveform envelope, rather than a damped exponential (bandpass figures).
-\item Idea: can we "fit" damped exponentials to spectra, like VQ-VAE fits Gaussians?
-\end{enumerate}
-
-Requirements for cost function:
-\begin{enumerate}
-\item Models energy distribution of real world speech, and way ear integrates energy.
-\item Good time domain distribution in each formant, this may not be obvious in non-preemph speech due to spectral tilt.
-\item Formant energy should be the same after processing.
-\item Formant energy should be smooth between frames.  Avoid amplitude modulation at the frame rate.
-\item Smooth transition between frames, don't break phase track.
-\item Deals with time varying number of harmonics, e.g. via interpolation of sparse functions
-\item Stretch goal: For UV speech mistakenly classifed as V, doesn't generate clicks.
-\item Low implemenation complexity in ML, to minimise chances of implemenation mistakes with current ML experience.
-\item Operate in the pre-emphasised domain to ensure the energy distribution of HF formants is treated equally with LF formants.  Removes spectral tilt.
-\end{enumerate}
-
-Candidates techniques:
-\begin{enumerate}
-\item Derive a loss function based on comparing 2nd order exponential $\alpha$.
-\item Match spectra, especially around formants, and use a HT min-phase to get phases.  $N_b$ filtering broadens peaks and chops off tops, several harmonics enter formant filter and $\alpha$ is reduced.
-\item Modify phases, not amplitude spectra.  Experiments show original phase and rate $K$ spectra sounds OK.  Ear is not that sensitive to frequency as long as energy distribution is OK.  Modifying spectra can lead to other artefacts as energy bounces around. OTOH, it might help intelligability.
-\item Use a CELP style weighting filter.  This will combine energy match of highest amplitude spectra, with some match of lower energy, and will ignore low energy HP/LP sections that have been filtered out.
-\item Ratio of minima/maxima of magnitude envelope, which can be used to obtain $\alpha$.  Someone must have worked out expressions for these?  Can we solve anlaytically?  Given Fourier series define by $\{A_m\}, \{\theta_m\},m=1..L$, can we obtain an expression for min/max or $\alpha$.
-\item Can we derive an expression for mag envelope as a function of phases?
-\end{enumerate}
-
-\subsection{Notes and Further Work}
-
-Notes:
-\begin{enumerate}
-\item Do we need an embedding layer for pitch?  Research embedding networks.
-\item Should we test with some contrived data?  Introduce expected non-linearity and see if network can train as a check.
-\item Just include voiced frames?  This seems like a good idea.  For UV frames pitch may not be meaningful, and may cause random noise. Set UV frames to a constant $F_0$ (like 0) so at least the network "knows".
-\item Make sure we use energy normalisation \cite{rowe2023_ratek_study} when resampling to rate $K$.
-\item Used mean removed vectors, just consider $200 < f < 3600$ Hz, for consistency with recent Codec 2 VQ work in \cite{rowe2023_ratek_study}.
-\item The $K=80$ are linear spaced, $K=20$ Mel spaced.
-\end{enumerate}
-
-Further work:
-\begin{enumerate}
-\item If fixed $K$ works, try to come up with a network that handles sparse vectors.
-\item Are MFCCs good choices for input features to neural vocoders? They are smoothed, linear transformations of the input speech.  Other latent spaces may be more suitable.
-\item A linear transformation (like a DCT or PCA) followed by VQ is a good idea - truncating DCT coeffs will reduce the dimension, making storage easier, and VQ will capture any non-linear dependencies.  Smaller dimension will help residual error problem in multistage VQ. Trade off between truncation and VQ distortion.
-\item Can we avoid gradient shift/tendancy towards Gaussians with multistage VQ?  Does mbest help?
-\item Scripts supporting this study need refactoring.
-\item It would be useful to look at LPCNet excitation and LPC filter spectra to see how males are handled, as that has a fairly coarse spectral represesntation.  So we would expect excitation for males to have notches either side of formants.
-\item Consider a model that represnts a 2D time-freq formant "blob".  This is what the ear detects - energy at a certain freq for a certain amount of time.  This works suggests time-freq distribution should be considered together, rather than a frame-frame breakdown.
+\item The weighted loss function approach may also be useful for quantisation, e.g. a VQ search.  It may be possible to use smaller dimension bottlenecks than $K=20$.  
+\item It may be possible to integrate the linear resampling steps with NN, however their complexity is low, and NNs are often inefficient when implementing well understood DSP operations.
+\item It may be possible to use MFCC feature vectors as the input, to avoid complexity and occasional errors around pitch dependant $\{A_m\}$ estimation. However there may be some benefit to the deconvolution (separation of excitation spectra from spectral envelope) inherent in the ${A_m}$ extraction process.
+\item The weights of the network have not been studied, and are likely sparse, with significant weights clustered around frequency regions.  It is likely the network can be reduced in size to make implementation possible on a micro-controller.
+\item Other ML models are possible, for example a loss function that includes the time domain envelope, with time domain synthesis in the training loop.
 \end{enumerate}
 
 \appendix
@@ -415,6 +378,71 @@ Figure \ref{fig:sec_order} illustrates the second order system for various value
 \input sec_order.tex
 \end{center}
 \end{figure}
+
+\section{ML Design Notes}
+
+Notes:
+\begin{enumerate}
+\item A first choice is $K=80$ vectors as a target, and MSE between log spectra as the cost function.  However like VQ, this will try to minimise the error across the entire spectra, and not focus on the critical formant bandwidths.
+\item The VQ search uses MSE between log spectra, and often removes/rounds off spectral peaks and broadens formant bandwidths.  
+\item VQ training using kmeans also encourages averaging which de-emphasises vectors with tight spectral peaks (VQ doesn't consider $F_0$).
+\item Matching the time domain waveform (or equivalently frequency domain amplitude and phase) is not critical, it's the time domain envelope that counts.
+\item Lets separate the problem of quantisation from energy distribution.  Use a low dimension, unquantised $K=20$ or MFCC vector as input, and focus on reasonable quality low pitched speech as the output.
+\item We are not tied to the current Codec 2 algorithm of converting magnitude spectra to phase spectra via a minimum phase Hilbert Transform.  We can generate phase spectra using other means.
+\item The cost function should be weighted against energy being confined to short time durations (clicks) in the synthesised speech.  This implies we need a function $X(\{A_m\},\{\theta_m\})$ that measures energy distribution.
+\item PAPR does not appear to be satisfactory (confirm/explore why).
+\item We would like formant bandwidth to be a function of $F_0$, as it matters for low pitched speakers (e.g. males) than females.  Having said that - females undersample the spectra which just one harmonic per formant so formant bandwidth is perhaps irrelevant to females.  We do want to preserve the power of the harmonic(s) in that formant (something the current ad-hoc post filter doesn't explicitly do).  A narrow bandwidth formant may work for both male and female speech.
+\item Smooth post filtering across frames is important, we don't want abrupt changes in formant energy or discontinuous phases.
+\item For UV speech mistakenly classified at V, we should also have energy distributed - we should never synthesise clicks.  UV speech tends to have broad, flat spectra with no sharp peaks, so if synthesised as V will have noticeable clicks.
+\item When formants are broadened, multiple harmonics of similar level are synthesised, creating a "two tone" time domain waveform envelope, rather than a damped exponential (bandpass figures).
+\item Idea: can we "fit" damped exponentials to spectra, like VQ-VAE fits Gaussians?
+\end{enumerate}
+
+Requirements for cost function:
+\begin{enumerate}
+\item Models energy distribution of real world speech, and way ear integrates energy.
+\item Good time domain distribution in each formant, this may not be obvious in non-preemph speech due to spectral tilt.
+\item Formant energy should be the same after processing.
+\item Formant energy should be smooth between frames.  Avoid amplitude modulation at the frame rate.
+\item Smooth transition between frames, don't break phase track.
+\item Deals with time varying number of harmonics, e.g. via interpolation of sparse functions
+\item Stretch goal: For UV speech mistakenly classifed as V, doesn't generate clicks.
+\item Low implemenation complexity in ML, to minimise chances of implemenation mistakes with current ML experience.
+\item Operate in the pre-emphasised domain to ensure the energy distribution of HF formants is treated equally with LF formants.  Removes spectral tilt.
+\end{enumerate}
+
+Candidates techniques:
+\begin{enumerate}
+\item Derive a loss function based on comparing 2nd order exponential $\alpha$.
+\item Match spectra, especially around formants, and use a HT min-phase to get phases.  $N_b$ filtering broadens peaks and chops off tops, several harmonics enter formant filter and $\alpha$ is reduced.
+\item Modify phases, not amplitude spectra.  Experiments show original phase and rate $K$ spectra sounds OK.  Ear is not that sensitive to frequency as long as energy distribution is OK.  Modifying spectra can lead to other artefacts as energy bounces around. OTOH, it might help intelligability.
+\item Use a CELP style weighting filter.  This will combine energy match of highest amplitude spectra, with some match of lower energy, and will ignore low energy HP/LP sections that have been filtered out.
+\item Ratio of minima/maxima of magnitude envelope, which can be used to obtain $\alpha$.  Someone must have worked out expressions for these?  Can we solve anlaytically?  Given Fourier series define by $\{A_m\}, \{\theta_m\},m=1..L$, can we obtain an expression for min/max or $\alpha$.
+\item Can we derive an expression for mag envelope as a function of phases?
+\end{enumerate}
+
+\section{Notes and Further Work}
+
+Notes:
+\begin{enumerate}
+\item Do we need an embedding layer for pitch?  Research embedding networks.
+\item Should we test with some contrived data?  Introduce expected non-linearity and see if network can train as a check.
+\item Just include voiced frames?  This seems like a good idea.  For UV frames pitch may not be meaningful, and may cause random noise. Set UV frames to a constant $F_0$ (like 0) so at least the network "knows".
+\item Make sure we use energy normalisation \cite{rowe2023_ratek_study} when resampling to rate $K$.
+\item Used mean removed vectors, just consider $200 < f < 3600$ Hz, for consistency with recent Codec 2 VQ work in \cite{rowe2023_ratek_study}.
+\item The $K=80$ are linear spaced, $K=20$ Mel spaced.
+\end{enumerate}
+
+Further work:
+\begin{enumerate}
+\item If fixed $K$ works, try to come up with a network that handles sparse vectors.
+\item Are MFCCs good choices for input features to neural vocoders? They are smoothed, linear transformations of the input speech.  Other latent spaces may be more suitable.
+\item A linear transformation (like a DCT or PCA) followed by VQ is a good idea - truncating DCT coeffs will reduce the dimension, making storage easier, and VQ will capture any non-linear dependencies.  Smaller dimension will help residual error problem in multistage VQ. Trade off between truncation and VQ distortion.
+\item Can we avoid gradient shift/tendancy towards Gaussians with multistage VQ?  Does mbest help?
+\item Scripts supporting this study need refactoring.
+\item It would be useful to look at LPCNet excitation and LPC filter spectra to see how males are handled, as that has a fairly coarse spectral represesntation.  So we would expect excitation for males to have notches either side of formants.
+\item Consider a model that represnts a 2D time-freq formant "blob".  This is what the ear detects - energy at a certain freq for a certain amount of time.  This works suggests time-freq distribution should be considered together, rather than a frame-frame breakdown.
+\end{enumerate}
 
 \bibliographystyle{plain}
 \bibliography{manifold_refs}

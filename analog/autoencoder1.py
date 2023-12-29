@@ -106,32 +106,46 @@ class NeuralNetwork2(nn.Module):
 
 # conv1d
 class NeuralNetwork3(nn.Module):
-    def __init__(self, input_dim, bottle_dim, seq, nf):
+    def __init__(self, input_dim, bottle_dim, seq, nf=128):
         super().__init__()
         self.input_dim = input_dim
         self.seq = seq
         self.nf = nf
-        self.c1 = nn.Conv1d(seq, nf, 3, padding='same')
-        self.l1 = nn.Linear(nf*input_dim,bottle_dim)
-        self.l2 = nn.Linear(bottle_dim, nf*seq)
-        self.c2 = nn.Conv1d(nf, seq, 3, padding='same')
+        self.c1 = nn.Conv1d(input_dim, nf, 3, padding='same')
+        self.c2 = nn.Conv1d(nf, bottle_dim, 3, padding='same')
+        self.c3 = nn.Conv1d(bottle_dim, nf, 3, padding='same')
+        self.c4 = nn.Conv1d(nf, input_dim, 3, padding='same')
     
     def forward(self, x):
-        #print(x.shape)
-        c1_out = F.relu(self.c1(x))
-        #print(c1_out.shape)
-        c1_outb = c1_out.reshape((-1,1,self.nf*self.input_dim));
-        #print(c1_outb.shape)
-        l1_out = F.relu(c1_outb)
-        #print(l1_out.shape)
-        l2_out = F.relu(l1_out).reshape((-1,self.nf,self.input_dim))
-        #print(l2_out.shape)
-        y = F.relu(self.c2(l2_out))
-        #print(y.shape)
-        #quit()
-        return y
 
-model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length,64).to(device)
+        # get reshape to (batch, features, timesteps) or in Torch terms (batch, channels, length))
+        #print(x.shape)
+        x = x.permute((0,2,1))
+        #print(x.shape)
+
+        # encoder
+        x = F.relu(self.c1(x))
+        x = F.max_pool1d(x,2)
+        #print(x.shape)
+        x = F.relu(self.c2(x))
+        x = F.max_pool1d(x,2)
+        #print(x.shape)
+
+        # decoder
+        x = F.interpolate(x,2)
+        x = F.relu(self.c3(x))
+        #print(x.shape)
+        x = F.interpolate(x,4)
+        #print(x.shape)
+        x = self.c4(x)
+        #print(x.shape)
+        x = x.permute((0,2,1))
+        #print(x.shape)
+        #quit()
+
+        return x
+
+model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
 print(model)
 
 # criterion to computes the loss between input and target

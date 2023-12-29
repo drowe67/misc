@@ -6,6 +6,7 @@ import torch
 from torch import nn
 import numpy as np
 import argparse
+import torch.nn.functional as F
 
 # loading datasets in .f32 files
 class f32Dataset(torch.utils.data.Dataset):
@@ -79,7 +80,7 @@ class NeuralNetwork1(nn.Module):
         y = self.linear_relu_stack(x)
         return y
 
-# take concatenated vectors
+# concatenated vectors
 class NeuralNetwork2(nn.Module):
     def __init__(self, input_dim, bottle_dim, seq):
         super().__init__()
@@ -103,7 +104,34 @@ class NeuralNetwork2(nn.Module):
         #print(y.shape,y1.shape)
         return y
 
-model = NeuralNetwork2(num_used_features, args.bottle_dim, sequence_length).to(device)
+# conv1d
+class NeuralNetwork3(nn.Module):
+    def __init__(self, input_dim, bottle_dim, seq, nf):
+        super().__init__()
+        self.input_dim = input_dim
+        self.seq = seq
+        self.nf = nf
+        self.c1 = nn.Conv1d(seq, nf, 3, padding='same')
+        self.l1 = nn.Linear(nf*input_dim,bottle_dim)
+        self.l2 = nn.Linear(bottle_dim, nf*seq)
+        self.c2 = nn.Conv1d(nf, seq, 3, padding='same')
+    
+    def forward(self, x):
+        #print(x.shape)
+        c1_out = F.relu(self.c1(x))
+        #print(c1_out.shape)
+        c1_outb = c1_out.reshape((-1,1,self.nf*self.input_dim));
+        #print(c1_outb.shape)
+        l1_out = F.relu(c1_outb)
+        #print(l1_out.shape)
+        l2_out = F.relu(l1_out).reshape((-1,self.nf,self.input_dim))
+        #print(l2_out.shape)
+        y = F.relu(self.c2(l2_out))
+        #print(y.shape)
+        #quit()
+        return y
+
+model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length,64).to(device)
 print(model)
 
 # criterion to computes the loss between input and target

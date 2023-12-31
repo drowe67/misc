@@ -14,21 +14,30 @@ class f32Dataset(torch.utils.data.Dataset):
                 feature_file,
                 sequence_length,
                 num_used_features=20,
-                num_features=22):
+                num_features=22,
+                overlap=True):
 
         self.sequence_length = sequence_length
- 
-        self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, num_features))
-        self.features = self.features[:, :num_used_features]
-        self.num_sequences = self.features.shape[0] - sequence_length + 1
+        self.overlap = overlap
 
+        # features are in dB 20log10(), remove 20 to reduce dynamic range but keep log response
+        self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, num_features))/20
+        self.features = self.features[:, :num_used_features]
+        if overlap:
+            self.num_sequences = self.features.shape[0] - sequence_length + 1
+        else:
+            self.num_sequences = self.features.shape[0] // sequence_length
+           
     def __len__(self):
         return self.num_sequences
 
     # overlapping sequences to make better use of training data
     def __getitem__(self, index):
-        #features = self.features[index * self.sequence_length: (index + 1) * self.sequence_length, :]
-        features = self.features[index: (index + self.sequence_length), :]
+        if self.overlap:
+            features = self.features[index: (index + self.sequence_length), :]
+        else:
+            print(index*self.sequence_length, (index+1)*(self.sequence_length))
+            features = self.features[index*self.sequence_length: (index+1)*(self.sequence_length), :]      
         return features
     
 parser = argparse.ArgumentParser()
@@ -37,6 +46,9 @@ parser.add_argument('--lr', type=float, default=5E-2, help='learning rate')
 parser.add_argument('--bottle_dim', type=int, default=10, help='bottleneck dim')
 parser.add_argument('--epochs', type=int, default=10, help='number of training epochs')
 parser.add_argument('--ncat', type=int, default=1, help='number of feature vectors to concatenate')
+parser.add_argument('--save_model', type=str, default="", help='filename of model to save')
+parser.add_argument('--inference', type=str, default="", help='Inference only with filename of saved model')
+parser.add_argument('--out_file', type=str, default="", help='path to output file [y[79]] in .f32 format')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -90,7 +102,7 @@ class NeuralNetwork2(nn.Module):
             nn.Linear(input_dim*seq, w1),
             nn.ReLU(),
             nn.Linear(w1, bottle_dim),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(bottle_dim, w1),
             nn.ReLU(),
             nn.Linear(w1, input_dim*seq)
@@ -102,6 +114,7 @@ class NeuralNetwork2(nn.Module):
         y1 = self.linear_relu_stack(x1)
         y = torch.reshape(y1,(-1,self.seq,self.input_dim))
         #print(y.shape,y1.shape)
+        #print(x)
         return y
 
 # conv1d
@@ -145,25 +158,86 @@ class NeuralNetwork3(nn.Module):
 
         return x
 
-model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
+# concatenated vectors, add some noise to the bottleneck
+class NeuralNetwork4(nn.Module):
+    def __init__(self, input_dim, bottle_dim, seq):
+        super().__init__()
+        self.input_dim = input_dim
+        self.seq = seq
+        self.bottle_dim = bottle_dim
+        self.l1 = nn.Linear(input_dim*seq, w1)
+        self.l2 = nn.Linear(w1, bottle_dim)
+        self.l3 = nn.Linear(bottle_dim,w1)
+        self.l4 = nn.Linear(w1, input_dim*seq)
+ 
+    def forward(self, x):
+        x = torch.reshape(x,(-1,1,self.input_dim*self.seq))
+        #print(x.shape,x1.shape)
+        x = F.relu(self.l1(x))
+        x = F.tanh(self.l2(x))
+        x = x + (0.01**0.5)*torch.randn(1,self.bottle_dim)
+        x = F.relu(self.l3(x))
+        x = self.l4(x)
+        x = torch.reshape(x,(-1,self.seq,self.input_dim))
+        #print(y.shape,y1.shape)
+        return x
+
+model = NeuralNetwork2(num_used_features, args.bottle_dim, sequence_length).to(device)
 print(model)
 
-# criterion to computes the loss between input and target
-loss_fn = nn.MSELoss()
+if len(args.inference) == 0:
+    # criterion to computes the loss between input and target
+    loss_fn = nn.MSELoss()
 
-# optimizer that will be used to update weights and biases
-optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    # optimizer that will be used to update weights and biases
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
 
-for epoch in range(args.epochs):
-    sum_loss = 0.0
-    for batch, x in enumerate(dataloader):
-        x = x.to(device)
-        y = model(x)
-        loss = loss_fn(x, y)   
-        loss.backward() 
-        optimizer.step()
-        optimizer.zero_grad()
-        sum_loss += loss.item()
-    print(f'Epochs:{epoch + 1:5d} | ' \
-          f'Batches per epoch: {batch + 1:3d} | ' \
-          f'Loss: {sum_loss / (batch + 1):.10f}')
+    for epoch in range(args.epochs):
+        sum_loss = 0.0
+        for batch, x in enumerate(dataloader):
+            x = x.to(device)
+            y = model(x)
+            loss = loss_fn(x, y)   
+            loss.backward() 
+            optimizer.step()
+            optimizer.zero_grad()
+            sum_loss += loss.item()
+    
+        sum_loss_dB2 = sum_loss * 400
+        print(f'Epochs:{epoch + 1:5d} | ' \
+            f'Batches per epoch: {batch + 1:3d} | ' \
+            f'Loss: {sum_loss_dB2 / (batch + 1):5.2f} dB^2')
+
+    if len(args.save_model):
+        print(f"Saving model to: {args.save_model}")
+        torch.save(model.state_dict(), args.save_model)
+
+# load a model file, run test data through it 
+if len(args.inference):
+    print(f"Loading model from: {args.inference}")
+    model.load_state_dict(torch.load(args.inference))
+    model.eval()
+    dataset_inference = f32Dataset(feature_file, sequence_length, overlap=False)
+    len_out = dataset_inference.__len__()
+    print(len_out)
+    b_hat_np = np.zeros([len_out,num_used_features*sequence_length],dtype=np.float32)
+    with torch.no_grad():
+        sum_Eq = 0
+        for i in range(len_out):
+            b = dataset_inference.__getitem__(i)
+            #b = b.reshape(1,sequence_length,num_used_features)
+            print(b.shape, b[:,:4])
+            b_hat = model(torch.from_numpy(b).to(device))
+            b_hat_cpu = b_hat[0,:].cpu().numpy()
+            print(b_hat_cpu.shape, b_hat_cpu[:,:4])
+            
+            sum_Eq = sum_Eq + 400*np.mean((b-b_hat_cpu)**2)
+            b_hat_np[i,] = 20*b_hat[0,].reshape((num_used_features*sequence_length))
+    print(f"Eq:{sum_Eq/len_out:5.2f}")
+
+    if len(args.out_file):
+        print(b_hat_np.shape)
+        b_hat_np = b_hat_np.reshape((-1))
+        print(b_hat_np.shape)
+        b_hat_np.astype('float32').tofile(args.out_file)
+

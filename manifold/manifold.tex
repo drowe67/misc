@@ -26,6 +26,8 @@ pinstyle/.style = {pin edge={to-,thin,black}}
 
 \epigraph{Uncrumpling paper balls is what machine learning is all about: finding neat representations for complex, highly folded data manifolds}{Francois Chollet \cite{chollet2018deep}}
 
+\section{Introduction}
+
 Speech coding can be defined as the art of representing speech using a small number of parameters that can be efficiently sent over a channel.
 
 Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $20log_{10}(A_m), m=1..L$ to a set of fixed length $K=20$ samples $B_k,k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phases are synthesised using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
@@ -38,9 +40,9 @@ Neural codecs have shown high quality speech can be synthesised using vectors of
 
 From an information theory perspective there is no reason to believe there is more information in speech from low pitch speakers than high pitched speakers. Therefore with an appropriate transformation we should be able to synthesise equivalent quality speech regardless of pitch.
 
-This document describes two experiments to determine if narrow bandwidth formants can be preserved for low pitch speakers using non-linear transformations, resulting in reasonable quality speech when synthesised using Codec 2 (without the use of a post filter).  
+This document describes two experiments to determine if narrow bandwidth formants can be preserved for low pitch speakers using non-linear transformations, resulting in reasonable quality speech when synthesised using Codec 2 (without the use of an ad-hoc post filter).  
 
-\section{Vector Quantisation}
+\subsection{Vector Quantisation}
 \label{sec:vq}
 
 Vector quantisers can take advantage of linear and non-linear dependencies to reduce bit rate \cite{makhoul1985vector}.  They can efficiently exploit information that is uncorrelated in a linear sense (no linear transformation exists), but is statistically dependant.
@@ -49,7 +51,7 @@ The 700C resampling to a fixed length $K<<L_{max}$ is a linear transformation ai
 
 In this experiment we will upsample the variable rate $L$ vectors to a fixed length $K=80$, then vector quantise.  In this way no information is lost from the source vectors.  The aim is to utilise the non-linear dependency matching properties of VQ to preserve high quality speech, while still maintaining a similar bit rate to $K=20$ quantisation.  We will ignore storage concerns for this experiment. 
 
-\section{Machine Learning}
+\subsection{Machine Learning}
 
 In this approach we will attempt to take a $K=20$ vector and resample it to $K=80$ using a small neural network.   We hope the network will discover any non-linear dependencies, and produce narrow bandwidth formants and (when synthesised using Codec 2) reasonable quality speech for low pitched speakers.  
 
@@ -57,7 +59,7 @@ We will include pitch as a feature (perhaps via an embedding network), arguing t
 
 We argue that essentially the same information (in the form of MFCCs) is used for high quality speech synthesis with neural vocoders, therefore these networks must be performing a similar non-linear mapping of coarsely sampled, smoothed spectral information to speech spectra that includes narrow bandwidth formants.  A counter argument is a simple neural network may not be capable of representing the non-linear function that maps between the two vectors.  However we are not trying to synthesise speech here - just the speech spectral envelope.  Other differences: the network proposed here outputs linear values using regression, more sophisticated neural vocoders employ sophisticated conditional probability models and output a PDF; this network considers just one frame, rather than utilising an autoregressive design that considers many past samples.
 
-\section{Evaluation Plan}
+\subsection{Evaluation Plan}
 
 Evaluation methods considered:
 \begin{enumerate}
@@ -73,7 +75,7 @@ For controls we could use:
 \begin{enumerate}
 \item Speech resampled through the $K=20$ "bottleneck" (without postfiltering).
 \item Speech VQed at $K=20$ and $K=80$. 
-\item Codec 2 3200 - this uses finely quantised LSPs that preserve formant shapes (and a post filter). 
+\item Codec 2 3200 - this uses finely quantised LSPs that preserve formant shapes (and an ad-hoc post filter). 
 \end{enumerate}
 
 \section{$K=80$ VQ Results}
@@ -82,7 +84,7 @@ $K=20$ and $K=80$ 2x12 bit (24 bit total VQs) were trained on 114,000 vectors us
 
 Figure \ref{fig:big_dog_f165_freq} is a plot of a single frame from the male sample.  The SD was significantly higher for $K=80$ than $K=20$, the reverse of the subjective results.  Note the narrow bandwidth of the formants - in this frame F1 is defined by a single harmonic around 10dB higher than adjacent harmonics.  While $K=80$ preserves the spectral detail well, the VQ is very noisy due to the difficulty with large dimension, multi-stage VQ. The largest errors (black) are around the formants - precisely the opposite of what we would like.
 
-Visual inspection of the male time domain synthesised waveforms and measurement of PAPR (Figure \ref{fig:big_dog_f165_time}) demonstrates the energy distribution issue. The process of dimension reduction and quantisation leads to spectral smoothing; narrow formants become wider.  A wider filter in the frequency domain leads to more concentration of energy in time (faster decay of the time domain envelope), which we believe is the source of the unpleasant buzzy artefact.  The human ear does not like clicks.
+Visual inspection of the male time domain synthesised waveforms (Figure \ref{fig:big_dog_f165_time}) demonstrates the energy distribution issue. The process of dimension reduction and quantisation leads to spectral smoothing; narrow formants become wider.  A wider filter in the frequency domain leads to more concentration of energy in time (faster decay of the time domain envelope), which we believe is the source of the unpleasant buzzy artefact.  The human ear does not like clicks.  The objective CPAPR measure does not rank the samples correctly, it should be lower when the time domain energy is spread more uniformly over time (e.g. lower for plots 1 and 3 that use the original amplitudes and phases).
 
 \begin{figure}
 \caption{Voiced frame 165 frequency domain from male speaker for $K=20$ and $K=80$, red is 24 bits/frame VQ. Objective VQ distortion is higher at $K=80$ however formants are sharper and formants better preserved.  F3 is poorly represented in both cases.  Note the formants F1-F3 are defined by single harmonics, indicating narrow bandwidth.}
@@ -94,7 +96,7 @@ Visual inspection of the male time domain synthesised waveforms and measurement 
 \end{figure}
 
 \begin{figure}
-\caption{Voiced frame 165 time domain synthesised speech from male speaker.  Plots 1 and 3 are the speech synthesised with original harmonic magnitudes and phases, presented as a control.  Plot 2 is speech synthesised from the $K=20$ model, plot 4 $K=80$. The difference in energy distribution over the pitch cycle is clear.  The objective PAPR measure ranks the samples correctly but appears only weakly related to energy distribution.}
+\caption{Voiced frame 165 time domain synthesised speech from male speaker.  Plots 1 and 3 are the speech synthesised with original harmonic magnitudes and phases, presented as a control.  Plot 2 is speech synthesised from the $K=20$ model, plot 4 $K=80$. The difference in energy distribution over the pitch cycle is clear.}
 \label{fig:big_dog_f165_time}
 \begin{center}
 \input big_dog_f165_k20_all.tex
@@ -130,8 +132,8 @@ L(\mathbf{y},\hat{\mathbf{y}}) &= \sum_{k=1}^{K=80}|(10^{Y_k}-10^{\hat{Y_k}})W(k
 where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectral peaks and emphasises spectral valleys, with $0<\gamma<1$ chosen by experiment ($\gamma =1$ is unweighted).  The loss function compares the spectrally weighted linear energy. This candidate has the following features:
 \begin{enumerate}
 \item Experience has shown us that if formant bandwidths are preserved, the $K=80$ spectrum can be used to generate speech with a good energy distribution using phase obtained by a minimum phase (Hilbert) transform.
-\item Operating in the magnitude domain with fixed $K=80$ avoids the problems around dealing with phase and time varying number of phases in the network and loss function.
-\item Features in the network $F()$ are in the $log_{10}()$ domain to reduce dynamic range. 
+\item Operating in the magnitude domain with fixed $K=80$ avoids the problems around dealing with phase and time varying number of parameters in the network and loss function.
+\item Features in the network $F()$ are unit energy and in the $log_{10}()$ domain to reduce dynamic range. 
 \item A loss function in the linear (rather than $log_{10}()$) domain will emphasise spectral match (and hence formant bandwidth preservation) in the high energy formants.
 \item Weighting means it will pay some attention to interformant regions and less to very low energy regions at low and high frequencies (due to input filtering of the source speech).
 \item Using pre-emphasised speech to extract $\{A_m\}$ will also help formant matching and energy distribution of higher frequency formants (assuming the input speech has flat filtering).
@@ -213,7 +215,7 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectral 
 \end{center}
 \end{figure}
 
-Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal processing. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the dimension $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  Pre-emphasis and de-emphasis is applied in the frequency domain. The ML network $F$ and loss function $L$ operates on normalised energy vectors as we are interested in matching spectral shape, not gain (see also manifold.py comments and implementation). It can be viewed as an autoencoder with the bottleneck being the smoothed dimension $K=20$ vector $\mathbf{b}$.
+Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal processing. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the dimension $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  Pre-emphasis and de-emphasis is applied in the frequency domain. The ML network $F$ and loss function $L$ operates on normalised energy vectors as we are interested in matching spectral shape, not gain (see also manifold.py comments and implementation). It can be viewed as an autoencoder with the bottleneck being the smoothed dimension $K=20$ vector $\mathbf{b}$.  Only the decoder side of the autoencoder is implemented with a nueral network - the encoding is performed using traditional, linear DSP.
 
 \subsection{ML Results}
 
@@ -234,9 +236,7 @@ Layer & Input Features & Output Features & Output Activation \\
 \caption{The function $F$ consists of three fully connected layers, the size and topology was arrived at by experiment. It has around 300,000 floating point weights.}
 \end{table}
 
-Figures \ref{fig:big_dog_f165_ml_freq} and \ref{fig:big_dog_f165_ml_time} show the ML system operating in the time and frequency domain.
-
-Table \ref{tab:ml_sd} presents an objective results for 4 samples outside of the training data.  Spectral distortion between $\mathbf{y}$ and $\hat{\mathbf{y}}$ is defined as:
+Figures \ref{fig:big_dog_f165_ml_freq} and \ref{fig:big_dog_f165_ml_time} show the ML system operating in the time and frequency domain. Table \ref{tab:ml_sd} presents an objective results for 4 samples outside of the training data.  Spectral distortion between $\mathbf{y}$ and $\hat{\mathbf{y}}$ is defined as:
 \begin{equation}
 E_q = \frac{1}{K}\sum_{k=0}^{K-1} |Y_k - \hat{Y}_k |^2
 \end{equation}
@@ -266,7 +266,7 @@ kristoff & M & 0.37 & 0.61  \\
 \end{table}
 
 \begin{figure}
-\caption{Voiced frame 165 frequency domain from male speaker for ML experiment. The neral network output $\hat{\mathbf{y}}$ has significantly narrower formants that the smoothed, dimension $K=20$ $\mathbf{b}$.}
+\caption{Voiced frame 165 frequency domain from male speaker for ML experiment. The neural network output $\hat{\mathbf{y}}$ has significantly narrower formants than the smoothed, dimension $K=20$ $\mathbf{b}$.}
 \label{fig:big_dog_f165_ml_freq}
 \begin{center}
 \input big_dog_f165_ml.tex
@@ -274,7 +274,7 @@ kristoff & M & 0.37 & 0.61  \\
 \end{figure}
 
 \begin{figure}
-\caption{Voiced frame 165 time domain synthesised speech from male speaker.  The upper plot is speech synthesised with original harmonic magnitudes and phases, presented as a control.  The lower plot is speech synthesised from the ML model, which actually has a lower peak/average ratio (CPAPR) indicating satisfactory energy distribution.}
+\caption{Voiced frame 165 time domain synthesised speech from male speaker.  The upper plot is speech synthesised with original harmonic magnitudes and phases, presented as a control.  The lower plot is speech synthesised from the ML model, and has a time domain energy distribution close to the original.}
 \label{fig:big_dog_f165_ml_time}
 \begin{center}
 \input big_dog_f165_ml_all.tex
@@ -283,7 +283,9 @@ kristoff & M & 0.37 & 0.61  \\
 
 \section{Conclusions}
 
-This work ties together modern neural vocoders and earlier sinusoidal vocoders, by showing how low pitched speech with a suitable energy distribution can be extracted from smoothed, low dimension feature vectors.  The ML experiment is trained as an autoencoder with the smoothed, low dimension vector $\mathbf{b}$ as the bottleneck. The output is a high resolution spectra, that is used to generate a suitable phase spectra via a Hilbert Transform. Inference has been demonstrated working outside of the training database. It was found that the inclusion of pitch feature wasn't significant, suggesting the formant bandwidths are encoded by the smoothed spectral information alone. By extending the autoencoder to include quantisation, this suggests a way forward for low complexity communications quality speech using small neural networks.
+This work ties together modern neural vocoders and earlier sinusoidal vocoders, by showing how low pitched speech with a suitable energy distribution can be extracted from smoothed, low dimension feature vectors.  The ML experiment can be considered an autoencoder with the smoothed, low dimension vector $\mathbf{b}$ as the bottleneck. The output is a high resolution spectral envelope, that is used to generate a suitable phase spectra via a Hilbert Transform. Inference has been demonstrated working outside of the training database. It was found that the inclusion of pitch feature wasn't significant, suggesting the formant bandwidths are encoded by the smoothed spectral information alone. Extending this framework to include quantisation may lead to low complexity communications quality speech coding using small neural networks and linear DSP.
+
+Further work:
 
 \begin{enumerate}
 \item The weighted loss function approach may also be useful for quantisation, e.g. a VQ search.  It may be possible to use smaller dimension bottlenecks than $K=20$.  
@@ -291,6 +293,7 @@ This work ties together modern neural vocoders and earlier sinusoidal vocoders, 
 \item It may be possible to use MFCC feature vectors as the input, to avoid complexity and occasional errors around pitch dependant $\{A_m\}$ estimation. However there may be some benefit to the deconvolution (separation of excitation spectra from spectral envelope) inherent in the ${A_m}$ extraction process.
 \item The weights of the network have not been studied, and are likely sparse, with significant weights clustered around frequency regions.  It is likely the network can be reduced in size to make implementation possible on a micro-controller.
 \item Other ML models are possible, for example a loss function that includes the time domain envelope, with time domain synthesis in the training loop.
+\item A better objective measure of energy distribution would be useful, Complex Peak Average Power Ratio (CPAPR) is not effective.  This should probably be comprised of several bandpass measures, to avoid F1 dominating.
 \end{enumerate}
 
 \appendix

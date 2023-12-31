@@ -7,6 +7,7 @@ from torch import nn
 import numpy as np
 import argparse
 import torch.nn.functional as F
+from matplotlib import pyplot as plt
 
 # loading datasets in .f32 files
 class f32Dataset(torch.utils.data.Dataset):
@@ -36,7 +37,6 @@ class f32Dataset(torch.utils.data.Dataset):
         if self.overlap:
             features = self.features[index: (index + self.sequence_length), :]
         else:
-            print(index*self.sequence_length, (index+1)*(self.sequence_length))
             features = self.features[index*self.sequence_length: (index+1)*(self.sequence_length), :]      
         return features
     
@@ -49,6 +49,8 @@ parser.add_argument('--ncat', type=int, default=1, help='number of feature vecto
 parser.add_argument('--save_model', type=str, default="", help='filename of model to save')
 parser.add_argument('--inference', type=str, default="", help='Inference only with filename of saved model')
 parser.add_argument('--out_file', type=str, default="", help='path to output file [y[79]] in .f32 format')
+parser.add_argument('--noplot', action='store_true', help='disable plots after training')
+parser.add_argument('--frame', type=int, default=165, help='frame # to start viewing')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -225,11 +227,8 @@ if len(args.inference):
         sum_Eq = 0
         for i in range(len_out):
             b = dataset_inference.__getitem__(i)
-            #b = b.reshape(1,sequence_length,num_used_features)
-            print(b.shape, b[:,:4])
             b_hat = model(torch.from_numpy(b).to(device))
             b_hat_cpu = b_hat[0,:].cpu().numpy()
-            print(b_hat_cpu.shape, b_hat_cpu[:,:4])
             
             sum_Eq = sum_Eq + 400*np.mean((b-b_hat_cpu)**2)
             b_hat_np[i,] = 20*b_hat[0,].reshape((num_used_features*sequence_length))
@@ -241,3 +240,62 @@ if len(args.inference):
         print(b_hat_np.shape)
         b_hat_np.astype('float32').tofile(args.out_file)
 
+# interactive frame-frame visualisation of running model on test data
+if args.noplot == False:
+
+    # we may have already loaded test data if in inference mode
+    if len(args.inference) == 0:
+        model.eval()
+        # num_test == 0 switches off energy and V filtering, so we get all frames in test data.
+        dataset_inference = f32Dataset(feature_file, sequence_length, overlap=False)
+
+    print("[click or n]-next [b]-back [j]-jump [w]-weighting [q]-quit")
+
+    b_f_kHz = np.array([0.1998, 0.2782, 0.3635, 0.4561, 0.5569, 0.6664, 0.7855, 0.9149, 1.0556, 1.2086, 1.3749, 1.5557,
+    1.7523, 1.9659, 2.1982, 2.4508, 2.7253, 3.0238, 3.3483, 3.7011])
+    Fs = 8000
+
+    # some interesting frames male1,male1,male2,female, use 'j' to jump to them
+    test_frames = np.array([61, 165, 4190, 5500])
+    test_frames_ind = 0
+
+    # called when we press a key on the plot
+    akey = ''
+    def on_press(event):
+        global akey
+        akey = event.key
+
+    fig, ax = plt.subplots(sequence_length, 1)
+    fig.canvas.mpl_connect('key_press_event', on_press)
+    ax_b = ax[0].twinx()
+
+    with torch.no_grad():
+        f = args.frame // sequence_length
+        loop = True
+        while loop:
+            b = dataset_inference.__getitem__(f)
+            b_hat = model(torch.from_numpy(b).to(device))
+            b_plot = 20*b
+            b_hat_plot = 20*b_hat[0,].cpu().numpy()
+            for j in range(sequence_length):
+                ax[j].cla()
+                ax[j].plot(b_f_kHz,b_plot[j,0:20])
+                t = f"f: {f+j}"
+                ax[j].set_title(t)
+                ax[j].plot(b_f_kHz,b_hat_plot[j,0:20],'r')
+                ax[j].axis([0, 4, 0, 70])
+ 
+            plt.show(block=False)
+            plt.pause(0.01)
+            button = plt.waitforbuttonpress(0)
+            if akey == 'b':
+                f -= 1
+            if akey == 'n' or button == False:
+                f += 1
+            if akey == 'j':
+                f = test_frames[test_frames_ind]
+                test_frames_ind += 1
+                test_frames_ind = np.mod(test_frames_ind,4)
+            if akey == 'q':
+                loop = False
+            akey = ''

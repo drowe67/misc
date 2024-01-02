@@ -30,7 +30,7 @@ pinstyle/.style = {pin edge={to-,thin,black}}
 
 Speech coding can be defined as the art of representing speech using a small number of parameters that can be efficiently sent over a channel.
 
-Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ harmonic magnitude samples $20log_{10}(A_m), m=1..L$ to a set of fixed length $K=20$ samples $B_k,k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phases are synthesised using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
+Codec 2 700C resamples the pitch dependent, time varying $L=F_s/(2F_0), L=20..80$ log harmonic magnitude samples $20log_{10}(A_m), m=1..L$ to a set of fixed length $K=20$, mel-spaced samples $B_k,k=1..K$.  These are then vector quantised $\hat{B_m}=Q(B_m)$.  Harmonic phases are synthesised using a minimum phase model. The recovered phase spectra and hence energy distribution across the pitch cycle is dependent on the magnitude spectra available at the receiver.
 
 There is some evidence that the distribution of energy over a pitch cycle is important for speech perception \cite{rowe2023_ratek_study}. To adequately represent male speech, the formant energy must be spread in time.  As Codec 2 synthesises phase using a minimum phase model - this implies narrow formant bandwidths must be maintained \footnote{Other ways of spreading time domain energy are possible, for example generating phases through heuristics, non-minimum phase models, or time domain compression \cite{rowe2023_ratek_study}}.  Narrow formant bandwidths lead to long decay times for filters ``ringing`` with formant energy. When low resolution spectral sampling is employed (e.g. smoothed vector quantised spectra or low bit rate LSP quantisation of LPC models), male speech becomes buzzy, muffled and less intelligible.  Speech with a short pitch period (e.g. female) has less time to decay between pitch cycles so is less sensitive to formant bandwidths, the short pitch period naturally leads to a more uniform distribution of energy over time.
 
@@ -49,7 +49,7 @@ Vector quantisers can take advantage of linear and non-linear dependencies to re
 
 The 700C resampling to a fixed length $K<<L_{max}$ is a linear transformation aimed at fixing the dimension of the data; reducing the distortion with multistage VQ where residuals tend towards independent Gaussians; and reducing VQ storage requirements.  However the resampling is a filtering/smoothing/aliasing operation, so some information is lost, for example narrow bandwidth formants cannot be recovered by a linear transformation.
 
-In this experiment we will upsample the variable rate $L$ vectors to a fixed length $K=80$, then vector quantise.  In this way no information is lost from the source vectors.  The aim is to utilise the non-linear dependency matching properties of VQ to preserve high quality speech, while still maintaining a similar bit rate to $K=20$ quantisation.  We will ignore storage concerns for this experiment. 
+In this experiment we will upsample the variable length $L$ vectors to a fixed length $K=80$, then vector quantise.  In this way no information is lost from the source vectors.  The aim is to utilise the non-linear dependency matching properties of VQ to preserve high quality speech, while still maintaining a similar bit rate to $K=20$ quantisation.  We will ignore storage concerns for this experiment. 
 
 \subsection{Machine Learning}
 
@@ -215,7 +215,9 @@ where $W(k)=10^{-Y_k \gamma}$ is a weighting filter that de-emphasises spectral 
 \end{center}
 \end{figure}
 
-Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal processing. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the dimension $L$ harmonic amplitudes $\mathbf{a}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  Pre-emphasis and de-emphasis is applied in the frequency domain. The ML network $F$ and loss function $L$ operates on normalised energy vectors as we are interested in matching spectral shape, not gain (see also manifold.py comments and implementation). It can be viewed as an autoencoder with the bottleneck being the smoothed dimension $K=20$ vector $\mathbf{b}$.  Only the decoder side of the autoencoder is implemented with a nueral network - the encoding is performed using traditional, linear DSP.
+Figure \ref{fig:ml_experiment} is a block diagram of the ML experiment signal processing. The steps up to the generation of $\mathbf{a}$ are part of the normal Codec 2 encoder. The loss function $L(\mathbf{y},\hat{\mathbf{y}})$ only used during training. The algorithm outputs the dimension $L$ harmonic amplitudes $\hat{\mathbf{a}}$ and phases $arg[H(e^{j\omega_0 m})]$ for sinusoidal synthesis \cite{rowe2023_codec2}.  Pre-emphasis and de-emphasis is applied in the frequency domain. The ML network $F$ and loss function $L$ operates on normalised energy vectors as we are interested in matching spectral shape, not gain (see also manifold.py comments and implementation).
+
+The ML system can be viewed as an auto-encoder with the bottleneck being the smoothed dimension $K=20$ vector $\mathbf{b}$.  Only the decoder side of the auto-encoder is implemented with a neural network - the encoding is performed using traditional, linear DSP. This suggests that the system will have a smooth, continuous "latent space".  It should not be sensitive to small changes as $\mathbf{b}$ (e.g. due to quantisation), and will be good at generative tasks, such as operation outside the training data.
 
 \subsection{ML Results}
 
@@ -289,11 +291,15 @@ Further work:
 
 \begin{enumerate}
 \item The weighted loss function approach may also be useful for quantisation, e.g. a VQ search.  It may be possible to use smaller dimension bottlenecks than $K=20$.  
-\item It may be possible to integrate the linear resampling steps with NN, however their complexity is low, and NNs are often inefficient when implementing well understood DSP operations.
+\item It may be possible to integrate the linear resampling (e.g. dim $L$ to dim $K=80$) steps with NN, however their complexity is low, and NNs are often inefficient when implementing well understood, linear DSP operations.  A smaller $K$ will reduce the size of the network, as long as no undersampling occurs.
 \item It may be possible to use MFCC feature vectors as the input, to avoid complexity and occasional errors around pitch dependant $\{A_m\}$ estimation. However there may be some benefit to the deconvolution (separation of excitation spectra from spectral envelope) inherent in the ${A_m}$ extraction process.
-\item The weights of the network have not been studied, and are likely sparse, with significant weights clustered around frequency regions.  It is likely the network can be reduced in size to make implementation possible on a micro-controller.
+\item The weights of the network have not been studied, and are likely sparse, with significant weights clustered around localised frequency regions.  It is likely the network can be reduced in size to make implementation possible on a micro-controller.
+\item Consider using one or two dimensional convolutional, rather than fully connected, layers in order to consider patches of features localised in time and space.
 \item Other ML models are possible, for example a loss function that includes the time domain envelope, with time domain synthesis in the training loop.
 \item A better objective measure of energy distribution would be useful, Complex Peak Average Power Ratio (CPAPR) is not effective.  This should probably be comprised of several bandpass measures, to avoid F1 dominating.
+\item Check that $F$ is indeed non-linear, by removing the activation functions.
+\item Explore why $F$ does not appear to be a function of $\omega_0$ as expected, and why it is a function of $\mathbf{b}$ alone. How is the formant bandwidth encoded in $\mathbf{b}$?  Spectrograms of male speech suggest formant bandwidths are much narrower than females, so perhaps despite smoothing this information is still present in $\mathbf{b}$.  Given our assumption that the information content of male and female speech is similar, this suggests further information reduction (reduced bit rate) is possible, and that the bandwidths can be learned, rather than transmitted.
+\item The use of mel-spaced log magnitude vectors such as $\mathbf{b}$ as a "latent" space is a common convention, used in Codec 2 700C and indeed many neural vocoders.  Given they are based on linear transformations it is unlikely to be the most compact representation.  We could use a ML system to map $\mathbf{y}$ to $\hat{\mathbf{y}}$ without the intermediate $\mathbf{b}$ step, perhaps with a VQ index in the bottleneck.
 \end{enumerate}
 
 \appendix

@@ -184,8 +184,10 @@ class NeuralNetwork4(nn.Module):
         #print(y.shape,y1.shape)
         return x
 
-model = NeuralNetwork2(num_used_features, args.bottle_dim, sequence_length).to(device)
+model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
 print(model)
+num_weights = sum(p.numel() for p in model.parameters())
+print(f"weights: {num_weights} float32 memory: {num_weights*4}")
 
 if len(args.inference) == 0:
     # criterion to computes the loss between input and target
@@ -273,8 +275,9 @@ if args.noplot == False:
         loop = True
         while loop:
             b = dataset_inference.__getitem__(f)
+            b = b.reshape((1,sequence_length,num_used_features))
             b_hat = model(torch.from_numpy(b).to(device))
-            b_plot = 20*b
+            b_plot = 20*b[0,]
             b_hat_plot = 20*b_hat[0,].cpu().numpy()
             for j in range(sequence_length):
                 ax[j].cla()

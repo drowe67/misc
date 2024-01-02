@@ -13,6 +13,7 @@
 
 function ml_fbf(samname, f)
   more off;
+  newamp_700c;
 
   Fs = 8000; resampler = 'spline'; Lhigh = 80; F0high = (Fs/2)/Lhigh;
   K=20; Kst = 0; Ken = K-1;

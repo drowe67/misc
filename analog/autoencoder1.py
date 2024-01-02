@@ -267,7 +267,6 @@ if args.noplot == False:
 
     fig, ax = plt.subplots(sequence_length, 1)
     fig.canvas.mpl_connect('key_press_event', on_press)
-    ax_b = ax[0].twinx()
 
     with torch.no_grad():
         f = args.frame // sequence_length

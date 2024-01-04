@@ -51,6 +51,7 @@ parser.add_argument('--inference', type=str, default="", help='Inference only wi
 parser.add_argument('--out_file', type=str, default="", help='path to output file [y[79]] in .f32 format')
 parser.add_argument('--noplot', action='store_true', help='disable plots after training')
 parser.add_argument('--frame', type=int, default=165, help='frame # to start viewing')
+parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -184,7 +185,19 @@ class NeuralNetwork4(nn.Module):
         #print(y.shape,y1.shape)
         return x
 
-model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
+match args.nn:
+    case 1:
+        model = NeuralNetwork1(num_used_features, args.bottle_dim, sequence_length).to(device)
+    case 2:
+        model = NeuralNetwork2(num_used_features, args.bottle_dim, sequence_length).to(device)
+    case 3:
+        model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
+    case 4:
+        model = NeuralNetwork4(num_used_features, args.bottle_dim, sequence_length).to(device)
+    case _:
+        print("unknown network!")
+        quit()
+
 print(model)
 num_weights = sum(p.numel() for p in model.parameters())
 print(f"weights: {num_weights} float32 memory: {num_weights*4}")
@@ -229,6 +242,7 @@ if len(args.inference):
         sum_Eq = 0
         for i in range(len_out):
             b = dataset_inference.__getitem__(i)
+            b = b.reshape((1,sequence_length,num_used_features))
             b_hat = model(torch.from_numpy(b).to(device))
             b_hat_cpu = b_hat[0,:].cpu().numpy()
             
@@ -248,8 +262,8 @@ if args.noplot == False:
     # we may have already loaded test data if in inference mode
     if len(args.inference) == 0:
         model.eval()
-        # num_test == 0 switches off energy and V filtering, so we get all frames in test data.
         dataset_inference = f32Dataset(feature_file, sequence_length, overlap=False)
+        len_out = dataset_inference.__len__()
 
     print("[click or n]-next [b]-back [j]-jump [w]-weighting [q]-quit")
 
@@ -282,7 +296,7 @@ if args.noplot == False:
             for j in range(sequence_length):
                 ax[j].cla()
                 ax[j].plot(b_f_kHz,b_plot[j,0:20])
-                t = f"f: {f+j}"
+                t = f"f: {f*sequence_length+j}"
                 ax[j].set_title(t)
                 ax[j].plot(b_f_kHz,b_hat_plot[j,0:20],'r')
                 ax[j].axis([0, 4, 0, 70])
@@ -291,9 +305,11 @@ if args.noplot == False:
             plt.pause(0.01)
             button = plt.waitforbuttonpress(0)
             if akey == 'b':
-                f -= 1
+                if f:
+                    f -= 1
             if akey == 'n' or button == False:
-                f += 1
+                if f < len_out:
+                    f += 1
             if akey == 'j':
                 f = test_frames[test_frames_ind]
                 test_frames_ind += 1

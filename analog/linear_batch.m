@@ -6,11 +6,74 @@
 
 1;
 
+function mel = ftomel(fHz)
+  mel = floor(2595*log10(1+fHz/700)+0.5);
+endfunction
+
+function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
+  mel_start = ftomel(200); mel_end = ftomel(3700);
+  step = (mel_end-mel_start)/(K-1);
+  mel = mel_start:step:mel_end;
+  rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
+  rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
+endfunction
+
+function fHz = warp(k, K)
+  mel_start = ftomel(200); mel_end = ftomel(3700);
+  step = (mel_end-mel_start)/(K-1);
+  mel = mel_start + (k-1)*step;
+  fHz = 700*((10 .^ (mel/2595)) - 1);
+endfunction
+
+function k = warp_inv(fHz, K)
+  mel_start = ftomel(200); mel_end = ftomel(3700);
+  step = (mel_end-mel_start)/(K-1);
+  mel = ftomel(fHz) - step;
+  k = (ftomel(fHz) - mel_start)/step + 1;
+endfunction
+
+function h = generate_filter(m,f0,L,Nb)
+  g = zeros(1,L);
+  fb = m*f0;
+  b = warp_inv(fb,Nb);
+  st = round(warp(b-1,Nb)/f0); st = max(st,1);
+  en = round(warp(b+1,Nb)/f0); en = min(en,L);
+  %printf("fb: %f b: %f warp(b-1): %f warp(b+1): %f st: %d en: %d\n", fb, b, warp(b-1,Nb), warp(b+1,Nb), st, en);
+  for k=st:m-1
+    g(k) = (k-st)/(m-st);
+  end
+  g(m) = 1;
+  for k=m+1:en
+    g(k) = (en-k)/(en-m);
+  end
+  g_sum = sum(g);
+  h = g/g_sum;
+endfunction
+
+% normalises the energy in AmdB_rate2 to be the same as AmdB_rate1
+function AmdB_rate2_hat = norm_energy(AmdB_rate1, AmdB_rate2)
+  c = sum(10 .^ (AmdB_rate1/10))/sum(10 .^ (AmdB_rate2/10));
+  AmdB_rate2_hat = AmdB_rate2 + 10*log10(c);
+end
+
+% Synthesised phase0 model using Hilbert Transform
+function phase0 = synth_phase_from_mag(mag_sample_freqs_kHz, mag_dB, Fs, Wo, L)
+  Nfft=512;
+  sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;  % fft frequency grid (nonneg freqs)
+  Gdbfk = interp1([0 mag_sample_freqs_kHz 4], [0 mag_dB 0], sample_freqs_kHz, "spline", "extrap");
+
+  [phase_ht s] = mag_to_phase(Gdbfk, Nfft);
+  phase0 = zeros(1,L);
+  for m=1:L
+    b = round(m*Wo*Nfft/(2*pi));
+    phase0(m) = phase_ht(b);
+  end
+end
+
 % Returns a file of b vectors, used for input to PyTorch ML inference tool
 function linear_batch_ml_in(samname, varargin)
   more off;
 
-  newamp_700c;
   Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
   
   K=20; Nb = 20; B_out_fn = ""; Y_out_fn = "";
@@ -106,7 +169,6 @@ endfunction
 function linear_batch_ml_out(samname, varargin)
   more off;
 
-  newamp_700c;
   Fs = 8000; max_amp = 160; resampler='spline'; Lhigh=80; max_amp = 160;
   
   Y_in_fn = ""; A_out_fn = ""; H_out_fn = ""; 
@@ -166,7 +228,7 @@ function linear_batch_ml_out(samname, varargin)
     Am_(f,1:L) = 10.^(AmdB_/20);
     
     if length(H_out_fn)
-      H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB_(f,:), Fs, Wo, L, 0);
+      H(f,1:L) = synth_phase_from_mag(rate_Lhigh_sample_freqs_kHz, YdB_(f,:), Fs, Wo, L);
     end
 
     printf("%d/%d %3.0f%%\r", f,frames, (f/frames)*100);

@@ -146,6 +146,9 @@ function linear_batch_ml_in(samname, varargin)
   if length(Y_out_fn)
     fy = fopen(Y_out_fn,"wb");
     for f=1:frames
+      %just pass a dummy vector with the same energy as y_hat to check inference is not cheating
+      %e = sum(10.^(YdB(f,:)/10));
+      %Yfloat = [10*log10(e) zeros(1,Lhigh-2)];
       Yfloat = YdB(f,:);
       fwrite(fy, Yfloat, "float32");
     end

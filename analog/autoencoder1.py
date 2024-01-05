@@ -14,23 +14,28 @@ class f32Dataset(torch.utils.data.Dataset):
     def __init__(self,
                 feature_file,
                 sequence_length,
-                num_used_features=20,
                 num_features=22,
+                num_dB_features=20,
                 overlap=True):
 
         self.sequence_length = sequence_length
         self.overlap = overlap
 
-        # features are in dB 20log10(), remove 20 to reduce dynamic range but keep log response
-        self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, num_features))/20
-        self.features = self.features[:, :num_used_features]
+        self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, num_features))
+        # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
+        self.features [:,:num_dB_features]= self.features[:,:num_dB_features]/20
         if overlap:
             self.num_sequences = self.features.shape[0] - sequence_length + 1
         else:
             self.num_sequences = self.features.shape[0] // sequence_length
-           
+
+        self.num_sequences1 = self.features.shape[0]
+
     def __len__(self):
         return self.num_sequences
+
+    def __len1__(self):
+        return self.num_sequences1
 
     # overlapping sequences to make better use of training data
     def __getitem__(self, index):
@@ -48,13 +53,14 @@ parser.add_argument('--epochs', type=int, default=10, help='number of training e
 parser.add_argument('--ncat', type=int, default=1, help='number of feature vectors to concatenate')
 parser.add_argument('--save_model', type=str, default="", help='filename of model to save')
 parser.add_argument('--inference', type=str, default="", help='Inference only with filename of saved model')
-parser.add_argument('--out_file', type=str, default="", help='path to output file [y[79]] in .f32 format')
+parser.add_argument('--out_file', type=str, default="", help='path to output file [b_hat[22]] in .f32 format')
 parser.add_argument('--noplot', action='store_true', help='disable plots after training')
 parser.add_argument('--frame', type=int, default=165, help='frame # to start viewing')
 parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
 args = parser.parse_args()
 
 feature_file = args.features
+num_features = 22
 num_used_features = 20
 sequence_length = args.ncat
 batch_size = 32
@@ -212,6 +218,8 @@ if len(args.inference) == 0:
     for epoch in range(args.epochs):
         sum_loss = 0.0
         for batch, x in enumerate(dataloader):
+            # strip off Wo and v features
+            x = x[:,:,:num_used_features] 
             x = x.to(device)
             y = model(x)
             loss = loss_fn(x, y)   
@@ -236,19 +244,26 @@ if len(args.inference):
     model.eval()
     dataset_inference = f32Dataset(feature_file, sequence_length, overlap=False)
     len_out = dataset_inference.__len__()
-    print(len_out)
-    b_hat_np = np.zeros([len_out,num_used_features*sequence_length],dtype=np.float32)
+    len_out1 = dataset_inference.__len1__()
+    print(len_out1, len_out)
+    b_hat_np = np.ones((len_out1,num_features),dtype=np.float32)
+
     with torch.no_grad():
-        sum_Eq = 0
+        sum_sd = 0
         for i in range(len_out):
             b = dataset_inference.__getitem__(i)
-            b = b.reshape((1,sequence_length,num_used_features))
-            b_hat = model(torch.from_numpy(b).to(device))
+            b1 = b[:,:num_used_features].reshape((1,sequence_length,num_used_features))
+            b_hat = model(torch.from_numpy(b1).to(device))
             b_hat_cpu = b_hat[0,:].cpu().numpy()
             
-            sum_Eq = sum_Eq + 400*np.mean((b-b_hat_cpu)**2)
-            b_hat_np[i,] = 20*b_hat[0,].reshape((num_used_features*sequence_length))
-    print(f"Eq:{sum_Eq/len_out:5.2f}")
+            sum_sd = sum_sd + 400*np.mean((b1-b_hat_cpu)**2)
+            st = i*sequence_length
+            en = (i+1)*sequence_length
+            b_hat_np[st:en,:20] = 20*b_hat[0,]
+            # put Wo and v back into features
+            #print(st,en)
+            b_hat_np[st:en,num_used_features:num_features] = b[:,num_used_features:num_features]
+    print(f"Eq:{sum_sd/len_out:5.2f}")
 
     if len(args.out_file):
         print(b_hat_np.shape)
@@ -289,7 +304,7 @@ if args.noplot == False:
         loop = True
         while loop:
             b = dataset_inference.__getitem__(f)
-            b = b.reshape((1,sequence_length,num_used_features))
+            b = b[:,:20].reshape((1,sequence_length,num_used_features))
             b_hat = model(torch.from_numpy(b).to(device))
             b_plot = 20*b[0,]
             b_hat_plot = 20*b_hat[0,].cpu().numpy()

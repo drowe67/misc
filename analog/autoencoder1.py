@@ -23,12 +23,14 @@ class f32Dataset(torch.utils.data.Dataset):
         self.overlap = overlap
 
         self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, num_features))
+        self.edB_feature = np.zeros(self.features.shape[0],dtype=np.float32)
 
         if norm:
             for i in range(self.features.shape[0]):
                 e = np.sum(10**(self.features[i,:num_dB_features]/10))
                 edB_feature = 10*np.log10(e)
                 self.features[i,:num_dB_features] -= edB_feature
+                self.edB_feature[i] = edB_feature
 
         # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
         self.features [:,:num_dB_features]= self.features[:,:num_dB_features]/20
@@ -54,6 +56,9 @@ class f32Dataset(torch.utils.data.Dataset):
             features = self.features[index*self.sequence_length: (index+1)*(self.sequence_length), :]      
         return features
     
+    def get_edB_feature(self, index):
+        return self.edB_feature[index]
+
 parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file in .f32 format')
 parser.add_argument('--lr', type=float, default=5E-2, help='learning rate')
@@ -75,6 +80,7 @@ num_features = 22
 num_used_features = 20
 sequence_length = args.ncat
 batch_size = 32
+gamma = 0.5
 
 dataset = f32Dataset(feature_file, sequence_length, norm=args.norm)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
@@ -309,9 +315,23 @@ print(model)
 num_weights = sum(p.numel() for p in model.parameters())
 print(f"weights: {num_weights} float32 memory: {num_weights*4}")
 
+# PyTorch custom loss function that operates in the weighted linear domain
+def my_loss(y_hat, y):
+    ten = 10*torch.ones(y.shape)
+    ten = ten.to(device)
+    y_lin = torch.pow(ten,y)
+    y_hat_lin = torch.pow(ten,y_hat)
+    w = -(1-gamma)*y
+    w = torch.clamp(w,max=30)
+    w_lin = torch.pow(ten,w)
+    weighted_error = (y_hat_lin - y_lin)*w_lin
+    loss = torch.mean(weighted_error**2)
+    return loss
+
+
 if len(args.inference) == 0:
     # criterion to computes the loss between input and target
-    loss_fn = nn.MSELoss()
+    loss_fn = my_loss
 
     # optimizer that will be used to update weights and biases
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
@@ -332,7 +352,7 @@ if len(args.inference) == 0:
         sum_loss_dB2 = sum_loss * 400
         print(f'Epochs:{epoch + 1:5d} | ' \
             f'Batches per epoch: {batch + 1:3d} | ' \
-            f'Loss: {sum_loss_dB2 / (batch + 1):5.2f} dB^2')
+            f'Loss: {sum_loss_dB2 / (batch + 1):5.2f}')
 
     if len(args.save_model):
         print(f"Saving model to: {args.save_model}")
@@ -414,11 +434,12 @@ if args.noplot == False:
             b_hat_plot = 20*b_hat[0,].cpu().numpy()
             for j in range(sequence_length):
                 ax[j].cla()
-                ax[j].plot(b_f_kHz,b_plot[j,0:20])
+                ax[j].plot(b_f_kHz,dataset_inference.get_edB_feature(f*sequence_length+j)+b_plot[j,0:20])
                 t = f"f: {f*sequence_length+j}"
                 ax[j].set_title(t)
-                ax[j].plot(b_f_kHz,b_hat_plot[j,0:20],'r')
-                #ax[j].axis([0, 4, 0, 70])
+                #print(dataset_inference.get_edB_feature(f+j))
+                ax[j].plot(b_f_kHz,dataset_inference.get_edB_feature(f*sequence_length+j)+b_hat_plot[j,0:20],'r')
+                ax[j].axis([0, 4, 0, 70])
  
             plt.show(block=False)
             plt.pause(0.01)

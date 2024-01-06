@@ -8,7 +8,10 @@ import numpy as np
 import argparse
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
+# vector-quantize-pytorch library
 from vector_quantize_pytorch import FSQ, VectorQuantize
+# another VQ-VAE
+from vqvae import VectorQuantizer
 
 # loading datasets in .f32 files
 class f32Dataset(torch.utils.data.Dataset):
@@ -31,9 +34,14 @@ class f32Dataset(torch.utils.data.Dataset):
                 edB_feature = 10*np.log10(e)
                 self.features[i,:num_dB_features] -= edB_feature
                 self.edB_feature[i] = edB_feature
-
+           
         # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
-        self.features [:,:num_dB_features]= self.features[:,:num_dB_features]/20
+        self.features[:,:num_dB_features]= self.features[:,:num_dB_features]/20
+        self.amean = np.mean(self.features,axis=0)
+        print(self.amean)
+        print(self.amean.shape, self.features.shape)
+        self.features -= self.amean
+ 
         if overlap:
             self.num_sequences = self.features.shape[0] - sequence_length + 1
         else:
@@ -59,6 +67,9 @@ class f32Dataset(torch.utils.data.Dataset):
     def get_edB_feature(self, index):
         return self.edB_feature[index]
 
+    def get_amean(self):
+        return self.amean
+
 parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file in .f32 format')
 parser.add_argument('--lr', type=float, default=5E-2, help='learning rate')
@@ -81,6 +92,7 @@ num_used_features = 20
 sequence_length = args.ncat
 batch_size = 32
 gamma = 0.5
+num_embeddings = 512
 
 dataset = f32Dataset(feature_file, sequence_length, norm=args.norm)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
@@ -258,41 +270,71 @@ class NeuralNetwork5(nn.Module):
 # Toy VQVAE example, one VQ step per sequence, TODO: need more complex loss function
 w6=512
 class NeuralNetwork6(nn.Module):
-    def __init__(self, input_dim, bottle_dim, seq):
+    def __init__(self, input_dim, bottle_dim, seq, nvq):
         super().__init__()
         self.input_dim = input_dim
         self.seq = seq
         self.bottle_dim = bottle_dim
+        self.nvq = nvq
+
         self.l1 = nn.Linear(input_dim*seq, w5)
-        self.l1a = nn.Linear(w5,w5)
-        self.l2 = nn.Linear(w5, bottle_dim*seq)
+        #self.l1a = nn.Linear(w5,w5)
+        self.l2 = nn.Linear(w5, bottle_dim*nvq)
         self.vq = VectorQuantize(
             dim = bottle_dim,
             codebook_size = 512,     # codebook size
             decay = 0.8,             # the exponential moving average decay, lower means the dictionary will change faster
             commitment_weight = 1.   # the weight on the commitment loss
         )
-        self.l3 = nn.Linear(bottle_dim*seq,w5)
-        self.l3a = nn.Linear(w5,w5)
+        self.l3 = nn.Linear(bottle_dim*nvq,w5)
+        #self.l3a = nn.Linear(w5,w5)
         self.l4 = nn.Linear(w5, input_dim*seq)
  
     def forward(self, x):
         x = torch.reshape(x,(-1,1,self.input_dim*self.seq))
         #print(x.shape)
         x = F.relu(self.l1(x))
-        x = F.relu(self.l1a(x))
+        #x = F.relu(self.l1a(x))
         x = F.relu(self.l2(x))
-        x = x.reshape(x.shape[0],self.seq,self.bottle_dim)
+        x = x.reshape(x.shape[0],self.nvq,self.bottle_dim)
         #print(x.shape)
         xhat, indices, commit_loss = self.vq(x)
         #print(xhat.shape)
         #quit()
-        x = F.relu(self.l3(xhat.reshape((xhat.shape[0],self.seq*self.bottle_dim))))
-        x = F.relu(self.l3a(x))
+        x = F.relu(self.l3(xhat.reshape((xhat.shape[0],self.nvq*self.bottle_dim))))
+        #x = F.relu(self.l3a(x))
         x = self.l4(x)
         x = torch.reshape(x,(-1,self.seq,self.input_dim))
         #print(y.shape,y1.shape)
-        return x
+        return x, commit_loss
+
+# Another VQVAE example, lets juts try a straight VQ
+class NeuralNetwork7(nn.Module):
+    def __init__(self, input_dim, bottle_dim, seq, nvq):
+        super().__init__()
+        self.input_dim = input_dim
+        self.seq = seq
+        self.bottle_dim = bottle_dim
+        self.nvq = nvq
+
+        # hopefully this layer adapts via committ loss to put x in range of VQ
+        self.lin = nn.Linear(input_dim, input_dim)       
+        self.vq = VectorQuantizer(input_dim, num_embeddings)
+        # Torch chokes if we don't have a trainable layer, this will just to an arbitrary rotation
+  
+    def forward(self, x):
+        x = x.reshape(x.shape[0],self.input_dim)
+        
+        (x, dictionary_loss, commitment_loss, encoding_indices) = self.vq(x)
+        x = x.reshape(x.shape[0],1,self.input_dim)
+        x = self.lin(x)
+        # don't think we need to return commitment loss if no trainable input layer
+        return {
+            "y": x,
+            "encoding_indices": encoding_indices,
+            "commitment_loss": commitment_loss,
+        }
+
 
 match args.nn:
     case 1:
@@ -306,7 +348,9 @@ match args.nn:
     case 5:
         model = NeuralNetwork5(num_used_features, args.bottle_dim, sequence_length, args.nvq).to(device)
     case 6:
-        model = NeuralNetwork6(num_used_features, args.bottle_dim, sequence_length).to(device)
+        model = NeuralNetwork6(num_used_features, args.bottle_dim, sequence_length, args.nvq).to(device)
+    case 7:
+        model = NeuralNetwork7(num_used_features, args.bottle_dim, sequence_length, args.nvq).to(device)
     case _:
         print("unknown network!")
         quit()
@@ -331,28 +375,39 @@ def my_loss(y_hat, y):
 
 if len(args.inference) == 0:
     # criterion to computes the loss between input and target
-    loss_fn = my_loss
+    #loss_fn =  my_loss
+    loss_fn =  nn.MSELoss()
 
     # optimizer that will be used to update weights and biases
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
 
     for epoch in range(args.epochs):
         sum_loss = 0.0
+        sum_loss_total = 0.0
+        indices_map = np.zeros(num_embeddings)
         for batch, x in enumerate(dataloader):
             # strip off Wo and v features
             x = x[:,:,:num_used_features] 
             x = x.to(device)
             y = model(x)
-            loss = loss_fn(x, y)   
+            indices = y["encoding_indices"].cpu().numpy()
+            indices_map[indices] = 1
+            loss = loss_fn(x, y["y"]) + 0.25*y["commitment_loss"]
             loss.backward() 
             optimizer.step()
             optimizer.zero_grad()
-            sum_loss += loss.item()
+            #print(loss, loss.item())
+            sum_loss_total += loss.item()
+            sum_loss += loss_fn(x, y["y"])
     
+        sum_loss_total_dB2 = sum_loss_total * 400
         sum_loss_dB2 = sum_loss * 400
+        vq_util = np.mean(indices_map)
         print(f'Epochs:{epoch + 1:5d} | ' \
             f'Batches per epoch: {batch + 1:3d} | ' \
-            f'Loss: {sum_loss_dB2 / (batch + 1):5.2f}')
+            f'Loss: {sum_loss_dB2 / (batch + 1):5.2f} ' \
+            f'Loss Total: {sum_loss_total_dB2 / (batch + 1):5.2f} ' \
+             f'VQ util: {vq_util:3.2f}')
 
     if len(args.save_model):
         print(f"Saving model to: {args.save_model}")
@@ -426,19 +481,21 @@ if args.noplot == False:
     with torch.no_grad():
         f = args.frame // sequence_length
         loop = True
+        amean = 20*dataset_inference.get_amean()[:num_used_features]
         while loop:
             b = dataset_inference.__getitem__(f)
             b = b[:,:20].reshape((1,sequence_length,num_used_features))
             b_hat = model(torch.from_numpy(b).to(device))
             b_plot = 20*b[0,]
-            b_hat_plot = 20*b_hat[0,].cpu().numpy()
+            b_hat_plot = 20*b_hat["y"][0,].cpu().numpy()
             for j in range(sequence_length):
                 ax[j].cla()
-                ax[j].plot(b_f_kHz,dataset_inference.get_edB_feature(f*sequence_length+j)+b_plot[j,0:20])
+                edB = dataset_inference.get_edB_feature(f*sequence_length+j) + amean
+                ax[j].plot(b_f_kHz,edB+b_plot[j,0:20])
                 t = f"f: {f*sequence_length+j}"
                 ax[j].set_title(t)
                 #print(dataset_inference.get_edB_feature(f+j))
-                ax[j].plot(b_f_kHz,dataset_inference.get_edB_feature(f*sequence_length+j)+b_hat_plot[j,0:20],'r')
+                ax[j].plot(b_f_kHz,edB+b_hat_plot[j,0:20],'r')
                 ax[j].axis([0, 4, 0, 70])
  
             plt.show(block=False)

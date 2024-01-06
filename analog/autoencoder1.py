@@ -8,6 +8,7 @@ import numpy as np
 import argparse
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
+from vector_quantize_pytorch import FSQ, VectorQuantize
 
 # loading datasets in .f32 files
 class f32Dataset(torch.utils.data.Dataset):
@@ -16,12 +17,19 @@ class f32Dataset(torch.utils.data.Dataset):
                 sequence_length,
                 num_features=22,
                 num_dB_features=20,
-                overlap=True):
+                overlap=True, norm=False):
 
         self.sequence_length = sequence_length
         self.overlap = overlap
 
         self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, num_features))
+
+        if norm:
+            for i in range(self.features.shape[0]):
+                e = np.sum(10**(self.features[i,:num_dB_features]/10))
+                edB_feature = 10*np.log10(e)
+                self.features[i,:num_dB_features] -= edB_feature
+
         # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
         self.features [:,:num_dB_features]= self.features[:,:num_dB_features]/20
         if overlap:
@@ -31,6 +39,7 @@ class f32Dataset(torch.utils.data.Dataset):
 
         self.num_sequences1 = self.features.shape[0]
 
+ 
     def __len__(self):
         return self.num_sequences
 
@@ -57,6 +66,8 @@ parser.add_argument('--out_file', type=str, default="", help='path to output fil
 parser.add_argument('--noplot', action='store_true', help='disable plots after training')
 parser.add_argument('--frame', type=int, default=165, help='frame # to start viewing')
 parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
+parser.add_argument('--norm', action='store_true', help='normalise energy')
+parser.add_argument('--nvq', type=int, default=1, help='number of vector quantisers')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -65,7 +76,7 @@ num_used_features = 20
 sequence_length = args.ncat
 batch_size = 32
 
-dataset = f32Dataset(feature_file, sequence_length)
+dataset = f32Dataset(feature_file, sequence_length, norm=args.norm)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
 for f in dataloader:
@@ -191,6 +202,92 @@ class NeuralNetwork4(nn.Module):
         #print(y.shape,y1.shape)
         return x
 
+# Toy FSQ example, one VQ step per sequence, we would expect efficiency to increase
+# with sequence as receptive field is larger
+w5=512
+class NeuralNetwork5(nn.Module):
+    def __init__(self, input_dim, bottle_dim, seq, nvq, nlevels=8):
+        super().__init__()
+        self.input_dim = input_dim
+        self.seq = seq
+        self.bottle_dim = bottle_dim
+        self.nvq = nvq
+
+        self.l1 = nn.Linear(input_dim*seq, w5)
+        #self.l1a = nn.Linear(w5,w5)
+        #self.l1b = nn.Linear(w5,w5)
+        #self.l1c = nn.Linear(w5,w5)
+        self.l2 = nn.Linear(w5, bottle_dim*nvq)
+        levels = nlevels*np.ones(bottle_dim)
+        print(levels.tolist(), nlevels**bottle_dim, np.log2(nlevels**bottle_dim))
+        self.quantizer = FSQ(levels.tolist())
+        self.l3 = nn.Linear(bottle_dim*nvq,w5)
+        #self.l3a = nn.Linear(w5,w5)
+        #self.l3b = nn.Linear(w5,w5)
+        #self.l3c = nn.Linear(w5,w5)
+        self.l4 = nn.Linear(w5, input_dim*seq)
+ 
+    def forward(self, x):
+        x = torch.reshape(x,(-1,1,self.input_dim*self.seq))
+        #print(x.shape)
+        x = F.relu(self.l1(x))
+        #x = F.relu(self.l1a(x))
+        #x = F.relu(self.l1b(x))
+        #x = F.relu(self.l1c(x))
+        x = F.tanh(self.l2(x))
+        x = x.reshape(x.shape[0],self.nvq,self.bottle_dim)
+        #print(x.shape)
+        xhat, indices = self.quantizer(x)
+        #print(xhat.shape)
+        #quit()
+        x = F.relu(self.l3(xhat.reshape((xhat.shape[0],self.nvq*self.bottle_dim))))
+        #x = F.relu(self.l3a(x))
+        #x = F.relu(self.l3b(x))
+        #x = F.relu(self.l3c(x))
+        x = self.l4(x)
+        x = torch.reshape(x,(-1,self.seq,self.input_dim))
+        #print(y.shape,y1.shape)
+        return x
+
+# Toy VQVAE example, one VQ step per sequence, TODO: need more complex loss function
+w6=512
+class NeuralNetwork6(nn.Module):
+    def __init__(self, input_dim, bottle_dim, seq):
+        super().__init__()
+        self.input_dim = input_dim
+        self.seq = seq
+        self.bottle_dim = bottle_dim
+        self.l1 = nn.Linear(input_dim*seq, w5)
+        self.l1a = nn.Linear(w5,w5)
+        self.l2 = nn.Linear(w5, bottle_dim*seq)
+        self.vq = VectorQuantize(
+            dim = bottle_dim,
+            codebook_size = 512,     # codebook size
+            decay = 0.8,             # the exponential moving average decay, lower means the dictionary will change faster
+            commitment_weight = 1.   # the weight on the commitment loss
+        )
+        self.l3 = nn.Linear(bottle_dim*seq,w5)
+        self.l3a = nn.Linear(w5,w5)
+        self.l4 = nn.Linear(w5, input_dim*seq)
+ 
+    def forward(self, x):
+        x = torch.reshape(x,(-1,1,self.input_dim*self.seq))
+        #print(x.shape)
+        x = F.relu(self.l1(x))
+        x = F.relu(self.l1a(x))
+        x = F.relu(self.l2(x))
+        x = x.reshape(x.shape[0],self.seq,self.bottle_dim)
+        #print(x.shape)
+        xhat, indices, commit_loss = self.vq(x)
+        #print(xhat.shape)
+        #quit()
+        x = F.relu(self.l3(xhat.reshape((xhat.shape[0],self.seq*self.bottle_dim))))
+        x = F.relu(self.l3a(x))
+        x = self.l4(x)
+        x = torch.reshape(x,(-1,self.seq,self.input_dim))
+        #print(y.shape,y1.shape)
+        return x
+
 match args.nn:
     case 1:
         model = NeuralNetwork1(num_used_features, args.bottle_dim, sequence_length).to(device)
@@ -200,6 +297,10 @@ match args.nn:
         model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
     case 4:
         model = NeuralNetwork4(num_used_features, args.bottle_dim, sequence_length).to(device)
+    case 5:
+        model = NeuralNetwork5(num_used_features, args.bottle_dim, sequence_length, args.nvq).to(device)
+    case 6:
+        model = NeuralNetwork6(num_used_features, args.bottle_dim, sequence_length).to(device)
     case _:
         print("unknown network!")
         quit()
@@ -277,7 +378,7 @@ if args.noplot == False:
     # we may have already loaded test data if in inference mode
     if len(args.inference) == 0:
         model.eval()
-        dataset_inference = f32Dataset(feature_file, sequence_length, overlap=False)
+        dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, overlap=False)
         len_out = dataset_inference.__len__()
 
     print("[click or n]-next [b]-back [j]-jump [w]-weighting [q]-quit")
@@ -297,6 +398,9 @@ if args.noplot == False:
         akey = event.key
 
     fig, ax = plt.subplots(sequence_length, 1)
+    if sequence_length == 1:
+        ax = np.array([ax])
+    print(ax.shape)
     fig.canvas.mpl_connect('key_press_event', on_press)
 
     with torch.no_grad():
@@ -314,7 +418,7 @@ if args.noplot == False:
                 t = f"f: {f*sequence_length+j}"
                 ax[j].set_title(t)
                 ax[j].plot(b_f_kHz,b_hat_plot[j,0:20],'r')
-                ax[j].axis([0, 4, 0, 70])
+                #ax[j].axis([0, 4, 0, 70])
  
             plt.show(block=False)
             plt.pause(0.01)

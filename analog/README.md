@@ -23,3 +23,9 @@ vocoders.
    ```
    python3 autoencoder1.py ../manifold/big_dog_b.f32 --nn 2 --bottle_dim 20 --ncat 2 --inference nn2_cat2.pt
    ```
+
+1. Install [vector-quantize-pytorch](https://github.com/lucidrains/vector-quantize-pytorch)
+   ```
+   pip install vector-quantize-pytorch
+   ```
+ 

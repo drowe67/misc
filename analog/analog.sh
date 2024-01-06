@@ -8,7 +8,7 @@ CODEC2_PATH=$HOME/codec2-dev
 PATH=$PATH:$CODEC2_PATH/build_linux/src:$CODEC2_PATH/build_linux/misc
 
 # bunch of options we can set via variables
-out_dir="${out_dir:-ratek_out}"
+out_dir="${out_dir:-wav}"
 extract_options="${extract_options:-}"
 options="${options:-}"
 Nb=20

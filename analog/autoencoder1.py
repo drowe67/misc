@@ -37,11 +37,12 @@ class f32Dataset(torch.utils.data.Dataset):
            
         # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
         self.features[:,:num_dB_features]= self.features[:,:num_dB_features]/20
-        self.amean = np.mean(self.features,axis=0)
-        print(self.amean)
+        #self.amean = np.mean(self.features,axis=0)
+        self.amean = np.zeros(num_features)
+        print(np.mean(self.features,axis=0))
+        print(np.std(self.features,axis=0))
         print(self.amean.shape, self.features.shape)
         self.features -= self.amean
- 
         if overlap:
             self.num_sequences = self.features.shape[0] - sequence_length + 1
         else:
@@ -308,7 +309,7 @@ class NeuralNetwork6(nn.Module):
         #print(y.shape,y1.shape)
         return x, commit_loss
 
-# Another VQVAE example, lets juts try a straight VQ
+# Another VQVAE example, lets just try a straight VQ
 class NeuralNetwork7(nn.Module):
     def __init__(self, input_dim, bottle_dim, seq, nvq):
         super().__init__()
@@ -317,15 +318,21 @@ class NeuralNetwork7(nn.Module):
         self.bottle_dim = bottle_dim
         self.nvq = nvq
 
-        # hopefully this layer adapts via committ loss to put x in range of VQ
+        # Torch chokes if we don't have a trainable layer
         self.lin = nn.Linear(input_dim, input_dim)       
-        self.vq = VectorQuantizer(input_dim, num_embeddings)
-        # Torch chokes if we don't have a trainable layer, this will just to an arbitrary rotation
+        self.vq1 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
+        self.vq2 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
+        self.vq3 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
   
     def forward(self, x):
         x = x.reshape(x.shape[0],self.input_dim)
         
-        (x, dictionary_loss, commitment_loss, encoding_indices) = self.vq(x)
+        (x_hat, dictionary_loss, commitment_loss, encoding_indices) = self.vq1(x)
+        x_res = x - x_hat
+        (x_res_hat, dictionary_loss, commitment_loss2, encoding_indices2) = self.vq2(x_res)
+        x_res2 = x_res - x_res_hat
+        (x_res2_hat, dictionary_loss, commitment_loss2, encoding_indices3) = self.vq3(x_res2)
+        x = x_hat + x_res_hat + x_res2_hat
         x = x.reshape(x.shape[0],1,self.input_dim)
         x = self.lin(x)
         # don't think we need to return commitment loss if no trainable input layer

@@ -320,24 +320,30 @@ class NeuralNetwork7(nn.Module):
 
         # Torch chokes if we don't have a trainable layer
         self.lin = nn.Linear(input_dim, input_dim)       
-        self.vq1 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
-        self.vq2 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
-        self.vq3 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
-  
+        #self.vq1 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
+        #self.vq2 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
+        #self.vq3 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
+        self.vq = nn.ModuleList([VectorQuantizer(input_dim, num_embeddings,decay=0.99) for i in range(nvq)])
+
     def forward(self, x):
         x = x.reshape(x.shape[0],self.input_dim)
         
-        (x_hat, dictionary_loss, commitment_loss, encoding_indices) = self.vq1(x)
-        x_res = x - x_hat
-        (x_res_hat, dictionary_loss, commitment_loss2, encoding_indices2) = self.vq2(x_res)
-        x_res2 = x_res - x_res_hat
-        (x_res2_hat, dictionary_loss, commitment_loss2, encoding_indices3) = self.vq3(x_res2)
-        x = x_hat + x_res_hat + x_res2_hat
-        x = x.reshape(x.shape[0],1,self.input_dim)
-        x = self.lin(x)
+        y = torch.zeros(x.shape)
+        for i in range(self.nvq):
+            (x_hat, dictionary_loss, commitment_loss, encoding_indices) = self.vq[i](x)
+            x -= x_hat            # VQ residual for next stage
+            y += x_hat
+
+        #(x_res_hat, dictionary_loss, commitment_loss2, encoding_indices2) = self.vq2(x_res)
+        #x_res2 = x_res - x_res_hat
+        #(x_res2_hat, dictionary_loss, commitment_loss2, encoding_indices3) = self.vq3(x_res2)
+        #x = x_hat + x_res_hat + x_res2_hat
+        
+        y = y.reshape(x.shape[0],1,self.input_dim)
+        y = self.lin(y)
         # don't think we need to return commitment loss if no trainable input layer
         return {
-            "y": x,
+            "y": y,
             "encoding_indices": encoding_indices,
             "commitment_loss": commitment_loss,
         }

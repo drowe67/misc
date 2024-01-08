@@ -29,3 +29,14 @@ vocoders.
    pip install vector-quantize-pytorch
    ```
  
+1. Dim reduction demo:
+   ```
+   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --lr 1E-1 --epochs 20 --bottle_dim 10 --ncat 1 --nn 2 --norm --wloss
+   ```
+
+1. Dim reduction with noise in the bottleneck, top simulate the effect of a quantiser, and encourage a well behaived latent distribution.
+   ```
+   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --lr 2E-1 --epochs 100 --bottle_dim 10 --ncat 1 --nn 4 --norm --wloss
+   ```
+   Noise is also added during inference, pressing the space bar allows you to see the effect of different noise samples.
+

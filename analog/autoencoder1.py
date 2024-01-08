@@ -36,7 +36,7 @@ class f32Dataset(torch.utils.data.Dataset):
                 self.edB_feature[i] = edB_feature
            
         # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
-        self.features[:,:num_dB_features]= self.features[:,:num_dB_features]/20
+        self.features[:,:num_dB_features] = self.features[:,:num_dB_features]/20
         #self.amean = np.mean(self.features,axis=0)
         self.amean = np.zeros(num_features)
         print(np.mean(self.features,axis=0))
@@ -85,6 +85,7 @@ parser.add_argument('--frame', type=int, default=165, help='frame # to start vie
 parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
 parser.add_argument('--norm', action='store_true', help='normalise energy')
 parser.add_argument('--nvq', type=int, default=1, help='number of vector quantisers')
+parser.add_argument('--wloss', action='store_true', help='use weighted linear loss function')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -214,7 +215,10 @@ class NeuralNetwork4(nn.Module):
         #print(x.shape,x1.shape)
         x = F.relu(self.l1(x))
         x = F.tanh(self.l2(x))
-        x = x + (0.01**0.5)*torch.randn(1,self.bottle_dim)
+        # Model uniform quantiser across -the interval -1 to 1
+        steps = 16
+        sd = 2/(steps*np.sqrt(12))
+        x = x + sd*torch.randn(1,self.bottle_dim)
         x = F.relu(self.l3(x))
         x = self.l4(x)
         x = torch.reshape(x,(-1,self.seq,self.input_dim))
@@ -320,10 +324,7 @@ class NeuralNetwork7(nn.Module):
 
         # Torch chokes if we don't have a trainable layer
         self.lin = nn.Linear(input_dim, input_dim)       
-        self.vq1 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
-        self.vq2 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
-        self.vq3 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
-        self.vq = nn.ModuleList([VectorQuantizer(input_dim, num_embeddings,decay=0.99) for i in range(nvq)])
+        self.vq = nn.ModuleList([VectorQuantizer(input_dim, num_embeddings) for i in range(nvq)])
 
     def forward(self, x):
         x = x.reshape(x.shape[0],self.input_dim)
@@ -335,27 +336,9 @@ class NeuralNetwork7(nn.Module):
             (x_hat, dictionary_loss, commitment_loss, encoding_indices) = self.vq[i](x)
             x = x - x_hat            # VQ residual for next stage (note we can't use x -= x_hat)
             y = y + x_hat            # VQ output is sum of all VQs
-            #print(encoding_indices.dtype)
-            #quit()
             commitment_loss_stage[i] = commitment_loss
             encoding_indices_stage[i,:] = encoding_indices[:,0]
-        #x = y
-        
-        """
-        (x_hat, dictionary_loss, commitment_loss, encoding_indices) = self.vq[0](x)
-        #x_res = x - x_hat
-        x = x - x_hat
-        #print(y.shape,x.shape,x_hat.shape)
-        #quit()
-        y += x_hat
-        (x_hat, dictionary_loss, commitment_loss2, encoding_indices2) = self.vq[1](x)
-        x = x - x_hat
-        y += x_hat
-        (x_hat, dictionary_loss, commitment_loss3, encoding_indices3) = self.vq[2](x)
-        #x = x_hat + x_res_hat + x_res2_hat
-        y += x_hat
-        """
-        #x = y
+ 
         y = y.reshape(y.shape[0],1,self.input_dim)
         y = self.lin(y)
 
@@ -406,8 +389,10 @@ def my_loss(y_hat, y):
 
 if len(args.inference) == 0:
     # criterion to computes the loss between input and target
-    #loss_fn =  my_loss
-    loss_fn =  nn.MSELoss()
+    if args.wloss:
+        loss_fn =  my_loss
+    else:
+        loss_fn =  nn.MSELoss()
 
     # optimizer that will be used to update weights and biases
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
@@ -421,24 +406,34 @@ if len(args.inference) == 0:
             x = x[:,:,:num_used_features] 
             x = x.to(device)
             y = model(x)
-            indices = y["encoding_indices"].cpu().numpy()
-            indices_map[indices] = 1
-            loss = loss_fn(x, y["y"]) + 0.25*y["commitment_loss"]
+            if args.nn == 7:
+                indices = y["encoding_indices"].cpu().numpy()
+                indices_map[indices] = 1
+                loss = loss_fn(x, y["y"]) + 0.25*y["commitment_loss"]
+            else:
+                loss = loss_fn(x, y)
+               
             loss.backward() 
             optimizer.step()
             optimizer.zero_grad()
-            #print(loss, loss.item())
             sum_loss_total += loss.item()
-            sum_loss += loss_fn(x, y["y"])
+            if args.nn == 7:
+                sum_loss += loss_fn(x, y["y"])
     
         sum_loss_total_dB2 = sum_loss_total * 400
-        sum_loss_dB2 = sum_loss * 400
-        vq_util = np.mean(indices_map)
-        print(f'Epochs:{epoch + 1:5d} | ' \
-            f'Batches per epoch: {batch + 1:3d} | ' \
-            f'Loss: {sum_loss_dB2 / (batch + 1):5.2f} ' \
-            f'Loss Total: {sum_loss_total_dB2 / (batch + 1):5.2f} ' \
-             f'VQ util: {vq_util:3.2f}')
+        if args.nn == 7:
+            sum_loss_dB2 = sum_loss * 400
+            vq_util = np.mean(indices_map)
+            print(f'Epochs:{epoch + 1:5d} | ' \
+                f'Batches per epoch: {batch + 1:3d} | ' \
+                f'Loss: {sum_loss_dB2 / (batch + 1):5.2f} ' \
+                f'Loss Total: {sum_loss_total_dB2 / (batch + 1):5.2f} ' \
+                f'VQ util: {vq_util:3.2f}')
+        else:
+            print(f'Epochs:{epoch + 1:5d} | ' \
+                f'Batches per epoch: {batch + 1:3d} | ' \
+                f'Loss: {sum_loss_total_dB2 / (batch + 1):5.2f}')
+            
 
     if len(args.save_model):
         print(f"Saving model to: {args.save_model}")
@@ -518,7 +513,10 @@ if args.noplot == False:
             b = b[:,:20].reshape((1,sequence_length,num_used_features))
             b_hat = model(torch.from_numpy(b).to(device))
             b_plot = 20*b[0,]
-            b_hat_plot = 20*b_hat["y"][0,].cpu().numpy()
+            if args.nn ==7:
+                b_hat_plot = 20*b_hat["y"][0,].cpu().numpy()
+            else:
+                b_hat_plot = 20*b_hat[0,].cpu().numpy()
             for j in range(sequence_length):
                 ax[j].cla()
                 edB = dataset_inference.get_edB_feature(f*sequence_length+j) + amean

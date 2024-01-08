@@ -42,7 +42,7 @@ class f32Dataset(torch.utils.data.Dataset):
         print(np.mean(self.features,axis=0))
         print(np.std(self.features,axis=0))
         print(self.amean.shape, self.features.shape)
-        self.features -= self.amean
+        #self.features -= self.amean
         if overlap:
             self.num_sequences = self.features.shape[0] - sequence_length + 1
         else:
@@ -320,32 +320,50 @@ class NeuralNetwork7(nn.Module):
 
         # Torch chokes if we don't have a trainable layer
         self.lin = nn.Linear(input_dim, input_dim)       
-        #self.vq1 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
-        #self.vq2 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
-        #self.vq3 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
+        self.vq1 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
+        self.vq2 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
+        self.vq3 = VectorQuantizer(input_dim, num_embeddings,decay=0.99)
         self.vq = nn.ModuleList([VectorQuantizer(input_dim, num_embeddings,decay=0.99) for i in range(nvq)])
 
     def forward(self, x):
         x = x.reshape(x.shape[0],self.input_dim)
         
         y = torch.zeros(x.shape)
+        commitment_loss_stage = torch.zeros(self.nvq)
+        encoding_indices_stage = torch.zeros(self.nvq,x.shape[0],dtype=torch.int64)
         for i in range(self.nvq):
             (x_hat, dictionary_loss, commitment_loss, encoding_indices) = self.vq[i](x)
-            x -= x_hat            # VQ residual for next stage
-            y += x_hat
-
-        #(x_res_hat, dictionary_loss, commitment_loss2, encoding_indices2) = self.vq2(x_res)
-        #x_res2 = x_res - x_res_hat
-        #(x_res2_hat, dictionary_loss, commitment_loss2, encoding_indices3) = self.vq3(x_res2)
-        #x = x_hat + x_res_hat + x_res2_hat
+            x = x - x_hat            # VQ residual for next stage (note we can't use x -= x_hat)
+            y = y + x_hat            # VQ output is sum of all VQs
+            #print(encoding_indices.dtype)
+            #quit()
+            commitment_loss_stage[i] = commitment_loss
+            encoding_indices_stage[i,:] = encoding_indices[:,0]
+        #x = y
         
-        y = y.reshape(x.shape[0],1,self.input_dim)
+        """
+        (x_hat, dictionary_loss, commitment_loss, encoding_indices) = self.vq[0](x)
+        #x_res = x - x_hat
+        x = x - x_hat
+        #print(y.shape,x.shape,x_hat.shape)
+        #quit()
+        y += x_hat
+        (x_hat, dictionary_loss, commitment_loss2, encoding_indices2) = self.vq[1](x)
+        x = x - x_hat
+        y += x_hat
+        (x_hat, dictionary_loss, commitment_loss3, encoding_indices3) = self.vq[2](x)
+        #x = x_hat + x_res_hat + x_res2_hat
+        y += x_hat
+        """
+        #x = y
+        y = y.reshape(y.shape[0],1,self.input_dim)
         y = self.lin(y)
+
         # don't think we need to return commitment loss if no trainable input layer
         return {
             "y": y,
-            "encoding_indices": encoding_indices,
-            "commitment_loss": commitment_loss,
+            "encoding_indices": encoding_indices_stage[0,:],
+            "commitment_loss": commitment_loss_stage[0],
         }
 
 

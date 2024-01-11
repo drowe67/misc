@@ -1,0 +1,95 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{tikz}
+\begin{document}
+
+\title{ML quantisation of Vocoder Features}
+\maketitle
+
+The goal is to achieve improved quantisation using ML techniques:
+\begin{enumerate}
+\item Lower bit rate for equivalent distortion.  
+\item Increased robustness to channel errors that traditional modulation and FEC?
+\end{enumerate}
+
+Expectations.  There is quite a bit of information in a mel spaced log spectral vector, and it will take a finite amount of bits to quantise it.  ML won't change this. Where ML can help is better transforms and time prediction over large windows.  For example finding non-linear dependencies and correlations and reducing the dimension of the bottleneck required to be quantised.  Better transforms and time series prediction than possible with linear techniques. Combination of spectral information with pitch and voicing features will save some bits if they are correlated with the spectral information.  A multistage VQ will work better with a small dimension, as the residual errors tend towards gaussian.
+
+However this will have it's limits for our use case where the quantisation window must be kept to around 100ms (including initial state information). ML isn't magic - it will take more information to quantise 8 x 10ms vectors than 1 x 10ms (but not 8 times as much).  One could start with a ML transform of 4 x 10ms vectors, quantise that as an initial state, then quantise the residual errors from each 10ms frame.
+
+Is running the VQ training loop (e.g. VQVAE) inside the ML system worth it?  Several practical problems, such as the rate the VQ adapts compared to the rest of the network, managing EWMA updates that attempt to zero out codebook entries, and possibly poorer perf than traditional k-means.  Traditional VQ works pretty well and can extract some non-linear dependencies. The VQ could be simulated in the training loop using small amounts of AWGN injection to ensure the latent space is well behaved. Then, the VQ can be designed on the training data in the bottleneck. In general, use traditional DSP/quantisation where possible, leave ML to what it does best.  Perhaps hybrid training, an epoch each.
+
+Where to these fit in:
+\begin{enumerate}
+\item Limit the amount of information through pre processing, e.g. compression, equalisation, dynamic range limiting.  This would reduce the information in the log spectral vectors.  Traditional DSP or ML? I feel this is where the biggest gains are.
+\item Training the VQ to minimise the weighted linear error (at $K=20$ or via $F$ at $K=80$).  Can this be performed using traditional VQ training?  Would we use a low dim vector for the VQ?
+\item Training a system that is robust to channel errors (or noise in an analog channel). How to get something close to MAP/or use LLRs and other info?  A latent vector that can handle a lot of "noise".
+\item Ensuring we get good energy distribution (formant bandwidths) under quantisation.  Preserving bandwidth more important that frequency - can we include this weighting in loss function.
+\end{enumerate}
+
+\begin{enumerate}
+\item Experiment 1: Goal is to demonstrate dimensionality reduction.  Build an autoencoder for 1 vector.  Try different architectures, e.g. FC and conv1D.  Determine bottleneck dimension for $1dB^2$ distortion.  Try MSE and weighted linear loss functions. Determine if we can get any dimensionality reduction, as this would make VQ much easier (assuming VQ latent space is well behaved).
+\item Experiment 1a: Goal is to demonstrate scalar linear quantisation $< 1dB^2$ at any bit rate, and ``shape" the latent space. Add noise to bottleneck to simulate uniform quantisation.
+\item Experiment 1b: Goal is to apply VQ to latent spaces. Visualise latent space somehow. Use a traditional VQ to quantise the bottleneck vectors, compare bit rate to 1a.
+\item Experiment 2: Build a VQVAE (VQ that trains in a ML network).  Compare distortion to kmeans for a range of VQ sizes.  Do they get the same performance?
+\item Experiment 3: Goal is to reduce bit rate by considering longer time windows.  Return to 1a (scalar linear quantisation) but attempt longer chunks of time (say 40 or 80 ms).
+\item Experiment 4: Embed pitch in the latent space being quantised, as well as log spectral information.
+\end{enumerate}
+
+\section{Experiment 1}
+
+A simple autoencoder network was designed consisting of 4 FC layers with a $tanh()$ non-linearity at the bottleneck.  The training material was dimension $k=20$ smoothed, unit energy, mel spaced log vectors $\mathbf{b}$.  Only one $\mathbf{b}$ vector was considered at a time (no time based transformations). A dimension $d=10$ bottleneck was sufficient to maintain less than $1 dB^2$ distortion, indicating a useful dimension reduction.  Good results (based on visual inspection) were also obtained using a weighted linear loss function.
+
+However it was unclear if the latent space was suitable for quantisation. To investigate this, a small amount of noise was added to simulate the effect of uniform quantisation over the $[-1,1]$ dynamic range of the $tanh$ function placed at the bottleneck.  This noise also encourages the network to converge on a latent space that behaves well in the presence of small quantisation errors.
+
+Consider a uniform quantiser with $s$ discrete levels applied to the interval $[a,b]$.  The reconstruction levels are given by:
+\begin{equation}
+r_i = a + \frac{b-a}{s}(i+0.5), \quad i=0,1,...,s-1
+\end{equation}
+It can be seen that each step is $\frac{b-a}{s}$ from the next.  The quantisation error will be uniformly distributed over the interval $[-\frac{(b-a)}{2s},+\frac{(b-a)}{2s}]$. For the 
+$tanh()$ function the interval $[a,b]=[-1,+1]$, and the quantisation error will be distributed over $[-\frac{1}{s}, + \frac{1}{s}]$.  Table \ref{tab:uniform quantiser} has some examples.
+
+The variance of the noise from a uniform distribution over the interval $[c,d]$ is given by:
+\begin{equation}
+\sigma^2 = \frac{(d-c)^2}{12}
+\end{equation}
+The variance of our quantisation noise is therefore:
+\begin{equation}
+\sigma^2 = \frac{1}{3s^2}
+\end{equation}
+We note that when vector quantising the noise is likely to be Gaussian.
+
+\begin{table}
+\label{tab:uniform quantiser}
+\centering
+\begin{tabular}{l l l l}
+\hline
+Bits & Level & Reconstruction Levels & Quant Error Interval \\
+\hline
+1 & 2 & $[-0.5,+0.5]$ & $[-0.5,+0.5]$  \\
+2 & 4 & $[-0.75, -0.25, +0.25, +0.75]$ & $[-0.125,+0.125]$ \\
+\hline
+\end{tabular}
+\caption{Uniform Quantiser Examples}
+\end{table}
+
+The process used to train a VQ is:
+\begin{enumerate}
+\item The autoencoder is trained with Gaussian noise.
+\item the networkj is then run in inference mode without quantisation noise and the latent bottleneck vectors saved to a file.
+\item An attempt is made to train a VQ that has a residual quantisation error $\simga_2$.
+\end{enumerate}
+
+
+\begin{enumerate}
+\item Need a meaningful way of interpreting the weighted loss as a comparable objective measure.  It should converge to a similar result as MSE, but favour different parts of the spectrum - change the distribution of the noise. Perhaps just report regular SD in parallel.
+\item This could be interpreted as 10x5 bits or a 50 bit quantiser
+\item L2 energy normalisation, expression, justification, reduce dynamic range during regression. Put energy "back in" later, as a separate feature
+\item an alternative to injecting noise is quantising to a nearest reconstruction level.  Good check.  However what does gradient look like?  Check again how additive noise is OK wrt to gradient. 
+\item To cross check substitute FVQ functions (coded so they don't blow up due to size)
+\item A better network would perform more exotic transformations, organise a suitable transformation.
+\item Useful to try a VQ at the bottleneck, kmeans and VQVAE trained, see how the information is organised.  Will training the VQ based on the MSE of the latent space be meaningful? I guess it depends on how latent space is organised.  So - very good idea to train a VQ against minimising MSE of this latent space.
+\item We can think of hybrid approaches, e.g. search latent space of output - analysis by synthesis I guess.  Use that to obtain centroids etc.  Fix NN while VQ search is in progress.  I guess that leads us back to the VQ In the loop.
+\item If we replace uniform with gaussian noise - can consider directly modulated symbols.  Need to work out SNR.
+\end{enumerate}
+\end{document}

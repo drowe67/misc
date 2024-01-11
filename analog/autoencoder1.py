@@ -79,7 +79,8 @@ parser.add_argument('--epochs', type=int, default=10, help='number of training e
 parser.add_argument('--ncat', type=int, default=1, help='number of feature vectors to concatenate')
 parser.add_argument('--save_model', type=str, default="", help='filename of model to save')
 parser.add_argument('--inference', type=str, default="", help='Inference only with filename of saved model')
-parser.add_argument('--out_file', type=str, default="", help='path to output file [b_hat[22]] in .f32 format')
+parser.add_argument('--out_file', type=str, default="", help='path to output file b_hat[22] in .f32 format')
+parser.add_argument('--latent_file', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
 parser.add_argument('--noplot', action='store_true', help='disable plots after training')
 parser.add_argument('--frame', type=int, default=165, help='frame # to start viewing')
 parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
@@ -200,11 +201,12 @@ class NeuralNetwork3(nn.Module):
 
 # concatenated vectors, add some noise to the bottleneck
 class NeuralNetwork4(nn.Module):
-    def __init__(self, input_dim, bottle_dim, seq):
+    def __init__(self, input_dim, bottle_dim, seq, inject_noise=True):
         super().__init__()
         self.input_dim = input_dim
         self.seq = seq
         self.bottle_dim = bottle_dim
+        self.inject_noise = inject_noise
         self.l1 = nn.Linear(input_dim*seq, w1)
         self.l2 = nn.Linear(w1, bottle_dim)
         self.l3 = nn.Linear(bottle_dim,w1)
@@ -216,14 +218,16 @@ class NeuralNetwork4(nn.Module):
         x = F.relu(self.l1(x))
         x = F.tanh(self.l2(x))
         # Model uniform quantiser across -the interval -1 to 1
-        steps = 16
-        sd = 2/(steps*np.sqrt(12))
-        x = x + sd*torch.randn(1,self.bottle_dim)
-        x = F.relu(self.l3(x))
+        steps = 32
+        if self.inject_noise:
+            l = x + (torch.rand(1,self.bottle_dim) - 0.5)/steps
+        else:
+            l = x
+        x = F.relu(self.l3(l))
         x = self.l4(x)
         x = torch.reshape(x,(-1,self.seq,self.input_dim))
         #print(y.shape,y1.shape)
-        return x
+        return x,l
 
 # Toy FSQ example, one VQ step per sequence, we would expect efficiency to increase
 # with sequence as receptive field is larger
@@ -358,7 +362,7 @@ match args.nn:
     case 3:
         model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
     case 4:
-        model = NeuralNetwork4(num_used_features, args.bottle_dim, sequence_length).to(device)
+        model = NeuralNetwork4(num_used_features, args.bottle_dim, sequence_length, inject_noise=False).to(device)
     case 5:
         model = NeuralNetwork5(num_used_features, args.bottle_dim, sequence_length, args.nvq).to(device)
     case 6:
@@ -411,7 +415,7 @@ if len(args.inference) == 0:
                 indices_map[indices] = 1
                 loss = loss_fn(x, y["y"]) + 0.25*y["commitment_loss"]
             else:
-                loss = loss_fn(x, y)
+                loss = loss_fn(x, y[0])
                
             loss.backward() 
             optimizer.step()
@@ -444,20 +448,22 @@ if len(args.inference):
     print(f"Loading model from: {args.inference}")
     model.load_state_dict(torch.load(args.inference))
     model.eval()
-    dataset_inference = f32Dataset(feature_file, sequence_length, overlap=False)
+    dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, overlap=False)
     len_out = dataset_inference.__len__()
     len_out1 = dataset_inference.__len1__()
     print(len_out1, len_out)
     b_hat_np = np.ones((len_out1,num_features),dtype=np.float32)
+    l_np = np.ones((len_out1,args.bottle_dim),dtype=np.float32)
 
     with torch.no_grad():
         sum_sd = 0
         for i in range(len_out):
             b = dataset_inference.__getitem__(i)
             b1 = b[:,:num_used_features].reshape((1,sequence_length,num_used_features))
-            b_hat = model(torch.from_numpy(b1).to(device))
+            b_hat,l = model(torch.from_numpy(b1).to(device))
             b_hat_cpu = b_hat[0,:].cpu().numpy()
-            
+            l_cpu = l.cpu().numpy()
+
             sum_sd = sum_sd + 400*np.mean((b1-b_hat_cpu)**2)
             st = i*sequence_length
             en = (i+1)*sequence_length
@@ -465,6 +471,8 @@ if len(args.inference):
             # put Wo and v back into features
             #print(st,en)
             b_hat_np[st:en,num_used_features:num_features] = b[:,num_used_features:num_features]
+            l_np[i,:] = l_cpu
+
     print(f"Eq:{sum_sd/len_out:5.2f}")
 
     if len(args.out_file):
@@ -472,6 +480,11 @@ if len(args.inference):
         b_hat_np = b_hat_np.reshape((-1))
         print(b_hat_np.shape)
         b_hat_np.astype('float32').tofile(args.out_file)
+    if len(args.latent_file):
+        print(l_np.shape)
+        l_np = l_np.reshape((-1))
+        print(l_np.shape)
+        l_np.astype('float32').tofile(args.latent_file)
 
 # interactive frame-frame visualisation of running model on test data
 if args.noplot == False:
@@ -510,10 +523,10 @@ if args.noplot == False:
         amean = 20*dataset_inference.get_amean()[:num_used_features]
         while loop:
             b = dataset_inference.__getitem__(f)
-            b = b[:,:20].reshape((1,sequence_length,num_used_features))
-            b_hat = model(torch.from_numpy(b).to(device))
+            b = b[:,:num_used_features].reshape((1,sequence_length,num_used_features))
+            b_hat,l = model(torch.from_numpy(b).to(device))
             b_plot = 20*b[0,]
-            if args.nn ==7:
+            if args.nn == 7:
                 b_hat_plot = 20*b_hat["y"][0,].cpu().numpy()
             else:
                 b_hat_plot = 20*b_hat[0,].cpu().numpy()

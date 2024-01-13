@@ -87,6 +87,7 @@ parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
 parser.add_argument('--norm', action='store_true', help='normalise energy')
 parser.add_argument('--nvq', type=int, default=1, help='number of vector quantisers')
 parser.add_argument('--wloss', action='store_true', help='use weighted linear loss function')
+parser.add_argument('--noise_var', type=float, default=0.0, help='inject gaussian noise at bottleneck')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -201,12 +202,12 @@ class NeuralNetwork3(nn.Module):
 
 # concatenated vectors, add some noise to the bottleneck
 class NeuralNetwork4(nn.Module):
-    def __init__(self, input_dim, bottle_dim, seq, inject_noise=True):
+    def __init__(self, input_dim, bottle_dim, seq, noise_var=0):
         super().__init__()
         self.input_dim = input_dim
         self.seq = seq
         self.bottle_dim = bottle_dim
-        self.inject_noise = inject_noise
+        self.noise_var = noise_var
         self.l1 = nn.Linear(input_dim*seq, w1)
         self.l2 = nn.Linear(w1, bottle_dim)
         self.l3 = nn.Linear(bottle_dim,w1)
@@ -217,12 +218,15 @@ class NeuralNetwork4(nn.Module):
         #print(x.shape,x1.shape)
         x = F.relu(self.l1(x))
         x = F.tanh(self.l2(x))
+        """
         # Model uniform quantiser across -the interval -1 to 1
         steps = 32
         if self.inject_noise:
             l = x + (torch.rand(1,self.bottle_dim) - 0.5)/steps
         else:
             l = x
+        """
+        l = x + np.sqrt(self.noise_var)*torch.randn(1,self.bottle_dim)
         x = F.relu(self.l3(l))
         x = self.l4(x)
         x = torch.reshape(x,(-1,self.seq,self.input_dim))
@@ -362,7 +366,7 @@ match args.nn:
     case 3:
         model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
     case 4:
-        model = NeuralNetwork4(num_used_features, args.bottle_dim, sequence_length, inject_noise=False).to(device)
+        model = NeuralNetwork4(num_used_features, args.bottle_dim, sequence_length, args.noise_var).to(device)
     case 5:
         model = NeuralNetwork5(num_used_features, args.bottle_dim, sequence_length, args.nvq).to(device)
     case 6:

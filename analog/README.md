@@ -34,9 +34,15 @@ vocoders.
    python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --lr 1E-1 --epochs 20 --bottle_dim 10 --ncat 1 --nn 2 --norm --wloss
    ```
 
-1. Dim reduction with noise in the bottleneck, top simulate the effect of a quantiser, and encourage a well behaived latent distribution.
+1. Dim reduction with noise in the bottleneck, to simulate the effect of a quantiser, and encourage a well behaived latent distribution.
    ```
-   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --lr 2E-1 --epochs 100 --bottle_dim 10 --ncat 1 --nn 4 --norm --wloss
+   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --bottle_dim 10 --ncat 1 --nn 4 --norm --epochs 100 --noise_var 1E-3 --save_model nn4_cat1a.pt
    ```
    Noise is also added during inference, pressing the space bar allows you to see the effect of different noise samples.
 
+1. Using model trained in lats step, run without noise and dump latent vectors for analysis and external VQ training:
+   ```
+   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --bottle_dim 10 --ncat 1 --nn 4 --norm --inference nn4_cat1a.pt --latent_file l.f32
+   ```
+   Note after run we enter GUI mode, pressing space bar will replot current frame.  This is interesting when noise is added,
+   as the effect of different noise vectors can be observed.

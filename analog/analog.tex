@@ -4,32 +4,42 @@
 \usepackage{tikz}
 \begin{document}
 
-\title{ML quantisation of Vocoder Features}
+\title{Analog Transmission of Vocoder Features}
 \maketitle
 
-The goal is to achieve improved quantisation using ML techniques:
+Given a vector of vocoder features $\bf{f}$, use an autoencoder $E$ to map them to a dimension $D$ vector $\bf{g}$ where $D$ is even. The elements of $\bf{g}$ are mapped to $D/2$ complex symbols $\bf{s}$.  The magnitude of each symbol is constrained to a maximum of 1, but unlike digital modulation is not constrained to a discrete set of points on the complex plane.
+
+The complex symbols $\bf{s}$ are updated every $T_s$ seconds. The total symbol rate over the channel is therefore $R_s = D/(2T_s)$ Hz.  If a spectrally efficient form of transmission is used the bandwidth over the analog (e.g. radio) channel will also be $R_s$.
+
+The channel is AWGN with a noise power spectral density $N_0$ Watts/Hz.  We assume perfect synchronisation between the transmitter and receiver such that the received symbols:
+\begin{equation}
+\hat{\bf{s}}=\bf{s}+\bf{n}
+\end{equation}
+where $\bf{n}$ is a vector of complex (single sided) Gaussian noise samples.
+
+
+The Signal to Noise ratio (SNR) is the ratio of signal power $S$ to noise power $N$ (both in Watts) given by:
+\begin{equation}
+\begin{split}
+\frac{S}{N} &= \frac{E_sR_s}{N_0B} \\
+            &= \frac{E_sD}{2N_0T_sB}
+\end{split}
+\end{equation}
+where $E_s$ is the mean energy per symbol, and $B$ is the bandwidth we measure SNR in. This is often $B=R_s$ but when comparing to another communications system it is useful to use a common $B$.
+
+Our goal is to determine if reasonable speech quality can be obtained over a channel of bandwidth $B<3000$ Hz and SNR between 0 and 6dB, both comparable to Single Side Band (SSB) - a common power and bandwidth efficient form of analog radio communication.
+
+Tasks:
 \begin{enumerate}
-\item Lower bit rate for equivalent distortion.  
-\item Increased robustness to channel errors that traditional modulation and FEC?
+\item Collate training databases, extract LPCNet features.
+\item Design and code up a suitable autoencoder network.
+\item How to simulate channel (add complex noise to complex symbols) during training?
+\item We could simplify for a first pass by treating the channel as $D$ real symbols, and adding real noise.
+\item How to constrain symbol magnitude during training?
+\item Train at a candidate SNR.
+\item Test over a channel at the candidate SNR. and evaluate quality
+\item If we start with just LPCNet spectral (cepstrum) features we can use spectral distortion as a early objective indication of performance.
+\item It would be interesting to contrast with a more traditional digital model, e.g. same autoencoder network but VQ or entropy encode to a bit stream and use QPSK (or just the known BER at a given SNR) over the channel.
+\item It would be interesting to determine SNR performance at different $D$. Small $D$ will make each symbol more sensitive to noise, however the power will be concentrated in less symbols.  The Shannon–Hartley theorem suggests wider bandwidth (larger $D$) will be better.
 \end{enumerate}
-
-Expectations.  There is quite a bit of information in a mel spaced log spectral vector, and it will take a finite amount of bits to quantise it.  ML won't change this. Where ML can help is better transforms and time prediction over large windows.  For example finding non-linear dependencies and correlations and reducing the dimension of the bottleneck required to be quantised.  Better transforms and time series prediction than possible with linear techniques. Combination of spectral information with pitch and voicing features will save some bits if they are correlated with the spectral information.  A multistage VQ will work better with a small dimension, as the residual errors tend towards gaussian.
-
-However this will have it's limits for our use case where the quantisation window must be kept to around 100ms (including initial state information). ML isn't magic - it will take more information to quantise 8 x 10ms vectors than 1 x 10ms (but not 8 times as much).  One could start with a ML transform of 4 x 10ms vectors, quantise that as an initial state, then quantise the residual errors from each 10ms frame.
-
-Is running the VQ training loop (e.g. VQVAE) inside the ML system worth it?  Several practical problems, such as the rate the VQ adapts compared to the rest of the network, managing EWMA updates that attempt to zero out codebook entries, and possibly poorer perf than traditional k-means.  Traditional VQ works pretty well and can extract some non-linear dependencies. The VQ could be simulated in the training loop using small amounts of AWGN injection to ensure the latent space is well behaved. Then, the VQ can be designed on the training data in the bottleneck. In general, use traditional DSP/quantisation where possible, leave ML to what it does best.  Perhaps hybrid training, an epoch each.
-
-Where to these fit in:
-\begin{enumerate}
-\item Limit the amount of information through pre processing, e.g. compression, equalisation, dynamic range limiting.  This would reduce the information in the log spectral vectors.  Traditional DSP or ML? I feel this is where the biggest gains are.
-\item Training the VQ to minimise the weighted linear error (at $K=20$ or via $F$ at $K=80$).  Can this be performed using traditional VQ training?  Would we use a low dim vector for the VQ?
-\item Training a system that is robust to channel errors (or noise in an analog channel). How to get something close to MAP/or use LLRs and other info?  A latent vector that can handle a lot of "noise".
-\item Ensuring we get good energy distribution (formant bandwidths) under quantisation.  Preserving bandwidth more important that frequency - can we include this weighting in loss function.
-\end{enumerate}
-
-\begin{enumerate}
-\item Experiment 1: Build an autoencoder for 1 vector.  Try different architectures, e.g. FC and conv1D.  Determine bottleneck dimension for 1dB^2 distortion for 1 and 4 concatenated vectors.  Try MSE and weighted linear loss functions. Determine if we can get any dimensionality reduction, as this would make VQ much easier (assuming VQ latent space is well behaved.
-\item Experiment 2: Build a VQVAE (VQ that trains in a ML network).  Compare distortion to kmeans for a range of VQ sizes.  Do they get the same performance?
-\end{enumerate}
-
 \end{document}

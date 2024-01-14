@@ -40,7 +40,7 @@ Where to these fit in:
 
 \section{Experiment 1}
 
-A simple autoencoder network was designed consisting of 4 FC layers with a $tanh()$ non-linearity at the bottleneck.  The training material was dimension $k=20$ smoothed, unit energy, mel spaced log vectors $\mathbf{b}$.  Only one $\mathbf{b}$ vector was considered at a time (no time based transformations). When trained with a SD los function \ref{eq:sd_loss} a dimension $d=10$ bottleneck was sufficient to maintain less than $1 dB^2$ distortion, indicating a useful dimension reduction.  Good results (based on visual inspection) were also obtained using a weighted linear loss function \ref{eq:wl_loss}.
+A simple autoencoder network was designed consisting of 4 FC layers with a $tanh()$ non-linearity at the bottleneck.  The training material was dimension $k=20$ smoothed, unit energy, mel spaced log vectors $\mathbf{b}$.  Only one $\mathbf{b}$ vector was considered at a time (no time based transformations). When trained with a SD loss function \ref{eq:sd_loss} a dimension $d=10$ bottleneck was sufficient to maintain less than $1 dB^2$ distortion, indicating a useful dimension reduction.  Good results (based on visual inspection) were also obtained using a weighted linear loss function \ref{eq:wl_loss}.
 
 However it was unclear if the latent space was suitable for quantisation. To investigate this, a small amount of noise was added to simulate the effect of uniform quantisation over the $[-1,1]$ dynamic range of the $tanh$ function placed at the bottleneck.  This noise also encourages the network to converge on a latent space that behaves well in the presence of small quantisation errors.
 
@@ -93,14 +93,16 @@ The autoencoder was trained with $\sigma^2=1E-3$ gaussian noise over 100 epochs,
 \begin{table}
 \label{tab:nn4_inference}
 \centering
-\begin{tabular}{l l l l l}
+\begin{tabular}{l l l l l l}
 \hline
-$\sigma^2$ & $\sigma$ & SD $dB^2$ & VQ bits & bits/s \\
+$\sigma^2$ & $\sigma$ & SD $dB^2$ & VQ bits & VQ stages & bits/s \\
 \hline
-0.000 & 0.000 & 1.56 & n/a & n/a \\
-0.001 & 0.031 & 1.88 & 33 & 1650 \\
-0.003 & 0.055 & 2.52 & 18 & 900 \\
-0.010 & 0.100 & 4.80 & 10 & 450 \\
+0.000  & 0.000 & 1.56 \\
+0.0007 & 0.003 &      & 36 & 3 & 1800 \\
+0.0010 & 0.031 & 1.88 & 33 & 3 & 1650 \\
+0.0015 & 0.038 &      & 24 & 2 & 1200 \\
+0.0030 & 0.055 & 2.52 & 18 & 2 & 900 \\
+0.0100 & 0.100 & 4.80 & 10 & 1 & 450 \\
 \hline
 \end{tabular}
 \caption{SD and multi-stage VQ bits for various levels of Gaussian bottleneck noise.  The bit rate assumes the vectors are sent every 20ms (sufficient for communications quality speech). }
@@ -117,7 +119,15 @@ A PCA was performed on the latent vectors using GNU Octave.  The PCA results sho
 
 A mesh plot was made of a segment of the latent vectors.  This clearly showed significant time correlation between the same elements in adjacent vectors.  A better autoencoder could exploit this time correlation, and jointly quantise adjacent vectors leading to a lower quantisation bit rate.
 
-A multistage vector quantiser (each stage with 12 bits or 4096 vectors) was trained using the latent vectors as training material.  The number of bits required to achieve the same variance as the intentionally injected noise is presented in \ref{tab:uniform quantiser}.
+A multistage vector quantiser (each stage with 12 bits or 4096 vectors) was trained using the latent vectors as training material.  The number of bits required to achieve the same variance as the intentionally injected noise is presented in \ref{tab:uniform quantiser}.  Figure \ref{fig:uniform_vq} plots the performance of the uniform and vector quantisers.  As with the PCA results, this suggests significant linear and non-linear correlation in the bottleneck data that could alternatively be removed by an improved ML network, leaving independent Gaussians to be VQed.
+
+\begin{figure}
+\caption{Uniform and VQ performance.  The VQ has a significant advantage at low bit rates. The dip in the final VQ point is probably due to a marginal amount of training data (143k vectors) as we approach 12 bits per stage.}
+\label{fig:uniform_vq}
+\begin{center}
+\input uniform_vq.tex
+\end{center}
+\end{figure}
 
 \subsection {WIP Todos}
 

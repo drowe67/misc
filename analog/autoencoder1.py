@@ -428,6 +428,8 @@ if len(args.inference) == 0:
             if args.nn == 7:
                 sum_loss += loss_fn(x, y["y"])
     
+        # note factor of 400 is arbitrary for weighted loss mode, it
+        # only makes sense when we are calculating SD
         sum_loss_total_dB2 = sum_loss_total * 400
         if args.nn == 7:
             sum_loss_dB2 = sum_loss * 400

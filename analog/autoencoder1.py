@@ -80,7 +80,8 @@ parser.add_argument('--ncat', type=int, default=1, help='number of feature vecto
 parser.add_argument('--save_model', type=str, default="", help='filename of model to save')
 parser.add_argument('--inference', type=str, default="", help='Inference only with filename of saved model')
 parser.add_argument('--out_file', type=str, default="", help='path to output file b_hat[22] in .f32 format')
-parser.add_argument('--latent_file', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
+parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
+parser.add_argument('--read_latent', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
 parser.add_argument('--noplot', action='store_true', help='disable plots after training')
 parser.add_argument('--frame', type=int, default=165, help='frame # to start viewing')
 parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
@@ -202,18 +203,19 @@ class NeuralNetwork3(nn.Module):
 
 # concatenated vectors, add some noise to the bottleneck
 class NeuralNetwork4(nn.Module):
-    def __init__(self, input_dim, bottle_dim, seq, noise_var=0):
+    def __init__(self, input_dim, bottle_dim, seq, noise_var=0, inject_l_hat=False):
         super().__init__()
         self.input_dim = input_dim
         self.seq = seq
         self.bottle_dim = bottle_dim
         self.noise_var = noise_var
+        self.inject_l_hat = inject_l_hat
         self.l1 = nn.Linear(input_dim*seq, w1)
         self.l2 = nn.Linear(w1, bottle_dim)
         self.l3 = nn.Linear(bottle_dim,w1)
         self.l4 = nn.Linear(w1, input_dim*seq)
- 
-    def forward(self, x):
+
+    def forward(self, x, l_hat=None):
         x = torch.reshape(x,(-1,1,self.input_dim*self.seq))
         #print(x.shape,x1.shape)
         x = F.relu(self.l1(x))
@@ -227,6 +229,8 @@ class NeuralNetwork4(nn.Module):
             l = x
         """
         l = x + np.sqrt(self.noise_var)*torch.randn(1,self.bottle_dim)
+        if self.inject_l_hat:
+            l = l_hat
         x = F.relu(self.l3(l))
         x = self.l4(x)
         x = torch.reshape(x,(-1,self.seq,self.input_dim))
@@ -357,6 +361,9 @@ class NeuralNetwork7(nn.Module):
             "commitment_loss": commitment_loss_stage[0],
         }
 
+inject_l_hat = False
+if (args.read_latent):
+    inject_l_hat = True
 
 match args.nn:
     case 1:
@@ -366,7 +373,7 @@ match args.nn:
     case 3:
         model = NeuralNetwork3(num_used_features, args.bottle_dim, sequence_length).to(device)
     case 4:
-        model = NeuralNetwork4(num_used_features, args.bottle_dim, sequence_length, args.noise_var).to(device)
+        model = NeuralNetwork4(num_used_features, args.bottle_dim, sequence_length, args.noise_var, inject_l_hat=inject_l_hat).to(device)
     case 5:
         model = NeuralNetwork5(num_used_features, args.bottle_dim, sequence_length, args.nvq).to(device)
     case 6:
@@ -459,14 +466,26 @@ if len(args.inference):
     len_out1 = dataset_inference.__len1__()
     print(len_out1, len_out)
     b_hat_np = np.ones((len_out1,num_features),dtype=np.float32)
+    # latent vectors out of model
     l_np = np.ones((len_out1,args.bottle_dim),dtype=np.float32)
 
+    # optionally read latent vectors from file for injection into network
+    if inject_l_hat:
+        l_hat = np.fromfile(args.read_latent, dtype=np.float32)
+        print(l_hat.shape)
+        l_hat = l_hat.reshape((-1),args.bottle_dim)
+        print(l_hat.shape)
+  
     with torch.no_grad():
         sum_sd = 0
         for i in range(len_out):
             b = dataset_inference.__getitem__(i)
             b1 = b[:,:num_used_features].reshape((1,sequence_length,num_used_features))
-            b_hat,l = model(torch.from_numpy(b1).to(device))
+            if inject_l_hat:
+                b_hat,l = model(torch.from_numpy(b1).to(device), torch.from_numpy(l_hat[i,:]).to(device))
+            else:
+                b_hat,l = model(torch.from_numpy(b1).to(device))
+               
             b_hat_cpu = b_hat[0,:].cpu().numpy()
             l_cpu = l.cpu().numpy()
 
@@ -486,11 +505,11 @@ if len(args.inference):
         b_hat_np = b_hat_np.reshape((-1))
         print(b_hat_np.shape)
         b_hat_np.astype('float32').tofile(args.out_file)
-    if len(args.latent_file):
+    if len(args.write_latent):
         print(l_np.shape)
         l_np = l_np.reshape((-1))
         print(l_np.shape)
-        l_np.astype('float32').tofile(args.latent_file)
+        l_np.astype('float32').tofile(args.write_latent)
 
 # interactive frame-frame visualisation of running model on test data
 if args.noplot == False:
@@ -530,7 +549,10 @@ if args.noplot == False:
         while loop:
             b = dataset_inference.__getitem__(f)
             b = b[:,:num_used_features].reshape((1,sequence_length,num_used_features))
-            b_hat,l = model(torch.from_numpy(b).to(device))
+            if inject_l_hat:
+                b_hat,l = model(torch.from_numpy(b1).to(device), torch.from_numpy(l_hat[f,:]).to(device))
+            else:
+                b_hat,l = model(torch.from_numpy(b).to(device))
             b_plot = 20*b[0,]
             if args.nn == 7:
                 b_hat_plot = 20*b_hat["y"][0,].cpu().numpy()

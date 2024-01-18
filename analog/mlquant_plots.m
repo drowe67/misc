@@ -9,8 +9,13 @@ function uniform_vq(epslatex=0)
 
   uniform_bits = [10 20 30 40 50];
   uniform_var  = [0.0833 0.0208 0.0052 0.0013 0.0003];
-  vq_bits = [10 18 24 33 36 ];
-  vq_var  = [0.01 0.003 0.0015 0.001 0.0007];
+  
+  load vq_train_var1.txt
+  load vq_train_var2.txt
+  load vq_train_var3.txt
+  
+  vq_bits = [log2(vq_train_var1(:,1)); 12+log2(vq_train_var1(:,1));  24+log2(vq_train_var1(:,1))];
+  vq_var  = [vq_train_var1(:,2); vq_train_var2(:,2); vq_train_var3(:,2)];
 
   semilogy(uniform_bits, uniform_var,'b+-;Uniform;');
   hold on; semilogy(vq_bits, vq_var,'g+-;VQ;'); hold off;

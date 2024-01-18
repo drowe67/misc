@@ -90,15 +90,15 @@ The autoencoder was trained with $\sigma^2=10^{-3}$ gaussian noise over 100 epoc
 \hline
 $\sigma^2$ & $\sigma$ & SD $dB^2$ & VQ bits & VQ stages & bits/s \\
 \hline
-0.000  & 0.000 & 1.56 \\
-0.0007 & 0.003 &      & 36 & 3 & 1800 \\
-0.0010 & 0.031 & 1.88 & 33 & 3 & 1650 \\
+0.000  & 0.000 & 1.89 \\
+0.0003 & 0.018 &      & 36 & 3 & 1800 \\
+0.0010 & 0.031 & 2.57 & 28 & 3 & 1650 \\
 0.0015 & 0.038 &      & 24 & 2 & 1200 \\
-0.0030 & 0.055 & 2.52 & 18 & 2 & 900 \\
-0.0100 & 0.100 & 4.80 & 10 & 1 & 450 \\
+0.0030 & 0.055 & 3.93 & 20 & 2 & 900 \\
+0.0100 & 0.100 & 8.77 & 10 & 1 & 450 \\
 \hline
 \end{tabular}
-\caption{SD and multi-stage VQ bits for various levels of Gaussian bottleneck noise.  The bit rate assumes the vectors are sent every 20ms (sufficient for communications quality speech). }
+\caption{SD and multi-stage VQ bits for various levels of Gaussian bottleneck noise, using \emph{nn4\_cat1.pt} trained with weighted loss.  The bit rate assumes the vectors are sent every 20ms (sufficient for communications quality speech). }
 \end{table}
 
 With $\sigma^2=0$, the network was run again and the bottleneck (latent) vectors stored to a file.
@@ -112,10 +112,12 @@ A PCA was performed on the latent vectors using GNU Octave.  The PCA results sho
 
 A mesh plot was made of a segment of the latent vectors.  This clearly showed significant time correlation between the same elements in adjacent vectors.  A better autoencoder could exploit this time correlation, and jointly quantise adjacent vectors leading to a lower quantisation bit rate.
 
-A multistage vector quantiser (each stage with 12 bits or 4096 vectors) was trained using the latent vectors as training material.  The number of bits required to achieve the same variance as the intentionally injected noise is presented in \ref{tab:uniform quantiser}.  Figure \ref{fig:uniform_vq} plots the performance of the uniform and vector quantisers.  As with the PCA results, this suggests significant linear and non-linear correlation in the bottleneck data that could alternatively be removed by an improved ML network, leaving independent Gaussians to be VQed.
+A multistage vector quantiser (each stage with 12 bits or 4096 vectors) was trained using the latent vectors as training material.  The number of bits required to achieve the same variance as the intentionally injected noise is presented in \ref{tab:uniform quantiser}.  Figure \ref{fig:uniform_vq} plots the performance of the uniform and vector quantisers.  The VQ stage breakpoints at 12 and 24 bits can be observed. The VQ is around 15 bits/frame better than uniform quantisation for the same quantiser error $\sigma^2$.  The slight downwards curve as the bits increase for each VQ stage is probably due to relatively small amount of training data (143,000 frames for up to $2^12=4096$ vectors per stage) resulting in some over-fitting. 
+
+As with the PCA results, the large slope of the first VQ stage (1-12 bits) suggests significant correlation in the bottleneck data that could alternatively be removed by an improved ML network, leaving independent Gaussians to be VQed.
 
 \begin{figure}
-\caption{Uniform and VQ performance.  The VQ has a significant advantage at low bit rates. The dip in the final VQ point is probably due to a marginal amount of training data (143k vectors) as we approach 12 bits per stage (over-fitting).}
+\caption{Uniform and multi-stage VQ performance}
 \label{fig:uniform_vq}
 \begin{center}
 \input uniform_vq.tex

@@ -58,5 +58,23 @@ vocoders.
 
 1. Inject VQ-ed vectors back into network:
    ```
-   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --bottle_dim 10 --ncat 1 --nn 4 --norm --inference nn4_cat1a.pt --read_latent train_l_hat.f32
-   ``` 
+   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --bottle_dim 10 --ncat 1 --nn 4 --norm --inference nn4_cat1.pt --read_latent train_l_hat.f32
+   ```
+
+1. Run VQ-ed autoencoder 4 experiment (Experiment 2 in `mlquant.pdf`) using d=10 bottleneck:
+   ```
+   ./analog.sh test_240118
+   ```
+   Results are in `240118_wav`.
+
+# Samples in `240118_wav`
+
+   | Index | Processing |
+   | ---- | ---- |
+   | 1 | original amplitudes and phase
+   | 3 | phase0, y_hat =F(b) from ML inference  (manifold project) |
+   | 5 | As per 3, but K=20 `b` vectors passed through autoencoder 4 d=10 bottleneck, no quantisation |
+   | 6 | As per 5, 24 bit VQ of bottleneck vectors |
+   | 7 | As per 5, 12 bit VQ of bottleneck vectors |
+   | 8 | Codec 2 3200 high anchor |
+

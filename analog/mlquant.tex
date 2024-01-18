@@ -92,14 +92,22 @@ $\sigma^2$ & $\sigma$ & SD $dB^2$ & VQ bits & VQ stages & bits/s \\
 \hline
 0.000  & 0.000 & 1.89 \\
 0.0003 & 0.018 &      & 36 & 3 & 1800 \\
-0.0010 & 0.031 & 2.57 & 28 & 3 & 1650 \\
+0.0010 & 0.031 & 2.57 & 28 & 3 & 1400 \\
 0.0015 & 0.038 &      & 24 & 2 & 1200 \\
-0.0030 & 0.055 & 3.93 & 20 & 2 & 900 \\
-0.0100 & 0.100 & 8.77 & 10 & 1 & 450 \\
+0.0030 & 0.055 & 3.93 & 20 & 2 & 1000 \\
+0.0100 & 0.100 & 8.77 & 10 & 1 & 500 \\
 \hline
 \end{tabular}
-\caption{SD and multi-stage VQ bits for various levels of Gaussian bottleneck noise, using \emph{nn4\_cat1.pt} trained with weighted loss.  The bit rate assumes the vectors are sent every 20ms (sufficient for communications quality speech). }
+\caption{SD and multi-stage VQ bits for various levels of Gaussian bottleneck noise, using \emph{nn4\_cat1.pt} trained with weighted linear loss.  The bit rate assumes the vectors are sent every 20ms (sufficient for communications quality speech). }
 \end{table}
+
+\begin{figure}
+\caption{Uniform and multi-stage VQ performance}
+\label{fig:uniform_vq}
+\begin{center}
+\input uniform_vq.tex
+\end{center}
+\end{figure}
 
 With $\sigma^2=0$, the network was run again and the bottleneck (latent) vectors stored to a file.
 
@@ -116,18 +124,19 @@ A multistage vector quantiser (each stage with 12 bits or 4096 vectors) was trai
 
 As with the PCA results, the large slope of the first VQ stage (1-12 bits) suggests significant correlation in the bottleneck data that could alternatively be removed by an improved ML network, leaving independent Gaussians to be VQed.
 
-\begin{figure}
-\caption{Uniform and multi-stage VQ performance}
-\label{fig:uniform_vq}
-\begin{center}
-\input uniform_vq.tex
-\end{center}
-\end{figure}
+Informal listening tests using headphones and laptop speakers (see \emph{240118\_wav} folder described in \emph{README}):
+\begin{enumerate}
+\item In the male samples, there was a drop in quality due to the unquantised autoencoder with the buzzy artefact (typical of poor energy distribution across the pitch cycle) returning.  This suggests formant bandwidths are not encoded well.  The network and VQ was trained with the target of minimising MSE in the smoothed $\mathbf{b}$ log mel-spaced vectors, rather than the high resolution $\mathbf{y}$ vectors that contain the bandwidth information.
+\item The 24 bit VQ of the bottleneck vectors worked quite well, with no obvious quality drop compared to the unquantised autoencoder.
+\item The unquantised autoencoder, VQ 12, and VQ 24 bit male samples were poorer than the reference Codec 2 3200 sample.
+\item With 12 bit VQ the males suffered a further drop in quality, but through a laptop speaker the female sample sounded noisey but otherwise quite acceptable.
+\end{enumerate} 
+So overall results were not satisfactory for a practical quantisation system, however this appears to be due to the autoencoder failing to encode formant bandwidths rather than VQ. The hybrid ML/VQ scheme does appear viable, suggested we have trained a ``well behaived" latent space that is amenable to quantisation. The use of ``old school" externally trained VQ was likely non-optimal but removed the need to deal with the many pitfalls of VQVAE \cite{mentzer2023finite}. The female results suggest low bit rates (12 bits/frame) may be possible if we can overcome the energy distribution issue.  However the buzzy artefacts for males suggests running the quantisation scheme on the smoothed $\mathbf{b}$ vectors may not be the best choice - we should perhaps make the target the high resolution $\mathbf{y}$ vectors.
 
 
 \subsection{Weighted Linear Loss Function}
 
-From the manifold work (TODO Ref), we have employed a weighted linear loss function:
+From the manifold work \cite{rowe2023_manifold}, we have employed a weighted linear loss function:
 \begin{equation}
 \label{eq:wl_loss}
 L = \frac{1}{K}\sum_{k=0}^{K-1}|(x_k-\hat{x}_k)W(k)|^2
@@ -186,5 +195,11 @@ This section WIP. Todos:
 \item We can think of hybrid approaches, e.g. search latent space of output - analysis by synthesis I guess.  Use that to obtain centroids etc.  Fix NN while VQ search is in progress.  I guess that leads us back to the VQ In the loop.
 \item If we replace uniform with gaussian noise - can consider directly modulated symbols.  Need to work out SNR.
 \end{enumerate}
+
+\bibliographystyle{plain}
+\bibliography{mlquant_refs}
+
+\end{document}
+
 
 \end{document}

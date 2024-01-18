@@ -1,4 +1,4 @@
-# Analog Modulation of Vocoder Features
+# Analog Modulation and Quantisation of Vocoder Features
 
 Experiments with autoencoders, quantisation, and analog modulation of Vocoder features.  Using Codec 2
 features for current work (as I am familiar with them), but could also be applied to other (e.g. neural)
@@ -6,12 +6,15 @@ vocoders.
 
 | Files | Description |
 | ---- | ---- |
-| analog.tex | Latex write up of experiments |
-| analog.sh | Ties C and Octave, and Pyton code together to automate experiment |
+| analog.tex | Latex write up of analog concept |
+| mlquant.tex | Latex write up of ML quantisation work |
+| analog.sh | Ties C and Octave, and Pyton code together to automate experiments |
 | linear_batch.m | Octave batch processing tools that perform linear DSP |
-| analog.py  | PyTorch ML part of experiment, training, inference, and visualisation modes |
+| analog.py  | PyTorch ML part of analog experiment, training, inference, and visualisation modes |
+| autoencoder1.py  | PyTorch ML part of ML autoencoder and quantisation experiments, training, inference, and visualisation modes |
+| mlquant_plots.m | Octave scripts to generate plots for mlquant.tex |
 
-1. Build C tools from ~/codec2-dev dr-papr branch, Git hash e430c433bcb34c6:
+1. Build C tools from ~/codec2-dev dr-papr branch, Git hash c43d2958c6c:
 
 1. Train a basic autoencoder on feature file `train_b20_ml.f32`, model saved to `nn2_cat2.pt`
    ```
@@ -61,13 +64,13 @@ vocoders.
    python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --bottle_dim 10 --ncat 1 --nn 4 --norm --inference nn4_cat1.pt --read_latent train_l_hat.f32
    ```
 
-1. Run VQ-ed autoencoder 4 experiment (Experiment 2 in `mlquant.pdf`) using d=10 bottleneck:
+1. Run VQ-ed autoencoder 4 experiment (Experiment 1 in `mlquant.tex`) using d=10 bottleneck:
    ```
    ./analog.sh test_240118
    ```
    Results are in `240118_wav`.
 
-# Samples in `240118_wav`
+# Samples in `240118_wav` (Experiment 1)
 
    | Index | Processing |
    | ---- | ---- |

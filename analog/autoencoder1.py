@@ -39,9 +39,9 @@ class f32Dataset(torch.utils.data.Dataset):
         self.features[:,:num_dB_features] = self.features[:,:num_dB_features]/20
         #self.amean = np.mean(self.features,axis=0)
         self.amean = np.zeros(num_features)
-        print(np.mean(self.features,axis=0))
-        print(np.std(self.features,axis=0))
-        print(self.amean.shape, self.features.shape)
+        #print(np.mean(self.features,axis=0))
+        #print(np.std(self.features,axis=0))
+        #print(self.amean.shape, self.features.shape)
         #self.features -= self.amean
         if overlap:
             self.num_sequences = self.features.shape[0] - sequence_length + 1
@@ -384,9 +384,9 @@ match args.nn:
         print("unknown network!")
         quit()
 
-print(model)
-num_weights = sum(p.numel() for p in model.parameters())
-print(f"weights: {num_weights} float32 memory: {num_weights*4}")
+if len(args.inference) == 0:
+    num_weights = sum(p.numel() for p in model.parameters())
+    print(f"weights: {num_weights} float32 memory: {num_weights*4}")
 
 # PyTorch custom loss function that operates in the weighted linear domain
 def my_loss(y_hat, y):
@@ -464,7 +464,7 @@ if len(args.inference):
     dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, overlap=False)
     len_out = dataset_inference.__len__()
     len_out1 = dataset_inference.__len1__()
-    print(len_out1, len_out)
+    #print(len_out1, len_out)
     b_hat_np = np.ones((len_out1,num_features),dtype=np.float32)
     # latent vectors out of model
     l_np = np.ones((len_out1,args.bottle_dim),dtype=np.float32)
@@ -472,9 +472,9 @@ if len(args.inference):
     # optionally read latent vectors from file for injection into network
     if inject_l_hat:
         l_hat = np.fromfile(args.read_latent, dtype=np.float32)
-        print(l_hat.shape)
+        #print(l_hat.shape)
         l_hat = l_hat.reshape((-1),args.bottle_dim)
-        print(l_hat.shape)
+        #print(l_hat.shape)
   
     with torch.no_grad():
         sum_sd = 0
@@ -501,14 +501,14 @@ if len(args.inference):
     print(f"Eq:{sum_sd/len_out:5.2f}")
 
     if len(args.out_file):
-        print(b_hat_np.shape)
+        #print(b_hat_np.shape)
         b_hat_np = b_hat_np.reshape((-1))
-        print(b_hat_np.shape)
+        #print(b_hat_np.shape)
         b_hat_np.astype('float32').tofile(args.out_file)
     if len(args.write_latent):
-        print(l_np.shape)
+        #print(l_np.shape)
         l_np = l_np.reshape((-1))
-        print(l_np.shape)
+        #print(l_np.shape)
         l_np.astype('float32').tofile(args.write_latent)
 
 # interactive frame-frame visualisation of running model on test data

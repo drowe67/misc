@@ -3,7 +3,7 @@ autoencoder3.py - ML quantisation experiment
 
 Based on misc/manifold/manifold.py, with bottleneck
 
-b -> bottleneck -> b_hat
+b -> bottleneck -> y_hat
 
 """
 
@@ -96,7 +96,7 @@ parser.add_argument('--inference', type=str, default="", help='Inference only wi
 parser.add_argument('--out_file', type=str, default="", help='path to output file [y[79]] in .f32 format')
 parser.add_argument('--bottle_dim', type=int, default=10, help='bottleneck dim')
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
-parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
+parser.add_argument('--nn', type=int, default=1, help='Neural Network to use')
 parser.add_argument('--noise_var', type=float, default=0.0, help='inject gaussian noise at bottleneck')
 args = parser.parse_args()
 feature_file = args.features
@@ -154,10 +154,11 @@ class NeuralNetwork1(nn.Module):
 
     def forward(self, y):
         l = self.encoder(y)
-        l = x + np.sqrt(self.noise_var)*torch.randn(1,self.bottle_dim)
-        y_hat = self.decoder(y)
+        l = l + np.sqrt(self.noise_var)*torch.randn(1,self.bottle_dim)
+        y_hat = self.decoder(l)
         return y_hat,l
 
+# ramping down and up either side of bottleneck 
 class NeuralNetwork2(nn.Module):
     def __init__(self, input_dim, output_dim, bottle_dim):
         super().__init__()
@@ -181,6 +182,7 @@ class NeuralNetwork2(nn.Module):
         y = self.linear_relu_stack(x)
         return y
 
+# several layers on input data
 class NeuralNetwork3(nn.Module):
     def __init__(self, input_dim, output_dim, bottle_dim):
         super().__init__()
@@ -204,6 +206,7 @@ class NeuralNetwork3(nn.Module):
         y = self.linear_relu_stack(x)
         return y
 
+# additional layers
 class NeuralNetwork4(nn.Module):
     def __init__(self, input_dim, output_dim, bottle_dim):
         super().__init__()
@@ -217,6 +220,8 @@ class NeuralNetwork4(nn.Module):
             nn.Linear(bottle_dim, bottle_dim),
             nn.Tanh(),
             nn.Linear(bottle_dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1),
             nn.ReLU(),
             nn.Linear(w1, w1),
             nn.ReLU(),
@@ -288,11 +293,11 @@ if len(args.inference) == 0:
 
     for epoch in range(args.epochs):
         sum_loss = 0.0
-        for batch,(f,y) in enumerate(dataloader):
+        for batch,(b,y) in enumerate(dataloader):
             #print(f,y)
-            f = f.to(device)
+            b = b.to(device)
             y = y.to(device)
-            y_hat = model(f)
+            y_hat,l = model(b)
             loss = loss_fn(y, y_hat)
             loss.backward() 
             optimizer.step()
@@ -319,29 +324,28 @@ if len(args.inference):
     dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0)
     len_out = dataset_eval.__len__()
     y_hat_np = np.zeros([len_out,target_dim],dtype=np.float32)
+    l_np = np.ones((len_out,args.bottle_dim),dtype=np.float32)
+
     with torch.no_grad():
-        for b in range(len_out):
-            (f,y) = dataset_eval.__getitem__(b)
-            #print(f.shape, f[0,21])
-            # force all voiced like training data
-            f[0,21] = 1
-            y_hat = model(torch.from_numpy(f).to(device))
+        for f in range(len_out):
+            (b,y) = dataset_eval.__getitem__(f)
+            # set voicing feature, as we trained on all voiced
+            b[0,21] = 1
+            y_hat,l = model(torch.from_numpy(b).to(device))
             y_hat = 20*y_hat[0,].cpu().numpy()
-            # restore energy, express in dB
-            e_y = np.sum(10**(20*y/10))
-            edB_y = 10*np.log10(e_y)
-            e_y_hat = np.sum(10**(y_hat/10))
-            edB_y_hat = 10*np.log10(e_y_hat)
-            e_dB_adj = 10*np.log10(1/e_y_hat)
-            #print(f"edB_y: {e_y} {e_y_hat} {e_dB_adj}\n")
-            y_hat_np[b,] = y_hat + dataset_eval.get_edB_target(b)
-            #y_hat_np[b,] = 20*y + dataset_eval.get_edB_target(b)
+            # restore frame energy
+            y_hat_np[f,] = y_hat + dataset_eval.get_edB_target(f)
+            l_np[f,:] = l.cpu().numpy()
 
     if len(args.out_file):
         print(y_hat_np.shape)
         y_hat_np = y_hat_np.reshape((-1))
         print(y_hat_np.shape)
         y_hat_np.astype('float32').tofile(args.out_file)
+
+    if len(args.write_latent):
+        l_np = l_np.reshape((-1))
+        l_np.astype('float32').tofile(args.write_latent)
 
 # interactive frame-frame visualisation of running model on test data
 if args.noplot == False:
@@ -377,19 +381,19 @@ if args.noplot == False:
     ax_b = ax[0].twinx()
 
     with torch.no_grad():
-        b = args.frame
+        f = args.frame
         loop = True
         while loop:
-            (f,y) = dataset_eval.__getitem__(b)
-            y_hat = model(torch.from_numpy(f).to(device))
-            f_plot = 20*f[0,]
+            (b,y) = dataset_eval.__getitem__(f)
+            y_hat,l = model(torch.from_numpy(b).to(device))
+            b_plot = 20*b[0,]
             y_plot = 20*y[0,]
             y_hat_plot = 20*y_hat[0,].cpu().numpy()
             # TODO: compute a distortion metric like SD or MSE (linear)
             (loss, loss_f, w_dB) = my_loss_np(y_hat_plot/20,y_plot/20)
             ax[0].cla()
-            ax[0].plot(b_f_kHz,f_plot[0:20])
-            t = f"f: {b}"
+            ax[0].plot(b_f_kHz,b_plot[0:20])
+            t = f"f: {f}"
             ax[0].set_title(t)
             ax[0].plot(y_f_kHz,y_plot,'g')
             ax[0].plot(y_f_kHz,y_hat_plot,'r')
@@ -405,11 +409,11 @@ if args.noplot == False:
             plt.pause(0.01)
             button = plt.waitforbuttonpress(0)
             if akey == 'b':
-                b -= 1
+                f -= 1
             if akey == 'n' or button == False:
-                b += 1
+                f += 1
             if akey == 'j':
-                b = test_frames[test_frames_ind]
+                f = test_frames[test_frames_ind]
                 test_frames_ind += 1
                 test_frames_ind = np.mod(test_frames_ind,4)
             if akey == 'w':

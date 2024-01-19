@@ -1,9 +1,10 @@
 """
-autoencoder2.py - ML quantisation experiment 
+autoencoder3.py - ML quantisation experiment 
 
-Based on misc/manifold/manifold.py
+Based on misc/manifold/manifold.py, with bottleneck
 
-y -> bottleneck -> y_hat
+b -> bottleneck -> b_hat
+
 """
 
 import torch
@@ -66,7 +67,7 @@ class f32Dataset(torch.utils.data.Dataset):
                 j += 1
         self.num_sequences = j
         if num_test:
-            print(f"Training: First {num_test} reserved for testing, {self.num_sequences}/{num_sequences_in} voiced vectors with energy > {thresh_dB} dB used")
+            print(f"Training: First {num_test} reserved for testing, {self.num_sequences}/{num_sequences_in} voiced vectors with energy > {thresh_dB} used")
         else:
             print(f"Testing: {self.num_sequences} loaded")
 
@@ -96,6 +97,7 @@ parser.add_argument('--out_file', type=str, default="", help='path to output fil
 parser.add_argument('--bottle_dim', type=int, default=10, help='bottleneck dim')
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
 parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
+parser.add_argument('--noise_var', type=float, default=0.0, help='inject gaussian noise at bottleneck')
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
@@ -125,54 +127,115 @@ device = (
 )
 print(f"Using {device} device")
 
+# Series of models tried during development - #1 seems the best ---------------
 w1=512
 class NeuralNetwork1(nn.Module):
-    def __init__(self, dim, bottle_dim):
+    def __init__(self, input_dim, output_dim, bottle_dim, noise_var):
         super().__init__()
+        self.noise_var = noise_var
+        self.bottle_dim = bottle_dim
+
         self.encoder = nn.Sequential(
-            nn.Linear(dim, w1),
+            nn.Linear(input_dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1),
             nn.ReLU(),
             nn.Linear(w1, bottle_dim),
-            nn.Tanh(),
+            nn.Tanh()
         )
+
         self.decoder = nn.Sequential(
             nn.Linear(bottle_dim, w1),
             nn.ReLU(),
             nn.Linear(w1, w1),
             nn.ReLU(),
-            nn.Linear(w1, dim)
-        )
+            nn.Linear(w1, output_dim)
+       )
 
     def forward(self, y):
         l = self.encoder(y)
-        y_hat = self.decoder(l)
+        l = x + np.sqrt(self.noise_var)*torch.randn(1,self.bottle_dim)
+        y_hat = self.decoder(y)
         return y_hat,l
 
-
-nf = 40
-k = 5
 class NeuralNetwork2(nn.Module):
-    def __init__(self, dim, bottle_dim):
+    def __init__(self, input_dim, output_dim, bottle_dim):
         super().__init__()
-        self.dim = dim
-        self.bottle_dim = dim
-        self.c1 = nn.Conv1d(dim, nf, 5, padding='same')
-        self.c2 = nn.Conv1d(nf, dim, 5, padding='same')
- 
-    def forward(self, y):
-        print(y.shape)
-        y.reshape(y.shape[0],1,self.dim)
-        print(y.shape)
-        y = F.relu(self.c1(y))
-        y = F.relu(self.c2(y))
-        
-        return y,torch.zeros(y.shape)
+        w1_2 = w1//2
+        w1_4 = w1//4
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(input_dim, w1_2),
+            nn.ReLU(),
+            nn.Linear(w1_2, w1_4),
+            nn.ReLU(),
+            nn.Linear(w1_4, bottle_dim),
+            nn.Tanh(),
+            nn.Linear(bottle_dim, w1_4),
+            nn.ReLU(),
+            nn.Linear(w1_4, w1_2),
+            nn.ReLU(),
+            nn.Linear(w1_2, output_dim)
+       )
+
+    def forward(self, x):
+        y = self.linear_relu_stack(x)
+        return y
+
+class NeuralNetwork3(nn.Module):
+    def __init__(self, input_dim, output_dim, bottle_dim):
+        super().__init__()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(input_dim, input_dim),
+            nn.ReLU(),
+            nn.Linear(input_dim, input_dim),
+            nn.ReLU(),
+            nn.Linear(input_dim, input_dim),
+            nn.ReLU(),
+            nn.Linear(input_dim, bottle_dim),
+            nn.Tanh(),
+            nn.Linear(bottle_dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1),
+            nn.ReLU(),
+            nn.Linear(w1, output_dim)
+       )
+
+    def forward(self, x):
+        y = self.linear_relu_stack(x)
+        return y
+
+class NeuralNetwork4(nn.Module):
+    def __init__(self, input_dim, output_dim, bottle_dim):
+        super().__init__()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(input_dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1),
+            nn.ReLU(),
+            nn.Linear(w1, bottle_dim),
+            nn.ReLU(),
+            nn.Linear(bottle_dim, bottle_dim),
+            nn.Tanh(),
+            nn.Linear(bottle_dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1),
+            nn.ReLU(),
+            nn.Linear(w1, output_dim)
+       )
+
+    def forward(self, x):
+        y = self.linear_relu_stack(x)
+        return y
 
 match args.nn:
     case 1:
-        model = NeuralNetwork1(target_dim, args.bottle_dim,).to(device)
+        model = NeuralNetwork1(feature_dim, target_dim, args.bottle_dim,args.noise_var).to(device)
     case 2:
-        model = NeuralNetwork2(target_dim, args.bottle_dim).to(device)
+        model = NeuralNetwork2(feature_dim, target_dim, args.bottle_dim).to(device)
+    case 3:
+        model = NeuralNetwork3(feature_dim, target_dim, args.bottle_dim).to(device)
+    case 4:
+        model = NeuralNetwork4(feature_dim, target_dim, args.bottle_dim).to(device)
     case _:
         print("unknown network!")
         quit()
@@ -222,12 +285,14 @@ if len(args.inference) == 0:
 
     # optimizer that will be used to update weights and biases
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
-    
+
     for epoch in range(args.epochs):
         sum_loss = 0.0
         for batch,(f,y) in enumerate(dataloader):
+            #print(f,y)
+            f = f.to(device)
             y = y.to(device)
-            y_hat,l = model(y)
+            y_hat = model(f)
             loss = loss_fn(y, y_hat)
             loss.backward() 
             optimizer.step()
@@ -254,25 +319,29 @@ if len(args.inference):
     dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0)
     len_out = dataset_eval.__len__()
     y_hat_np = np.zeros([len_out,target_dim],dtype=np.float32)
-    l_np = np.ones((len_out,args.bottle_dim),dtype=np.float32)
-
     with torch.no_grad():
-        for f in range(len_out):
-            (tmp,y) = dataset_eval.__getitem__(f)
-            y_hat,l = model(torch.from_numpy(y).to(device))
+        for b in range(len_out):
+            (f,y) = dataset_eval.__getitem__(b)
+            #print(f.shape, f[0,21])
+            # force all voiced like training data
+            f[0,21] = 1
+            y_hat = model(torch.from_numpy(f).to(device))
             y_hat = 20*y_hat[0,].cpu().numpy()
-            y_hat_np[f,] = y_hat + dataset_eval.get_edB_target(f)
-            l_np[f,:] = l.cpu().numpy()
+            # restore energy, express in dB
+            e_y = np.sum(10**(20*y/10))
+            edB_y = 10*np.log10(e_y)
+            e_y_hat = np.sum(10**(y_hat/10))
+            edB_y_hat = 10*np.log10(e_y_hat)
+            e_dB_adj = 10*np.log10(1/e_y_hat)
+            #print(f"edB_y: {e_y} {e_y_hat} {e_dB_adj}\n")
+            y_hat_np[b,] = y_hat + dataset_eval.get_edB_target(b)
+            #y_hat_np[b,] = 20*y + dataset_eval.get_edB_target(b)
 
     if len(args.out_file):
         print(y_hat_np.shape)
         y_hat_np = y_hat_np.reshape((-1))
         print(y_hat_np.shape)
         y_hat_np.astype('float32').tofile(args.out_file)
-
-    if len(args.write_latent):
-        l_np = l_np.reshape((-1))
-        l_np.astype('float32').tofile(args.write_latent)
 
 # interactive frame-frame visualisation of running model on test data
 if args.noplot == False:
@@ -308,17 +377,19 @@ if args.noplot == False:
     ax_b = ax[0].twinx()
 
     with torch.no_grad():
-        f = args.frame
+        b = args.frame
         loop = True
         while loop:
-            (tmp_,y) = dataset_eval.__getitem__(f)
-            y_hat,l = model(torch.from_numpy(y).to(device))
+            (f,y) = dataset_eval.__getitem__(b)
+            y_hat = model(torch.from_numpy(f).to(device))
+            f_plot = 20*f[0,]
             y_plot = 20*y[0,]
             y_hat_plot = 20*y_hat[0,].cpu().numpy()
             # TODO: compute a distortion metric like SD or MSE (linear)
             (loss, loss_f, w_dB) = my_loss_np(y_hat_plot/20,y_plot/20)
             ax[0].cla()
-            t = f"f: {f}"
+            ax[0].plot(b_f_kHz,f_plot[0:20])
+            t = f"f: {b}"
             ax[0].set_title(t)
             ax[0].plot(y_f_kHz,y_plot,'g')
             ax[0].plot(y_f_kHz,y_hat_plot,'r')
@@ -334,11 +405,11 @@ if args.noplot == False:
             plt.pause(0.01)
             button = plt.waitforbuttonpress(0)
             if akey == 'b':
-                f -= 1
+                b -= 1
             if akey == 'n' or button == False:
-                f += 1
+                b += 1
             if akey == 'j':
-                f = test_frames[test_frames_ind]
+                b = test_frames[test_frames_ind]
                 test_frames_ind += 1
                 test_frames_ind = np.mod(test_frames_ind,4)
             if akey == 'w':

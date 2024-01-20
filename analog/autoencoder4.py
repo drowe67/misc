@@ -8,6 +8,8 @@ import numpy as np
 import argparse
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
+import scipy.fftpack as sci
+
 # vector-quantize-pytorch library
 from vector_quantize_pytorch import FSQ, VectorQuantize
 # another VQ-VAE
@@ -20,7 +22,7 @@ class f32Dataset(torch.utils.data.Dataset):
                 sequence_length,
                 num_features=22,
                 num_dB_features=20,
-                overlap=True, norm=False, lower_limit_dB=-100, zero_mean=False):
+                overlap=True, norm=False, lower_limit_dB=-100, zero_mean=False, dct=False):
 
         self.sequence_length = sequence_length
         self.overlap = overlap
@@ -41,7 +43,10 @@ class f32Dataset(torch.utils.data.Dataset):
         # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
         self.features[:,:num_dB_features] = self.features[:,:num_dB_features]/20
 
-        self.mean= 0
+        if dct:
+            self.features[:,:num_dB_features] = sci.dct(self.features[:,:num_dB_features],axis=1,norm='ortho')
+ 
+        self.mean = 0
         if zero_mean:
             self.mean = np.mean(self.features[:,:num_dB_features],axis=0)
             self.features[:,:num_dB_features] -= self.mean
@@ -96,6 +101,7 @@ parser.add_argument('--lower_limit_dB', type=float, default=10.0, help='lower li
 parser.add_argument('--zero_mean', action='store_true', help='remove mean from training data')
 parser.add_argument('--loss_file', type=str, default="", help='file with epoch\tloss on each line')
 parser.add_argument('--opt', type=str, default="SGD", help='SGD/Adam')
+parser.add_argument('--dct', action='store_true', help='Apply DCT to input vectors')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -106,12 +112,9 @@ batch_size = 32
 gamma = 0.5
 inject_l_hat = args.write_latent;
 
-dataset = f32Dataset(feature_file, sequence_length, norm=args.norm,lower_limit_dB=args.lower_limit_dB, zero_mean=args.zero_mean)
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
-
-for f in dataloader:
-    print(f"Shape of features: {f.shape}")
-    break
+if len(args.inference) == 0:
+    dataset = f32Dataset(feature_file, sequence_length, norm=args.norm,lower_limit_dB=args.lower_limit_dB, zero_mean=args.zero_mean, dct=args.dct)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
 # Get cpu, gpu or mps device for training.
 device = (
@@ -186,27 +189,88 @@ class NeuralNetwork3(nn.Module):
         y = self.linear_relu_stack(x)
         return y,torch.zeros((1))
 
-
+# this is showing some improvement over 1 when dim reduced
 class NeuralNetwork4(nn.Module):
     def __init__(self, input_dim, bottle_dim):
         super().__init__()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(input_dim, w1),
             nn.ReLU(),
-            nn.Linear(w1, w1/2),
+            nn.Linear(w1, w1//2),
             nn.ReLU(),
-            nn.Linear(w1, bottle_dim),
+            nn.Linear(w1//2, bottle_dim),
             nn.ReLU(),
-            nn.Linear(bottle_dim, w1),
+            nn.Linear(bottle_dim, w1//2),
             nn.ReLU(),
-            nn.Linear(w1, w1/2),
+            nn.Linear(w1//2, w1),
+            nn.ReLU(),
+            nn.Linear(w1, input_dim)
+       )
+    def forward(self, x):
+        y = self.linear_relu_stack(x)
+        return y,torch.zeros((1))
+
+# like 4 but tanh bottleneck
+class NeuralNetwork5(nn.Module):
+    def __init__(self, input_dim, bottle_dim, noise_var=0):
+        super().__init__()
+        self.bottle_dim = bottle_dim
+        self.noise_var = noise_var
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1//2),
+            nn.ReLU(),
+            nn.Linear(w1//2, bottle_dim),
+            nn.Tanh()
+       )
+        self.decoder = nn.Sequential(
+            nn.Linear(bottle_dim, w1//2),
+            nn.ReLU(),
+            nn.Linear(w1//2, w1),
             nn.ReLU(),
             nn.Linear(w1, input_dim)
        )
 
-    def forward(self, x):
-        y = self.linear_relu_stack(x)
-        return y,torch.zeros((1))
+    def forward(self, y):
+        l = self.encoder(y)
+        l = l + np.sqrt(self.noise_var)*torch.randn(1,self.bottle_dim)
+        y_hat = self.decoder(l)
+        return y_hat,l
+
+# like 5 but with batch normalisation - results was very slow training, loss > 10dB after 50 epochs
+class NeuralNetwork6(nn.Module):
+    def __init__(self, input_dim, bottle_dim, noise_var=0):
+        super().__init__()
+        self.input_dim = input_dim
+        self.bottle_dim = bottle_dim
+        self.noise_var = noise_var
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, w1),
+            nn.BatchNorm1d(w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1//2),
+            nn.BatchNorm1d(w1//2),
+            nn.ReLU(),
+            nn.Linear(w1//2, bottle_dim),
+            nn.Tanh()
+       )
+        self.decoder = nn.Sequential(
+            nn.Linear(bottle_dim, w1//2),
+            nn.BatchNorm1d(w1//2),
+            nn.ReLU(),
+            nn.Linear(w1//2, w1),
+            nn.BatchNorm1d(w1),
+            nn.ReLU(),
+            nn.Linear(w1, input_dim)
+       )
+
+    def forward(self, y):
+        l = self.encoder(y.reshape((y.shape[0],self.input_dim)))
+        l = l + np.sqrt(self.noise_var)*torch.randn(1,self.bottle_dim)
+        y_hat = self.decoder(l)
+        return y_hat.reshape((y.shape[0],1,self.input_dim)),l
+
 match args.nn:
     case 1:
         model = NeuralNetwork1(num_used_features, args.bottle_dim).to(device)
@@ -216,6 +280,10 @@ match args.nn:
         model = NeuralNetwork3(num_used_features, args.bottle_dim).to(device)
     case 4:
         model = NeuralNetwork4(num_used_features, args.bottle_dim).to(device)
+    case 5:
+        model = NeuralNetwork5(num_used_features, args.bottle_dim, args.noise_var).to(device)
+    case 6:
+        model = NeuralNetwork6(num_used_features, args.bottle_dim, args.noise_var).to(device)
     case _:
         print("unknown network!")
         quit()
@@ -307,6 +375,7 @@ if len(args.inference):
   
     with torch.no_grad():
         sum_sd = 0
+        amean = dataset_inference.get_mean()
         for i in range(len_out):
             b = dataset_inference.__getitem__(i)
             b1 = b[:,:num_used_features].reshape((1,sequence_length,num_used_features))
@@ -321,13 +390,13 @@ if len(args.inference):
             sum_sd = sum_sd + 400*np.mean((b1-b_hat_cpu)**2)
             st = i*sequence_length
             en = (i+1)*sequence_length
-            b_hat_np[st:en,:20] = 20*b_hat[0,]
+            b_hat_np[st:en,:20] = 20*(b_hat_cpu + amean)
             # put Wo and v back into features
             #print(st,en)
             b_hat_np[st:en,num_used_features:num_features] = b[:,num_used_features:num_features]
             l_np[i,:] = l_cpu
 
-    print(f"Eq:{sum_sd/len_out:5.2f}")
+    print(f"SD:{sum_sd/len_out:5.2f} dB^2")
 
     if len(args.out_file):
         #print(b_hat_np.shape)
@@ -346,7 +415,8 @@ if args.noplot == False:
     # we may have already loaded test data if in inference mode
     if len(args.inference) == 0:
         model.eval()
-        dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, overlap=False, lower_limit_dB=args.lower_limit_dB, zero_mean=args.zero_mean)
+        dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, 
+                                        overlap=False, lower_limit_dB=args.lower_limit_dB, zero_mean=args.zero_mean,dct=args.dct)
         len_out = dataset_inference.__len__()
 
     print("[click or n]-next [b]-back [j]-jump [w]-weighting [q]-quit")
@@ -382,8 +452,15 @@ if args.noplot == False:
                 b_hat,l = model(torch.from_numpy(b1).to(device), torch.from_numpy(l_hat[f,:]).to(device))
             else:
                 b_hat,l = model(torch.from_numpy(b).to(device))
-            b_plot = 20*(b[0,] + amean)
-            b_hat_plot = 20*(b_hat[0,].cpu().numpy() + amean)
+        
+            if args.dct:
+                b_plot = 20*(sci.idct(b[0,] + amean,axis=1,norm='ortho'))
+                b_hat_cpu = b_hat[0,].cpu().numpy() + amean
+                b_hat_cpu = sci.idct(b_hat_cpu,axis=1,norm='ortho')
+                b_hat_plot = 20*(b_hat_cpu)
+            else:
+                b_plot = 20*(b[0,] + amean)
+                b_hat_plot = 20*(b_hat[0,].cpu().numpy() + amean)
             for j in range(sequence_length):
                 ax[j].cla()
                 if args.norm:
@@ -395,7 +472,7 @@ if args.noplot == False:
                 ax[j].set_title(t)
                 #print(dataset_inference.get_edB_feature(f+j))
                 ax[j].plot(b_f_kHz,edB+b_hat_plot[j,0:20],'r')
-                ax[j].axis([0, 4, -20, 70])
+                ax[j].axis([0, 4, 0, 70])
  
             plt.show(block=False)
             plt.pause(0.01)

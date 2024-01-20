@@ -37,12 +37,6 @@ class f32Dataset(torch.utils.data.Dataset):
            
         # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
         self.features[:,:num_dB_features] = self.features[:,:num_dB_features]/20
-        #self.amean = np.mean(self.features,axis=0)
-        self.amean = np.zeros(num_features)
-        #print(np.mean(self.features,axis=0))
-        #print(np.std(self.features,axis=0))
-        #print(self.amean.shape, self.features.shape)
-        #self.features -= self.amean
         if overlap:
             self.num_sequences = self.features.shape[0] - sequence_length + 1
         else:
@@ -171,7 +165,7 @@ class NeuralNetwork3(nn.Module):
         self.c2 = nn.Conv1d(nf, bottle_dim, 3, padding='same')
         self.c3 = nn.Conv1d(bottle_dim, nf, 3, padding='same')
         self.c4 = nn.Conv1d(nf, input_dim, 3, padding='same')
-    
+     
     def forward(self, x):
 
         # get reshape to (batch, features, timesteps) or in Torch terms (batch, channels, length))

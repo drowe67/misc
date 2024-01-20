@@ -95,6 +95,7 @@ parser.add_argument('--noise_var', type=float, default=0.0, help='inject gaussia
 parser.add_argument('--lower_limit_dB', type=float, default=10.0, help='lower limit in energy per feature vector')
 parser.add_argument('--zero_mean', action='store_true', help='remove mean from training data')
 parser.add_argument('--loss_file', type=str, default="", help='file with epoch\tloss on each line')
+parser.add_argument('--opt', type=str, default="SGD", help='SGD/Adam')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -122,7 +123,7 @@ device = (
 )
 print(f"Using {device} device")
 
-# Define model
+# consistent good performer
 w1=512
 class NeuralNetwork1(nn.Module):
     def __init__(self, input_dim, bottle_dim):
@@ -141,37 +142,80 @@ class NeuralNetwork1(nn.Module):
         y = self.linear_relu_stack(x)
         return y,torch.zeros((1))
 
-# concatenated vectors
+# quite good, but stuck at 0.2 after 100 epochs
 class NeuralNetwork2(nn.Module):
-    def __init__(self, input_dim, bottle_dim, seq):
+    def __init__(self, input_dim, bottle_dim):
         super().__init__()
-        self.input_dim = input_dim
-        self.seq = seq
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_dim*seq, w1),
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, w1),
             nn.ReLU(),
             nn.Linear(w1, bottle_dim),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(bottle_dim, w1),
             nn.ReLU(),
-            nn.Linear(w1, input_dim*seq)
+            nn.Linear(w1, 64),
+            nn.ReLU(),
+            nn.Linear(64, input_dim)
        )
 
     def forward(self, x):
-        x1 = torch.reshape(x,(-1,1,self.input_dim*self.seq))
-        #print(x.shape,x1.shape)
-        y1 = self.linear_relu_stack(x1)
-        y = torch.reshape(y1,(-1,self.seq,self.input_dim))
-        #print(y.shape,y1.shape)
-        #print(x)
-        return y
+        y = self.linear_relu_stack(x)
+        return y,torch.zeros((1))
+
+# poor perf, around 1dB after 50 epochs
+class NeuralNetwork3(nn.Module):
+    def __init__(self, input_dim, bottle_dim):
+        super().__init__()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, bottle_dim),
+            nn.ReLU(),
+            nn.Linear(bottle_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, input_dim)
+       )
+
+    def forward(self, x):
+        y = self.linear_relu_stack(x)
+        return y,torch.zeros((1))
 
 
+class NeuralNetwork4(nn.Module):
+    def __init__(self, input_dim, bottle_dim):
+        super().__init__()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(input_dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1/2),
+            nn.ReLU(),
+            nn.Linear(w1, bottle_dim),
+            nn.ReLU(),
+            nn.Linear(bottle_dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1/2),
+            nn.ReLU(),
+            nn.Linear(w1, input_dim)
+       )
+
+    def forward(self, x):
+        y = self.linear_relu_stack(x)
+        return y,torch.zeros((1))
 match args.nn:
     case 1:
         model = NeuralNetwork1(num_used_features, args.bottle_dim).to(device)
     case 2:
-        model = NeuralNetwork2(num_used_features, args.bottle_dim, sequence_length).to(device)
+        model = NeuralNetwork2(num_used_features, args.bottle_dim).to(device)
+    case 3:
+        model = NeuralNetwork3(num_used_features, args.bottle_dim).to(device)
+    case 4:
+        model = NeuralNetwork4(num_used_features, args.bottle_dim).to(device)
     case _:
         print("unknown network!")
         quit()
@@ -204,7 +248,13 @@ if len(args.inference) == 0:
         print("training with MSE loss")
 
     # optimizer that will be used to update weights and biases
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    if args.opt == "SGD":
+        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+        print("SGD")
+    if args.opt == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), weight_decay=args.lr)
+        print("Adam")
+   
     loss_epoch=np.zeros((args.epochs))
 
     for epoch in range(args.epochs):
@@ -332,8 +382,8 @@ if args.noplot == False:
                 b_hat,l = model(torch.from_numpy(b1).to(device), torch.from_numpy(l_hat[f,:]).to(device))
             else:
                 b_hat,l = model(torch.from_numpy(b).to(device))
-            b_plot = 20*b[0,] + amean
-            b_hat_plot = 20*b_hat[0,].cpu().numpy() + amean
+            b_plot = 20*(b[0,] + amean)
+            b_hat_plot = 20*(b_hat[0,].cpu().numpy() + amean)
             for j in range(sequence_length):
                 ax[j].cla()
                 if args.norm:

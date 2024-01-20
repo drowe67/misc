@@ -20,7 +20,7 @@ class f32Dataset(torch.utils.data.Dataset):
                 sequence_length,
                 num_features=22,
                 num_dB_features=20,
-                overlap=True, norm=False):
+                overlap=True, norm=False, lower_limit_dB=-100, zero_mean=False):
 
         self.sequence_length = sequence_length
         self.overlap = overlap
@@ -28,15 +28,25 @@ class f32Dataset(torch.utils.data.Dataset):
         self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, num_features))
         self.edB_feature = np.zeros(self.features.shape[0],dtype=np.float32)
 
-        if norm:
-            for i in range(self.features.shape[0]):
-                e = np.sum(10**(self.features[i,:num_dB_features]/10))
-                edB_feature = 10*np.log10(e)
+        for i in range(self.features.shape[0]):
+            e = np.sum(10**(self.features[i,:num_dB_features]/10))
+            edB_feature = 10*np.log10(e)
+            if edB_feature < lower_limit_dB:
+                self.features[i,:num_dB_features] += lower_limit_dB - edB_feature
+                edB_feature = lower_limit_dB
+            if norm:
                 self.features[i,:num_dB_features] -= edB_feature
-                self.edB_feature[i] = edB_feature
-           
+            self.edB_feature[i] = edB_feature
+   
         # features are in dB 20log10(), scale down by 20 to reduce dynamic range but keep log response        
         self.features[:,:num_dB_features] = self.features[:,:num_dB_features]/20
+
+        self.mean= 0
+        if zero_mean:
+            self.mean = np.mean(self.features[:,:num_dB_features],axis=0)
+            self.features[:,:num_dB_features] -= self.mean
+        print(self.mean)
+        print(np.std(self.features[:,:num_dB_features],axis=0))
         if overlap:
             self.num_sequences = self.features.shape[0] - sequence_length + 1
         else:
@@ -44,7 +54,6 @@ class f32Dataset(torch.utils.data.Dataset):
 
         self.num_sequences1 = self.features.shape[0]
 
- 
     def __len__(self):
         return self.num_sequences
 
@@ -62,8 +71,8 @@ class f32Dataset(torch.utils.data.Dataset):
     def get_edB_feature(self, index):
         return self.edB_feature[index]
 
-    def get_amean(self):
-        return self.amean
+    def get_mean(self):
+        return self.mean
 
 parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file in .f32 format')
@@ -83,6 +92,9 @@ parser.add_argument('--norm', action='store_true', help='normalise energy')
 parser.add_argument('--nvq', type=int, default=1, help='number of vector quantisers')
 parser.add_argument('--wloss', action='store_true', help='use weighted linear loss function')
 parser.add_argument('--noise_var', type=float, default=0.0, help='inject gaussian noise at bottleneck')
+parser.add_argument('--lower_limit_dB', type=float, default=10.0, help='lower limit in energy per feature vector')
+parser.add_argument('--zero_mean', action='store_true', help='remove mean from training data')
+parser.add_argument('--loss_file', type=str, default="", help='file with epoch\tloss on each line')
 args = parser.parse_args()
 
 feature_file = args.features
@@ -91,9 +103,9 @@ num_used_features = 20
 sequence_length = args.ncat
 batch_size = 32
 gamma = 0.5
-num_embeddings = 512
+inject_l_hat = args.write_latent;
 
-dataset = f32Dataset(feature_file, sequence_length, norm=args.norm)
+dataset = f32Dataset(feature_file, sequence_length, norm=args.norm,lower_limit_dB=args.lower_limit_dB, zero_mean=args.zero_mean)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
 for f in dataloader:
@@ -127,7 +139,7 @@ class NeuralNetwork1(nn.Module):
 
     def forward(self, x):
         y = self.linear_relu_stack(x)
-        return y
+        return y,torch.zeros((1))
 
 # concatenated vectors
 class NeuralNetwork2(nn.Module):
@@ -157,7 +169,7 @@ class NeuralNetwork2(nn.Module):
 
 match args.nn:
     case 1:
-        model = NeuralNetwork1(num_used_features, args.bottle_dim, sequence_length).to(device)
+        model = NeuralNetwork1(num_used_features, args.bottle_dim).to(device)
     case 2:
         model = NeuralNetwork2(num_used_features, args.bottle_dim, sequence_length).to(device)
     case _:
@@ -165,6 +177,7 @@ match args.nn:
         quit()
 
 if len(args.inference) == 0:
+    print(model)
     num_weights = sum(p.numel() for p in model.parameters())
     print(f"weights: {num_weights} float32 memory: {num_weights*4}")
 
@@ -181,56 +194,42 @@ def my_loss(y_hat, y):
     loss = torch.mean(weighted_error**2)
     return loss
 
-
 if len(args.inference) == 0:
     # criterion to computes the loss between input and target
     if args.wloss:
         loss_fn =  my_loss
+        print("training with weighted linear loss")
     else:
         loss_fn =  nn.MSELoss()
+        print("training with MSE loss")
 
     # optimizer that will be used to update weights and biases
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    loss_epoch=np.zeros((args.epochs))
 
     for epoch in range(args.epochs):
         sum_loss = 0.0
-        sum_loss_total = 0.0
-        indices_map = np.zeros(num_embeddings)
         for batch, x in enumerate(dataloader):
             # strip off Wo and v features
             x = x[:,:,:num_used_features] 
             x = x.to(device)
-            y = model(x)
-            if args.nn == 7:
-                indices = y["encoding_indices"].cpu().numpy()
-                indices_map[indices] = 1
-                loss = loss_fn(x, y["y"]) + 0.25*y["commitment_loss"]
-            else:
-                loss = loss_fn(x, y[0])
+            y,l = model(x)
+            loss = loss_fn(x, y)
                
             loss.backward() 
             optimizer.step()
             optimizer.zero_grad()
-            sum_loss_total += loss.item()
-            if args.nn == 7:
-                sum_loss += loss_fn(x, y["y"])
-    
-        # note factor of 400 is arbitrary for weighted loss mode, it
-        # only makes sense when we are calculating SD
-        sum_loss_total_dB2 = sum_loss_total * 400
-        if args.nn == 7:
-            sum_loss_dB2 = sum_loss * 400
-            vq_util = np.mean(indices_map)
-            print(f'Epochs:{epoch + 1:5d} | ' \
-                f'Batches per epoch: {batch + 1:3d} | ' \
-                f'Loss: {sum_loss_dB2 / (batch + 1):5.2f} ' \
-                f'Loss Total: {sum_loss_total_dB2 / (batch + 1):5.2f} ' \
-                f'VQ util: {vq_util:3.2f}')
-        else:
-            print(f'Epochs:{epoch + 1:5d} | ' \
-                f'Batches per epoch: {batch + 1:3d} | ' \
-                f'Loss: {sum_loss_total_dB2 / (batch + 1):5.2f}')
-            
+            sum_loss += loss.item()
+   
+        # Convert back to dB^2
+        sum_loss_dB2 = sum_loss * 400
+        print(f'Epochs:{epoch + 1:5d} | ' \
+            f'Batches per epoch: {batch + 1:3d} | ' \
+            f'Loss: {sum_loss_dB2 / (batch + 1):5.2f}')
+        loss_epoch[epoch] = sum_loss_dB2 / (batch + 1)
+
+    if len(args.loss_file):
+        np.savetxt(args.loss_file, loss_epoch)
 
     if len(args.save_model):
         print(f"Saving model to: {args.save_model}")
@@ -241,7 +240,7 @@ if len(args.inference):
     print(f"Loading model from: {args.inference}")
     model.load_state_dict(torch.load(args.inference))
     model.eval()
-    dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, overlap=False)
+    dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, overlap=False,lower_limit_dB=args.lower_limit_dB,zero_mean=args.zero_mean)
     len_out = dataset_inference.__len__()
     len_out1 = dataset_inference.__len1__()
     #print(len_out1, len_out)
@@ -297,7 +296,7 @@ if args.noplot == False:
     # we may have already loaded test data if in inference mode
     if len(args.inference) == 0:
         model.eval()
-        dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, overlap=False)
+        dataset_inference = f32Dataset(feature_file, sequence_length, norm=args.norm, overlap=False, lower_limit_dB=args.lower_limit_dB, zero_mean=args.zero_mean)
         len_out = dataset_inference.__len__()
 
     print("[click or n]-next [b]-back [j]-jump [w]-weighting [q]-quit")
@@ -325,7 +324,7 @@ if args.noplot == False:
     with torch.no_grad():
         f = args.frame // sequence_length
         loop = True
-        amean = 20*dataset_inference.get_amean()[:num_used_features]
+        amean = dataset_inference.get_mean()
         while loop:
             b = dataset_inference.__getitem__(f)
             b = b[:,:num_used_features].reshape((1,sequence_length,num_used_features))
@@ -333,20 +332,20 @@ if args.noplot == False:
                 b_hat,l = model(torch.from_numpy(b1).to(device), torch.from_numpy(l_hat[f,:]).to(device))
             else:
                 b_hat,l = model(torch.from_numpy(b).to(device))
-            b_plot = 20*b[0,]
-            if args.nn == 7:
-                b_hat_plot = 20*b_hat["y"][0,].cpu().numpy()
-            else:
-                b_hat_plot = 20*b_hat[0,].cpu().numpy()
+            b_plot = 20*b[0,] + amean
+            b_hat_plot = 20*b_hat[0,].cpu().numpy() + amean
             for j in range(sequence_length):
                 ax[j].cla()
-                edB = dataset_inference.get_edB_feature(f*sequence_length+j) + amean
+                if args.norm:
+                    edB = dataset_inference.get_edB_feature(f*sequence_length+j)
+                else:
+                    edB = 0
                 ax[j].plot(b_f_kHz,edB+b_plot[j,0:20])
                 t = f"f: {f*sequence_length+j}"
                 ax[j].set_title(t)
                 #print(dataset_inference.get_edB_feature(f+j))
                 ax[j].plot(b_f_kHz,edB+b_hat_plot[j,0:20],'r')
-                ax[j].axis([0, 4, 0, 70])
+                ax[j].axis([0, 4, -20, 70])
  
             plt.show(block=False)
             plt.pause(0.01)

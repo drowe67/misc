@@ -103,21 +103,21 @@ function test_240119 {
   batch_process_ml2 $fullfile "'Y_in','${filename}_y.f32','Y_hat_in','${filename}_y_hat.f32'" "3_y_hat"
   
   # 4. Use ML inference to recover y_hat from b using autoencoder3.py with dim 20 bottleneck
-  python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --bottle_dim 20 --nn 1 --inference ae3_nn1_b20.pt --noplot --out_file ${filename}_y_hat_ae3_b20.f32
-  batch_process_ml2 $fullfile "'Y_in','${filename}_y.f32','Y_hat_in','${filename}_y_hat_ae3_b20.f32'" "4_y_hat_ae3_b20"
+  #python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --bottle_dim 20 --nn 1 --inference ae3_nn1_b20.pt --noplot --out_file ${filename}_y_hat_ae3_b20.f32
+  #batch_process_ml2 $fullfile "'Y_in','${filename}_y.f32','Y_hat_in','${filename}_y_hat_ae3_b20.f32'" "4_y_hat_ae3_b20"
 
   # 5. Use ML inference to recover y_hat from b using autoencoder3.py with dim 10 bottleneck
-  python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --nn 1 --inference ae3_nn1.pt --noplot --out_file ${filename}_y_hat_ae3.f32
+  python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --nn 1 --inference ae3_b10_g0.8.pt --bottle_dim 10 --noplot --out_file ${filename}_y_hat_ae3.f32
   batch_process_ml2 $fullfile "'Y_in','${filename}_y.f32','Y_hat_in','${filename}_y_hat_ae3.f32'" "5_y_hat_ae3"
 
-#: <<'END'
+: <<'END'
 
   # 6. Use 24 bit VQ system to produce y_hat from b, dim 20 bottleneck
-  python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --bottle_dim 20 --nn 1 --inference ae3_nn1_b20.pt --noplot --write_latent ${filename}_l.f32
+  ython3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --bottle_dim 20 --nn 1 --inference ae3_nn1_b20.pt --noplot --write_latent ${filename}_l.f32
   cat ${filename}_l.f32 | ~/codec2-dev/build_linux/misc/vq_mbest -k 20 -q ae3_vq1.f32,ae3_vq2.f32 --mbest 5 > ${filename}_l_hat.f32
   python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --bottle_dim 20 --nn 1 --inference ae3_nn1_b20.pt --noplot --read_latent ${filename}_l_hat.f32 --out_file ${filename}_y_hat_vq24.f32
   batch_process_ml2 $fullfile "'Y_in','${filename}_y.f32','Y_hat_in','${filename}_y_hat_vq24.f32'" "5_y_hat_ae3_b20_vq24"
-#END
+END
 
   # Codec 2 3200 anchor
   cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_3200.wav 

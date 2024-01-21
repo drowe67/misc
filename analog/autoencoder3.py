@@ -22,7 +22,7 @@ class f32Dataset(torch.utils.data.Dataset):
                 features_dim,
                 target_dim,
                 num_test = 0,
-                thresh_dB=10):
+                thresh_dB=10, zero_mean=False):
 
         self.sequence_length = sequence_length
 
@@ -71,6 +71,13 @@ class f32Dataset(torch.utils.data.Dataset):
         else:
             print(f"Testing: {self.num_sequences} loaded")
 
+        self.b_mean = 0
+        if zero_mean:
+            self.b_mean = np.mean(self.features[:,:20],axis=0)
+            self.features[:,:20] -= self.b_mean
+            print(self.b_mean)
+        print(np.std(self.features[:,:20],axis=0))
+
     def __len__(self):
         return self.num_sequences
 
@@ -81,7 +88,10 @@ class f32Dataset(torch.utils.data.Dataset):
 
     def get_edB_target(self, index):
         return self.edB_target[index]
-   
+    
+    def get_b_mean(self):
+        return self.b_mean
+
 parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file [b[22] Wo v] .f32 format')
 parser.add_argument('target', type=str, help='path to target file [y[79]] in .f32 format')
@@ -98,6 +108,9 @@ parser.add_argument('--bottle_dim', type=int, default=10, help='bottleneck dim')
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
 parser.add_argument('--nn', type=int, default=1, help='Neural Network to use')
 parser.add_argument('--noise_var', type=float, default=0.0, help='inject gaussian noise at bottleneck')
+parser.add_argument('--zero_mean', action='store_true', help='remove mean from training data')
+parser.add_argument('--gamma', type=float, default=0.5, help='weighted linear loss factor 0..1 (1 is no weighting, pure linear)')
+
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
@@ -107,10 +120,10 @@ feature_dim = 22
 target_dim = 79
 sequence_length=1
 batch_size = 32
-gamma = 0.5
+gamma = args.gamma
  
 if len(args.inference) == 0:
-    dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test, thresh_dB=thresh_dB)
+    dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test, thresh_dB=thresh_dB,zero_mean=args.zero_mean)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
     for f,y in dataloader:
@@ -321,7 +334,7 @@ if len(args.inference):
     model.load_state_dict(torch.load(args.inference))
     model.eval()
     # num_test == 0 switches off energy and V filtering, so we get all frames in test data.
-    dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0)
+    dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0,zero_mean=args.zero_mean)
     len_out = dataset_eval.__len__()
     y_hat_np = np.zeros([len_out,target_dim],dtype=np.float32)
     l_np = np.ones((len_out,args.bottle_dim),dtype=np.float32)
@@ -354,7 +367,7 @@ if args.noplot == False:
     if len(args.inference) == 0:
         model.eval()
         # num_test == 0 switches off energy and V filtering, so we get all frames in test data.
-        dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0)
+        dataset_eval = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim, num_test=0,zero_mean=args.zero_mean)
 
     print("[click or n]-next [b]-back [j]-jump [w]-weighting [q]-quit")
 
@@ -382,17 +395,18 @@ if args.noplot == False:
 
     with torch.no_grad():
         f = args.frame
+        b_mean = dataset_eval.get_b_mean()
         loop = True
         while loop:
             (b,y) = dataset_eval.__getitem__(f)
             y_hat,l = model(torch.from_numpy(b).to(device))
-            b_plot = 20*b[0,]
+            b_plot = 20*(b[0,:20]+ + b_mean)
             y_plot = 20*y[0,]
             y_hat_plot = 20*y_hat[0,].cpu().numpy()
             # TODO: compute a distortion metric like SD or MSE (linear)
             (loss, loss_f, w_dB) = my_loss_np(y_hat_plot/20,y_plot/20)
             ax[0].cla()
-            ax[0].plot(b_f_kHz,b_plot[0:20])
+            ax[0].plot(b_f_kHz,b_plot)
             t = f"f: {f}"
             ax[0].set_title(t)
             ax[0].plot(y_f_kHz,y_plot,'g')

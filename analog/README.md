@@ -11,8 +11,13 @@ vocoders.
 | analog.sh | Ties C and Octave, and Pyton code together to automate experiments |
 | linear_batch.m | Octave batch processing tools that perform linear DSP |
 | analog.py  | PyTorch ML part of analog experiment, training, inference, and visualisation modes |
-| autoencoder1.py  | PyTorch ML part of ML autoencoder and quantisation experiments, training, inference, and visualisation modes |
+| autoencoder1.py  | PyTorch ML part of ML autoencoder and quantisation experiments, training, inference, and visualisation modes, b->b_hat |
 | mlquant_plots.m | Octave scripts to generate plots for mlquant.tex |
+| autoencoder4.py  | Pytorch ML to test autoencoder design, e.g. with d=20 bottlenck, should be low distortion |
+| auto_test.sh  | Shell script that drives autoencoder4.py in various configurations |
+| auto_plots.sh  | Octave script to plot loss curves from auto_test.sh |
+| autoencoder2.py | Variation on autoencoder1.py that does y->y_hat |
+| autoencoder3.py | Variation on autoencoder1.py that does b->y_hat |
 
 1. Build C tools from ~/codec2-dev dr-papr branch, Git hash c43d2958c6c:
 
@@ -32,7 +37,7 @@ vocoders.
    pip install vector-quantize-pytorch
    ```
  
-1. Dim reduction demo:
+1. Dim reduction demo (TODO fix this demo, not working as of 200121):
    ```
    python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --lr 1E-1 --epochs 20 --bottle_dim 10 --ncat 1 --nn 2 --norm --wloss
    ```
@@ -68,16 +73,21 @@ vocoders.
    ```
    ./analog.sh test_240118
    ```
-   Results are in `240118_wav`.
+   Results are in `240118_wav` (see legend below).  Result was an unacceptable drop in quality on male samples, traced to the bottleneck of the autoencoder step.  VQ seemed to work Ok. Female sample OK.  More in ml_quant.tex/pdf
+
+1. Experiments with gamma, autoencoder3.py (b->y_hat)
+   ```
+   python3 autoencoder3.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 2 --epochs 50 --nn 1 --frame 63  --bottle_dim 10 --gamma 0.9
+   ```
 
 # Samples in `240118_wav` (Experiment 1)
 
-   | Index | Processing |
-   | ---- | ---- |
-   | 1 | original amplitudes and phase
-   | 3 | phase0, y_hat =F(b) from ML inference  (manifold project) |
-   | 5 | As per 3, but K=20 `b` vectors passed through autoencoder 4 d=10 bottleneck, no quantisation |
-   | 6 | As per 5, 24 bit VQ of bottleneck vectors |
-   | 7 | As per 5, 12 bit VQ of bottleneck vectors |
-   | 8 | Codec 2 3200 high anchor |
+   | Index | Processing | Results |
+   | ---- | ---- | ---- |
+   | 1 | original amplitudes and phase | OK |
+   | 3 | phase0, y_hat =F(b) from ML inference  (manifold project) | OK |
+   | 5 | As per 3, but K=20 `b` vectors passed through autoencoder 4 d=10 bottleneck, no quantisation | Male drop in quality |
+   | 6 | As per 5, 24 bit VQ of bottleneck vectors | Male drop in quality |
+   | 7 | As per 5, 12 bit VQ of bottleneck vectors | Male drop in quality |
+   | 8 | Codec 2 3200 high anchor | - |
 

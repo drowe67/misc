@@ -62,9 +62,6 @@ class f32Dataset(torch.utils.data.Dataset):
     def get_edB_feature(self, index):
         return self.edB_feature[index]
 
-    def get_amean(self):
-        return self.amean
-
 parser = argparse.ArgumentParser()
 parser.add_argument('features', type=str, help='path to feature file in .f32 format')
 parser.add_argument('--lr', type=float, default=5E-2, help='learning rate')
@@ -127,7 +124,7 @@ class NeuralNetwork1(nn.Module):
 
     def forward(self, x):
         y = self.linear_relu_stack(x)
-        return y
+        return y,torch.zeros((1))
 
 # concatenated vectors
 class NeuralNetwork2(nn.Module):
@@ -147,12 +144,9 @@ class NeuralNetwork2(nn.Module):
 
     def forward(self, x):
         x1 = torch.reshape(x,(-1,1,self.input_dim*self.seq))
-        #print(x.shape,x1.shape)
         y1 = self.linear_relu_stack(x1)
         y = torch.reshape(y1,(-1,self.seq,self.input_dim))
-        #print(y.shape,y1.shape)
-        #print(x)
-        return y
+        return y,torch.zeros((1))
 
 # conv1d
 class NeuralNetwork3(nn.Module):
@@ -361,7 +355,7 @@ if (args.read_latent):
 
 match args.nn:
     case 1:
-        model = NeuralNetwork1(num_used_features, args.bottle_dim, sequence_length).to(device)
+        model = NeuralNetwork1(num_used_features, args.bottle_dim).to(device)
     case 2:
         model = NeuralNetwork2(num_used_features, args.bottle_dim, sequence_length).to(device)
     case 3:
@@ -414,13 +408,13 @@ if len(args.inference) == 0:
             # strip off Wo and v features
             x = x[:,:,:num_used_features] 
             x = x.to(device)
-            y = model(x)
+            y,l = model(x)
             if args.nn == 7:
                 indices = y["encoding_indices"].cpu().numpy()
                 indices_map[indices] = 1
                 loss = loss_fn(x, y["y"]) + 0.25*y["commitment_loss"]
             else:
-                loss = loss_fn(x, y[0])
+                loss = loss_fn(x, y)
                
             loss.backward() 
             optimizer.step()
@@ -539,7 +533,6 @@ if args.noplot == False:
     with torch.no_grad():
         f = args.frame // sequence_length
         loop = True
-        amean = 20*dataset_inference.get_amean()[:num_used_features]
         while loop:
             b = dataset_inference.__getitem__(f)
             b = b[:,:num_used_features].reshape((1,sequence_length,num_used_features))
@@ -554,7 +547,7 @@ if args.noplot == False:
                 b_hat_plot = 20*b_hat[0,].cpu().numpy()
             for j in range(sequence_length):
                 ax[j].cla()
-                edB = dataset_inference.get_edB_feature(f*sequence_length+j) + amean
+                edB = dataset_inference.get_edB_feature(f*sequence_length+j)
                 ax[j].plot(b_f_kHz,edB+b_plot[j,0:20])
                 t = f"f: {f*sequence_length+j}"
                 ax[j].set_title(t)

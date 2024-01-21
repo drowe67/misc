@@ -37,11 +37,12 @@ vocoders.
    pip install vector-quantize-pytorch
    ```
  
-1. Dim reduction demo (TODO fix this demo, not working as of 200121):
+1. Dim reduction demo:
    ```
-   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --lr 1E-1 --epochs 20 --bottle_dim 10 --ncat 1 --nn 2 --norm --wloss
+   python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --lr 1E-1 --epochs 50 --bottle_dim 10 --ncat 1 --nn 2 --norm
    ```
-
+   About 1.3dB after 50 epochs (no noise in bottleneck)
+   
 1. Dim reduction with noise in the bottleneck, to simulate the effect of a quantiser, and encourage a well behaived latent distribution.
    ```
    python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --bottle_dim 10 --ncat 1 --nn 4 --norm --wloss --epochs 100 --noise_var 1E-3 --save_model nn4_cat1.pt
@@ -69,7 +70,7 @@ vocoders.
    python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --bottle_dim 10 --ncat 1 --nn 4 --norm --inference nn4_cat1.pt --read_latent train_l_hat.f32
    ```
 
-1. Run VQ-ed autoencoder 4 experiment (Experiment 1 in `mlquant.tex`) using d=10 bottleneck:
+1. Run VQ-ed autoencoder 4 experiment (Experiment 1 in `mlquant.tex`) using d=10 bottleneck b->b_hat->y_hat:
    ```
    ./analog.sh test_240118
    ```

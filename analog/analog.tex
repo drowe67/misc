@@ -1,0 +1,45 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{tikz}
+\begin{document}
+
+\title{Analog Transmission of Vocoder Features}
+\maketitle
+
+Given a vector of vocoder features $\bf{f}$, use an autoencoder $E$ to map them to a dimension $D$ vector $\bf{g}$ where $D$ is even. The elements of $\bf{g}$ are mapped to $D/2$ complex symbols $\bf{s}$.  The magnitude of each symbol is constrained to a maximum of 1, but unlike digital modulation is not constrained to a discrete set of points on the complex plane.
+
+The complex symbols $\bf{s}$ are updated every $T_s$ seconds. The total symbol rate over the channel is therefore $R_s = D/(2T_s)$ Hz.  If a spectrally efficient form of transmission is used the bandwidth over the analog (e.g. radio) channel will also be $R_s$.
+
+The channel is AWGN with a noise power spectral density $N_0$ Watts/Hz.  We assume perfect synchronisation between the transmitter and receiver such that the received symbols:
+\begin{equation}
+\hat{\bf{s}}=\bf{s}+\bf{n}
+\end{equation}
+where $\bf{n}$ is a vector of complex (single sided) Gaussian noise samples.
+
+
+The Signal to Noise ratio (SNR) is the ratio of signal power $S$ to noise power $N$ (both in Watts) given by:
+\begin{equation}
+\begin{split}
+\frac{S}{N} &= \frac{E_sR_s}{N_0B} \\
+            &= \frac{E_sD}{2N_0T_sB}
+\end{split}
+\end{equation}
+where $E_s$ is the mean energy per symbol, and $B$ is the bandwidth we measure SNR in. This is often $B=R_s$ but when comparing to another communications system it is useful to use a common $B$.
+
+Our goal is to determine if reasonable speech quality can be obtained over a channel of bandwidth $B<3000$ Hz and SNR between 0 and 6dB, both comparable to Single Side Band (SSB) - a common power and bandwidth efficient form of analog radio communication.
+
+Tasks:
+\begin{enumerate}
+\item Collate training databases, extract LPCNet features.
+\item Design and code up a suitable autoencoder network.
+\item How to simulate channel (add complex noise to complex symbols) during training?
+\item We could simplify for a first pass by treating the channel as $D$ real symbols, and adding real noise.
+\item How to constrain symbol magnitude during training?
+\item Train at a candidate SNR.
+\item Test over a channel at the candidate SNR. and evaluate quality
+\item If we start with just LPCNet spectral (cepstrum) features we can use spectral distortion as a early objective indication of performance.
+\item It would be interesting to contrast with a more traditional digital model, e.g. same autoencoder network but VQ or entropy encode to a bit stream and use QPSK (or just the known BER at a given SNR) over the channel.
+\item It would be interesting to determine SNR performance at different $D$. Small $D$ will make each symbol more sensitive to noise, however the power will be concentrated in less symbols.  The Shannon–Hartley theorem suggests wider bandwidth (larger $D$) will be better.
+\end{enumerate}
+\end{document}

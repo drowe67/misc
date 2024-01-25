@@ -75,15 +75,6 @@ vocoders.
    ./analog.sh test_240118
    ```
    Results are in `240118_wav` (see legend below).  Result was an unacceptable drop in quality on male samples, traced to the bottleneck of the autoencoder step.  VQ seemed to work Ok. Female sample OK.  More in ml_quant.tex/pdf
- 
-1. 240121 Experiments with gamma, autoencoder3.py (b->y_hat)
-   ```
-   python3 autoencoder3.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 1 --epochs 200 --nn 1 --frame 63 --bottle_dim 10 --gamma 0.85 --save_model ae3_b10_g0.85.pt
-   ./analog.sh test_240121
-   ```
-   Speech quality increased going from 50 to 200 epochs, which suggests more training material rqd.  Not sure if gamma change is significant - it did look like it was doing a good job on the graphics GUI.  Quality with d=10 bottleneck now acceptable for this round of work (better than 240118). 240121A is with 50 epochs, 240121B with 200.  In each folder, compare the different between samples 3 & 5.  The delta seems smaller for B.
-
-# Samples in `240118_wav` (Experiment 1)
 
    | Index | Processing | Results |
    | ---- | ---- | ---- |
@@ -93,4 +84,13 @@ vocoders.
    | 6 | As per 5, 24 bit VQ of bottleneck vectors | Male drop in quality |
    | 7 | As per 5, 12 bit VQ of bottleneck vectors | Male drop in quality |
    | 8 | Codec 2 3200 high anchor | - |
+ 
+1. 240121 Experiments with gamma, autoencoder3.py (b->y_hat)
+   ```
+   python3 autoencoder3.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 1 --epochs 200 --nn 1 --frame 63 --bottle_dim 10 --gamma 0.85 --save_model ae3_b10_g0.85.pt
+   ./analog.sh test_240121
+   ```
+   Speech quality improved going from 50 to 200 epochs, which suggests more training material rqd.  Not sure if gamma change is significant - it did look like it was doing a good job on the graphics GUI.  Quality with d=10 bottleneck now acceptable for this round of work (better than 240118). 240121A is with 50 epochs, 240121B with 200.  In each folder, using headphones, compare the different between samples 3 (dim 20 b->y_hat) & 5 (b->y_hat via d=10 bottleneck).  The delta seems smaller for B.  There is a bass artefact that is present on 5, modulated by the speech.
+
+  
 

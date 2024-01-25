@@ -172,26 +172,26 @@ function do_plots_E(epslatex=0, png_name="")
   #load loss_C9.txt
   #load loss_C10.txt
   figure(1); clf; 
-  semilogy(loss_E1,'b+-;1 ae3 nn1 d=10 lr 1;'); 
+  semilogy(loss_E1,'b-;1 ae3 nn1 d=10 lr 1;'); 
   hold on;
-  semilogy(loss_E2,'bx-;2 ae3 nn1 d=10 lr 1;');
-  semilogy(loss_E3,'g+-;3 ae3 nn1 d=10 lr 0.5;');
-  semilogy(loss_E4,'ro-;4 ae2 nn1 d=10;');
-  semilogy(loss_E5,'rx-;5 ae2 nn2 d=10;');
+  semilogy(loss_E2,'b-;2 ae3 nn1 d=10 lr 1;');
+  semilogy(loss_E3,'g-;3 ae3 nn1 d=10 lr 0.5;');
+  semilogy(loss_E4,'r-;4 ae2 nn1 d=10;');
+  semilogy(loss_E5,'r-;5 ae2 nn2 d=10;');
   #semilogy(loss_E6,'c+-;6 ae3 nn1 lr 1 1E-3;');
   #semilogy(loss_C7,co-;7 nn4 d=20 3E-3;');
   #semilogy(loss_C8,'g+-;8 nn4 d=15;');
   #semilogy(loss_C9,'g*-;9 nn4 d=15;');
   #semilogy(loss_C10,'c+-;9 nn4 tanh d=15;');
   hold off;
-  xlabel('Epochs'); ylabel('Loss'); grid;
+  xlabel('Epochs'); grid;
   axis([0 length(loss_E1) 0.5E-3 1E-2])
   
   if length(png_name)
     print("-dpng", png_name)
   end
 
-  if epslatex, print_eps_restore("auto.tex","-S300,300",textfontsize,linewidth); end
+  if epslatex, print_eps_restore("auto_loss.tex","-S350,250",textfontsize,linewidth); end
 
 endfunction
 

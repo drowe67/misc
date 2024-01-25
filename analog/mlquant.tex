@@ -9,22 +9,19 @@
 \title{ML quantisation of Codec 2 Vocoder Features}
 \maketitle
 
-The goal is to achieve improved quantisation of Codec 2 features using ML techniques, for example lower bit rate for equivalent distortion.
+The goal of this study is to explore quantisation of Codec 2 features using ML techniques.
 
-It is useful to frame our expectations.  There is quite a bit of information in a mel spaced log spectral vector, and it will take a finite amount of bits to quantise it.  ML won't change this.  Where ML can help is better transforms and time prediction over large windows.  For example finding non-linear dependencies and correlations and reducing the dimension of the bottleneck required to be quantised.  Better transforms and time series prediction than possible with linear techniques. Combination of spectral information with pitch and voicing features will save some bits if they are correlated with the spectral information.  A multistage VQ will work better with a small dimension, as the residual errors tend towards Gaussian.
+It is useful to frame our expectations.  There is significant information in a mel spaced log spectral vector, and it will take a finite amount of bits to quantise it.  ML won't change this.  Where ML can help is better transforms and time prediction over large windows.  For example finding non-linear dependencies and correlations and reducing the dimension of the bottleneck required to be quantised.  Better transforms and time series prediction than possible with linear techniques. Combination of spectral information with pitch and voicing features will save some bits if they are correlated with the spectral information.  A multistage VQ will work better with a small dimension, as the residual errors tend towards Gaussian.
 
-However this will have it's limits for our use case where the quantisation window must be kept to around 100ms (including initial state information). ML isn't magic - it will take more information to quantise 8 x 10ms vectors than 1 x 10ms (but not 8 times as much).  One could start with a ML transform of 4 x 10ms vectors, quantise that as an initial state, then quantise the residual errors from each 10ms frame.
+However this will have it's limits for our use case where the quantisation window must be kept to around 100ms. ML isn't magic - it will take more information to quantise 8 x 10ms vectors than 1 x 10ms (but not 8 times as much).
 
 Is running the VQ training (e.g. VQVAE) inside the ML system worth it?  The literature cites several practical problems \cite{mentzer2023finite}, such as the rate the VQ adapts compared to the rest of the network, managing exponential weighted moving average (EWMA) updates that attempt to zero out codebook entries, and possibly poorer perf than traditional k-means.  Traditional VQ works pretty well and can extract some non-linear dependencies.  The approach tried here is to simulate quantisation in the training loop using small amounts of noise injection to ensure the latent space is well behaved. Then, the VQ can be designed on the training data in the bottleneck. The principle is to use traditional DSP/quantisation where possible, leaving ML to what it does best.  
 
 Planned experiments:
 \begin{enumerate}
-\item Experiment 1: Goal is to demonstrate dimensionality reduction.  Build an autoencoder for 1 vector.  Try different architectures, e.g. FC and conv1D.  Determine bottleneck dimension for $1dB^2$ distortion.  Try MSE and weighted linear loss functions. Determine if we can get any dimensionality reduction, as this would make VQ much easier (assuming VQ latent space is well behaved).
+\item Experiment 1: Goal is to demonstrate dimensionality reduction.  Build an autoencoder for 1 vector.  Try different architectures.  Determine bottleneck dimension for $1dB^2$ distortion.  Try MSE and weighted linear loss functions. Determine if we can get any dimensionality reduction, as this would make VQ much easier (assuming VQ latent space is well behaved).
 \item Experiment 1a: Goal is to demonstrate scalar linear quantisation $< 1dB^2$ at any bit rate, and ``shape" the latent space. Add noise to bottleneck to simulate uniform quantisation.
 \item Experiment 1b: Goal is to apply VQ to latent spaces. Visualise latent space somehow. Use a traditional VQ to quantise the bottleneck vectors, compare bit rate to 1a.
-\item Experiment 2: Build a VQVAE (VQ that trains in a ML network).  Compare distortion to kmeans for a range of VQ sizes.  Do they get the same performance?
-\item Experiment 3: Goal is to reduce bit rate by considering longer time windows.  Return to 1a (scalar linear quantisation) but attempt longer chunks of time (say 40 or 80 ms).
-\item Experiment 4: Embed pitch in the latent space being quantised, as well as log spectral information.
 \end{enumerate}
 
 \section{Experiment 1}
@@ -75,9 +72,26 @@ The process used to train a VQ is:
 \item A VQ is trained on the latent vectors using \emph{kmeans} that has a residual quantisation error $\sigma^2$.
 \end{enumerate}
 
-\subsection{Results}
+\subsection{Autoencoder 1 Results}
 
-The autoencoder was trained with $\sigma^2=10^{-3}$ gaussian noise over 100 epochs, using the weighted linear loss function \ref{eq:wl_loss} and normalised $K=20$ target vectors.  The network was then run in inference mode, and the SD for various amounts of noise at the bottleneck measured (Table \ref{tab:nn4_inference}).  Note that although the network was trained using a weighted linear loss function, inference performance was measured using the SD loss function.
+Several autoencoders were tested, summarised in \ref{tab:autoencoders}.
+
+\begin{table}
+\label{tab:autoencoders}
+\centering
+\begin{tabular}{l l l}
+\hline
+Name & Input & Output \\
+\hline
+Autoencoder1 & $\mathbf{b}$ & $\hat{\mathbf{b}}$ \\
+Autoencoder2 & $\mathbf{y}$ & $\hat{\mathbf{y}}$ \\
+Autoencoder3 & $\mathbf{b}$ & $\hat{\mathbf{y}}$ \\
+\hline
+\end{tabular}
+\caption{Autoencoder designs. $\mathbf{b}$ are mel spaced, smoothed $K=20$ vectors, $\mathbf{y}$ are oversampled $K=80$ linear spaced.}
+\end{table}
+
+The autoencoder \emph{autoencoder1.py} was trained with $\sigma^2=10^{-3}$ gaussian noise over 100 epochs, using the weighted linear loss function \ref{eq:wl_loss} and normalised $K=20$ target vectors.  The network was then run in inference mode, and the SD for various amounts of noise at the bottleneck measured (Table \ref{tab:nn4_inference}).  Note that although the network was trained using a weighted linear loss function, inference performance was measured using the SD loss function.
 
 \begin{table}
 \label{tab:nn4_inference}
@@ -129,10 +143,45 @@ Informal listening tests using headphones and laptop speakers (see \emph{240118\
 \end{enumerate} 
 So overall results were not satisfactory for a practical quantisation system, however this appears to be due to autoencoder distortion rather than VQ. The hybrid ML/VQ scheme does appear viable, suggested we have trained a ``well behaived" latent space that is amenable to quantisation. The use of ``old school" externally trained VQ was likely non-optimal but removed the need to deal with the many pitfalls of VQVAE \cite{mentzer2023finite}. The female results suggest low bit rates (12 bits/frame) may be possible if we can overcome the energy distribution issue.  However the buzzy artefacts for males suggests running the quantisation scheme on the smoothed $\mathbf{b}$ vectors may not be the best choice - we should perhaps make the target the high resolution $\mathbf{y}$ vectors.
 
-\subsection{conclusions}
+\subsection{Autoencoder 2 and 3 Results}
 
-Demonstrated dim reduction
-Developed a scheme for combinging VQ
+After some experimentation, improved results were obtained using \emph{autoencoder3.py} by letting the network train for 200 rather than 50 epochs.  This reduced the loss and produced acceptable quality speech with a $d=10$ bottleneck.  Quantising the bottleneck using a 24 bit VQ also produced acceptable speech.  VQ distortion results similar to Table \ref{tab:nn4_inference} were obtained, e.g. $\sigma^2 = 0.0015$ for 24 bits over the training database.  Informal listening showed some audible distortion under quantisation through headphones, however the distortion was hard to detect through laptop speakers. Samples from inside the training database sounded better than samples from outside, however the VQ did not break down.  The speech samples are available in the \emph{240125\_wav} folder.
+
+The weighting factor $\gamma$ was adjusted from 0.5 to 0.85, however it is unsure if this was useful.  There was a slight bass artefact that was evident after dimensionality reduction, that may indicate a mismatch at low frequencies.
+
+Finally, \emph{autoencoder3.py} was tested with a $d=10$ bottleneck but without quantisation.  The output speech was quite good, with a slight bass artefact from samples outside the training database. This design is interesting as it removes the need for the intermediate $\mathbf{b}$ log mel-spaced samples, a staple of the ML vocoder world.  Instead, the network trains it's own representation.
+
+\begin{figure}
+\caption{Autoencoder 2 and 3 Loss versus Epochs. Note the significant drop from 50 to 200 epochs. The two blue lines represents two training runs of the same network, in this case they produce the same results.}
+\label{fig:auto_loss}
+\begin{center}
+\input auto_loss.tex
+\end{center}
+\end{figure}
+
+\subsection{Conclusions and Further Work}
+
+Conclusions:
+\begin{enumerate}
+\item After some experimentation, successful $d=10$ dimensionality reduction was obtained, and the bottleneck vectors quantised using a 24 bit VQ with acceptable results. Some robustness to samples outside the training data was demonstrated.
+\item A scheme has been developed for combining ML with traditional VQ.  While probably non-optimal compared to quantisation in the network, it is simple to train and implement and likely usable on small machines such as microcontrollers.
+\item The VQ outperformed the baseline linear quantisation model, suggesting significant correlation still exists in the bottleneck vectors.
+\item We have a useful objective measure $\sigma^2$ for selecting bit rate and designing quantisers.
+\item A PCA showed significant linear dependencies still existed in the bottleneck vectors, and a mesh plot illustrated time dependencies.  An improved network could remove these dependencies, leaving less information to quantise.
+\item Training for extended periods and plotting loss against epochs was a useful (Figure \ref{fig:auto_loss}). In this work, extending training from 50 to 200 epochs resulted in halving the loss and improved speech quality. This also suggests more training material is advisable.  Some designs showed differing results with successive training runs; performing multiple training runs and comparing loss function plots is useful. Removing the mean from features helped in some autoencoder experiments, but is problematic to apply with weighted linear loss.
+\item All three architectures in Table \ref{tab:autoencoders} could be considered for a practical quantisation system.
+\item Buzzy male speech (poor energy distribution) is the classic breakdown artefact.  A better network (or indeed baseline vocoder) that accurately modelled energy distribution would ensure buzzy speech is not possible.
+\end{enumerate}
+
+Further Work:
+\begin{enumerate}
+\item Extend the network to consider blocks of samples in time, and use more sophisticated networks than simple FC layers.
+\item Train the quantiser in the loop.
+\item Demonstrate transparent dimensionality reduction.
+\item Develop a quantiser that include the other vocoder parameter and the frame energy (the vectors quantised above were normalised).
+\item Develop a fully quantised codec using these techniques and compare to existing Codec 2 modes.
+\item Develop reduced memory networks that will fit in a few 10's of kbytes, for microcontroller implementation.
+\end{enumerate}
 
 \subsection{Weighted Linear Loss Function}
 

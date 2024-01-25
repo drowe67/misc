@@ -1,8 +1,4 @@
-# Analog Modulation and Quantisation of Vocoder Features
-
-Experiments with autoencoders, quantisation, and analog modulation of Vocoder features.  Using Codec 2
-features for current work (as I am familiar with them), but could also be applied to other (e.g. neural)
-vocoders.
+# ML quantisation of Codec 2 Vocoder Features
 
 | Files | Description |
 | ---- | ---- |
@@ -97,7 +93,7 @@ vocoders.
    ```
    ./analog.sh test_240125
    ```
-   Through headphones, noticeable VQ distortion on some samples, hard to tell through laptop speakers.  Those samples outside of training database have more distortion on VQ, e.g. 0.003 rather than 0.015, which is expected.  This would be 1200 bit/s at a 20ms frame rate.  The VQ is operating "open loop".
+   Through headphones, noticeable VQ distortion on some samples, hard to tell through laptop speakers.  Those samples outside of training database have more distortion on VQ, e.g. 0.003 rather than 0.015, which is expected.  This would be 1200 bit/s at a 20ms frame rate.  The VQ is operating "open loop".  Less buzzy on males than 240118 (but not perfect).
 
    | Index | Processing |
    | ---- | ---- | ---- |

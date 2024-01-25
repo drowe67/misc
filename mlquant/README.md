@@ -1,5 +1,7 @@
 # ML quantisation of Codec 2 Vocoder Features
 
+Write up in `mlquant.pdf`
+
 | Files | Description |
 | ---- | ---- |
 | analog.tex | Latex write up of analog concept |
@@ -18,6 +20,13 @@
 
 1. Build C tools from ~/codec2-dev dr-papr branch, Git hash c43d2958c6c:
 
+1. Install [vector-quantize-pytorch](https://github.com/lucidrains/vector-quantize-pytorch)
+   ```
+   pip install vector-quantize-pytorch
+   ```
+
+1. Generate `~/Downloads/train_b20_ml.f32` and `~/Downloads/train_y80_ml.f32` training data using `misc/manifold` Makefile.
+   
 1. Train a basic autoencoder on feature file `train_b20_ml.f32`, model saved to `nn2_cat2.pt`
    ```
    python3 autoencoder1.py ~/Downloads/train_b20_ml.f32 --nn 2 --lr 0.05 --epochs 100 --bottle_dim 20 --ncat 2 --save_model nn2_cat2.pt --noplot
@@ -27,11 +36,6 @@
 1. Run inference on feature file `big_dog_b.f32` and enter frame by frame visualisation GUI:
    ```
    python3 autoencoder1.py ../manifold/big_dog_b.f32 --nn 2 --bottle_dim 20 --ncat 2 --inference nn2_cat2.pt
-   ```
-
-1. Install [vector-quantize-pytorch](https://github.com/lucidrains/vector-quantize-pytorch)
-   ```
-   pip install vector-quantize-pytorch
    ```
  
 1. Dim reduction demo:
@@ -96,7 +100,7 @@
    Through headphones, noticeable VQ distortion on some samples, hard to tell through laptop speakers.  Those samples outside of training database have more distortion on VQ, e.g. 0.003 rather than 0.015, which is expected.  This would be 1200 bit/s at a 20ms frame rate.  The VQ is operating "open loop".  Less buzzy on males than 240118 (but not perfect).
 
    | Index | Processing |
-   | ---- | ---- | ---- |
+   | ---- | ---- |
    | 1 | original amplitudes and phase |
    | 3 | phase0, y_hat =F(b) from ML inference  (manifold project) |
    | 5 | As per 3, but K=20 `b` vectors passed through autoencoder 4 d=10 bottleneck, no quantisation |

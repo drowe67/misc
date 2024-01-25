@@ -12,7 +12,7 @@ Some small projects on miscellaneous topics.
 | May 2023 | emi | HF EMI study: Qualitative discussion of EMI on lower HF bands, expressions for PWM noise and noise blanking, experimental EMI measurements |
 | July 2023 | freedv_low | Low SNR FreeDV waveform study |
 | Sep 2023 | folded_balun | Folded balun (Pawsey Stub) |
-| Oct 2023 | analog | ML Quantisation & Analog Transmission of Vocoder Features |
+| Jan 2024 | mlquant | ML quantisation of Codec 2 Features |
 | Oct 2023 | manifold | Experiments with non-linear dependencies with Codec 2 spectral magnitude vectors |
 
 I build the Latex documents using Texmaker:

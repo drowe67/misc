@@ -96,6 +96,8 @@ parser.add_argument('--out_file', type=str, default="", help='path to output fil
 parser.add_argument('--bottle_dim', type=int, default=10, help='bottleneck dim')
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
 parser.add_argument('--nn', type=int, default=2, help='Neural Network to use')
+parser.add_argument('--gamma', type=float, default=0.5, help='weighted linear loss factor 0..1 (1 is no weighting, pure linear)')
+parser.add_argument('--loss_file', type=str, default="", help='file with epoch\tloss on each line')
 args = parser.parse_args()
 feature_file = args.features
 target_file = args.target
@@ -105,7 +107,7 @@ feature_dim = 22
 target_dim = 79
 sequence_length=1
 batch_size = 32
-gamma = 0.5
+gamma = args.gamma
  
 if len(args.inference) == 0:
     dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test, thresh_dB=thresh_dB)
@@ -129,6 +131,7 @@ w1=512
 class NeuralNetwork1(nn.Module):
     def __init__(self, dim, bottle_dim):
         super().__init__()
+        self.bottle_dim = bottle_dim
         self.encoder = nn.Sequential(
             nn.Linear(dim, w1),
             nn.ReLU(),
@@ -148,25 +151,33 @@ class NeuralNetwork1(nn.Module):
         y_hat = self.decoder(l)
         return y_hat,l
 
-
-nf = 40
-k = 5
 class NeuralNetwork2(nn.Module):
     def __init__(self, dim, bottle_dim):
         super().__init__()
-        self.dim = dim
-        self.bottle_dim = dim
-        self.c1 = nn.Conv1d(dim, nf, 5, padding='same')
-        self.c2 = nn.Conv1d(nf, dim, 5, padding='same')
- 
+        self.bottle_dim = bottle_dim
+        self.encoder = nn.Sequential(
+            nn.Linear(dim, w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1//2),
+            nn.ReLU(),
+            nn.Linear(w1//2, bottle_dim),
+            nn.Tanh(),
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(bottle_dim, w1//2),
+            nn.ReLU(),
+            nn.Linear(w1//2,w1),
+            nn.ReLU(),
+            nn.Linear(w1, w1),
+            nn.ReLU(),
+            nn.Linear(w1, dim)
+        )
+
     def forward(self, y):
-        print(y.shape)
-        y.reshape(y.shape[0],1,self.dim)
-        print(y.shape)
-        y = F.relu(self.c1(y))
-        y = F.relu(self.c2(y))
-        
-        return y,torch.zeros(y.shape)
+        l = self.encoder(y)
+        y_hat = self.decoder(l)
+        return y_hat,l
+
 
 match args.nn:
     case 1:
@@ -222,7 +233,8 @@ if len(args.inference) == 0:
 
     # optimizer that will be used to update weights and biases
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
-    
+    loss_epoch=np.zeros((args.epochs))
+   
     for epoch in range(args.epochs):
         sum_loss = 0.0
         for batch,(f,y) in enumerate(dataloader):
@@ -240,6 +252,11 @@ if len(args.inference) == 0:
         print(f'Epochs:{epoch + 1:5d} | ' \
             f'Batches per epoch: {batch + 1:3d} | ' \
             f'Loss: {sum_loss / (batch + 1):.10f}')
+
+        loss_epoch[epoch] = sum_loss / (batch + 1)
+
+    if len(args.loss_file):
+        np.savetxt(args.loss_file, loss_epoch)
 
     if len(args.save_model):
         print(f"Saving model to: {args.save_model}")

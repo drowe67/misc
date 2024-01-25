@@ -18,6 +18,7 @@ vocoders.
 | auto_plots.sh  | Octave script to plot loss curves from auto_test.sh |
 | autoencoder2.py | Variation on autoencoder1.py that does y->y_hat |
 | autoencoder3.py | Variation on autoencoder1.py that does b->y_hat |
+| vq_train.sh | helper script for VQ training |
 
 1. Build C tools from ~/codec2-dev dr-papr branch, Git hash c43d2958c6c:
 
@@ -92,5 +93,18 @@ vocoders.
    ```
    Speech quality improved going from 50 to 200 epochs, which suggests more training material rqd.  Not sure if gamma change is significant - it did look like it was doing a good job on the graphics GUI.  Quality with d=10 bottleneck now acceptable for this round of work (better than 240118). 240121A is with 50 epochs, 240121B with 200.  In each folder, using headphones, compare the different between samples 3 (dim 20 b->y_hat) & 5 (b->y_hat via d=10 bottleneck).  The delta seems smaller for B.  There is a bass artefact that is present on 5, modulated by the speech.
 
-  
+1. 240125_wav  autoencoder3.py (b->y_hat) as above but with 24 bit VQ:
+   ```
+   ./analog.sh test_240125
+   ```
+   Through headphones, noticeable VQ distortion on some samples, hard to tell through laptop speakers.  Those samples outside of training database have more distortion on VQ, e.g. 0.003 rather than 0.015, which is expected.  This would be 1200 bit/s at a 20ms frame rate.  The VQ is operating "open loop".
+
+   | Index | Processing |
+   | ---- | ---- | ---- |
+   | 1 | original amplitudes and phase |
+   | 3 | phase0, y_hat =F(b) from ML inference  (manifold project) |
+   | 5 | As per 3, but K=20 `b` vectors passed through autoencoder 4 d=10 bottleneck, no quantisation |
+   | 6 | As per 5, 24 bit VQ of bottleneck vectors |
+   | 8 | Codec 2 3200 high anchor |
+ 
 

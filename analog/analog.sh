@@ -39,7 +39,47 @@ function batch_process_ml2 {
   ${c2sim_opt} | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_${outname}.wav
 }
 
-# autoencoder3.py b->y_hat --nn1, dim 10 bottleneck, with VQ, diff noise injection
+# autoencoder3.py b->y_hat --nn1, dim 10 bottleneck, with VQ
+function test_240125 {
+  fullfile=$1
+  filename=$(basename -- "$fullfile")
+  filename="${filename%.*}"
+  extension="${filename##*.}"
+  mkdir -p $out_dir
+
+: <<'END'
+
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin --dump ${filename}
+
+  # 1. orig amp and phase
+  c2sim $fullfile --hpf --modelout ${filename}_model.bin -o - | \
+  sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_1_out.wav
+ 
+  # 3. Use ML inference to recover y_hat from b using manifold.py (known previous good result)
+  # note y is used for energy side information and measuring SD, shape of y_hat is inferred from b. 
+  echo "linear_batch;" \
+       "linear_batch_ml_in(\"${filename}\", 'Nb',100, 'Y_out', \"${filename}_y.f32\"); quit;" | octave-cli -qf
+  echo "linear_batch;" \
+       "linear_batch_ml_in(\"${filename}\", 'B_out', \"${filename}_b.f32\"); quit;" | octave-cli -qf
+  python3 ../manifold/manifold.py ${filename}_b.f32 ${filename}_y.f32 --inference ../manifold/model1.pt --noplot --out_file ${filename}_y_hat.f32
+  batch_process_ml2 $fullfile "'Y_in','${filename}_y.f32','Y_hat_in','${filename}_y_hat.f32'" "3_y_hat"
+  
+  # 5. Recover y_hat from b using autoencoder3.py with dim 10 bottleneck
+  python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --nn 1 --inference ae3_b10_g0.85.pt --bottle_dim 10 --noplot --out_file ${filename}_y_hat_ae3.f32
+  batch_process_ml2 $fullfile "'Y_in','${filename}_y.f32','Y_hat_in','${filename}_y_hat_ae3.f32'" "5_y_hat_ae3"
+END
+  # 6. Use 24 bit VQ system to produce y_hat from b, dim 10 bottleneck
+  python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --nn 1 --inference ae3_b10_g0.85.pt --bottle_dim 10 --noplot --write_latent ${filename}_l.f32
+  cat ${filename}_l.f32 | ~/codec2-dev/build_linux/misc/vq_mbest -k 10 -q ae3_b10_vq1.f32,ae3_b10_vq2.f32 --mbest 5 > ${filename}_l_hat.f32
+  python3 autoencoder3.py ${filename}_b.f32 ${filename}_y.f32 --nn 1 --inference ae3_b10_g0.85.pt --bottle_dim 10 --noplot --read_latent ${filename}_l_hat.f32 --out_file ${filename}_y_hat_vq24.f32
+  batch_process_ml2 $fullfile "'Y_in','${filename}_y.f32','Y_hat_in','${filename}_y_hat_vq24.f32'" "6_y_hat_ae3_vq24"
+
+
+  # Codec 2 3200 anchor
+  cat $fullfile | hpf | c2enc 3200 - - | c2dec 3200 - - | sox -t .s16 -r 8000 -c 1 - ${out_dir}/${filename}_8_3200.wav 
+}
+
+# autoencoder3.py b->y_hat --nn1, dim 10 bottleneck, noise injection to simulate VQ
 function test_240121 {
   fullfile=$1
   filename=$(basename -- "$fullfile")
@@ -243,6 +283,14 @@ if [ $# -gt 0 ]; then
         #test_240119 ${CODEC2_PATH}/raw/kristoff.raw
         #test_240119 ${CODEC2_PATH}/raw/mmt1.raw
         test_240119 ${CODEC2_PATH}/wav/vk5dgr_testing_8k.wav
+      ;;
+    test_240125)
+        test_240125 ${CODEC2_PATH}/raw/big_dog.raw
+        test_240125 ${CODEC2_PATH}/raw/two_lines.raw
+        test_240125 ${CODEC2_PATH}/raw/hts1a.raw
+        test_240125 ${CODEC2_PATH}/raw/kristoff.raw
+        test_240125 ${CODEC2_PATH}/raw/mmt1.raw
+        test_240125 ${CODEC2_PATH}/wav/vk5dgr_testing_8k.wav
       ;;
      esac
 else

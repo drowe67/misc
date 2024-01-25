@@ -106,10 +106,12 @@ parser.add_argument('--inference', type=str, default="", help='Inference only wi
 parser.add_argument('--out_file', type=str, default="", help='path to output file [y[79]] in .f32 format')
 parser.add_argument('--bottle_dim', type=int, default=10, help='bottleneck dim')
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
+parser.add_argument('--read_latent', type=str, default="", help='path to output file of latent vectors l[bottle_dim] in .f32 format')
 parser.add_argument('--nn', type=int, default=1, help='Neural Network to use')
 parser.add_argument('--noise_var', type=float, default=0.0, help='inject gaussian noise at bottleneck')
 parser.add_argument('--zero_mean', action='store_true', help='remove mean from training data')
 parser.add_argument('--gamma', type=float, default=0.5, help='weighted linear loss factor 0..1 (1 is no weighting, pure linear)')
+parser.add_argument('--loss_file', type=str, default="", help='file with epoch\tloss on each line')
 
 args = parser.parse_args()
 feature_file = args.features
@@ -123,7 +125,8 @@ batch_size = 32
 gamma = args.gamma
  
 if len(args.inference) == 0:
-    dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test, thresh_dB=thresh_dB,zero_mean=args.zero_mean)
+    dataset = f32Dataset(feature_file, target_file, sequence_length, feature_dim, target_dim,num_test=args.num_test,
+                         thresh_dB=thresh_dB,zero_mean=args.zero_mean)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
     for f,y in dataloader:
@@ -143,10 +146,11 @@ print(f"Using {device} device")
 # Series of models tried during development - #1 seems the best ---------------
 w1=512
 class NeuralNetwork1(nn.Module):
-    def __init__(self, input_dim, output_dim, bottle_dim, noise_var):
+    def __init__(self, input_dim, output_dim, bottle_dim, noise_var, inject_l_hat=False):
         super().__init__()
         self.noise_var = noise_var
         self.bottle_dim = bottle_dim
+        self.inject_l_hat = inject_l_hat
 
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, w1),
@@ -165,9 +169,12 @@ class NeuralNetwork1(nn.Module):
             nn.Linear(w1, output_dim)
        )
 
-    def forward(self, y):
+    def forward(self, y, l_hat=None):
         l = self.encoder(y)
-        l = l + np.sqrt(self.noise_var)*torch.randn(1,self.bottle_dim)
+        l = l + np.sqrt(self.noise_var)*torch.randn(l.shape[0],self.bottle_dim)
+        if self.inject_l_hat:
+            l = l_hat.reshape(l.shape[0],self.bottle_dim)
+        #print(l.shape)
         y_hat = self.decoder(l)
         return y_hat,l
 
@@ -245,9 +252,13 @@ class NeuralNetwork4(nn.Module):
         y = self.linear_relu_stack(x)
         return y
 
+inject_l_hat = False
+if (args.read_latent):
+    inject_l_hat = True
+
 match args.nn:
     case 1:
-        model = NeuralNetwork1(feature_dim, target_dim, args.bottle_dim,args.noise_var).to(device)
+        model = NeuralNetwork1(feature_dim, target_dim, args.bottle_dim,args.noise_var,inject_l_hat=inject_l_hat).to(device)
     case 2:
         model = NeuralNetwork2(feature_dim, target_dim, args.bottle_dim).to(device)
     case 3:
@@ -304,6 +315,8 @@ if len(args.inference) == 0:
     # optimizer that will be used to update weights and biases
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
 
+    loss_epoch=np.zeros((args.epochs))
+
     for epoch in range(args.epochs):
         sum_loss = 0.0
         for batch,(b,y) in enumerate(dataloader):
@@ -323,6 +336,10 @@ if len(args.inference) == 0:
         print(f'Epochs:{epoch + 1:5d} | ' \
             f'Batches per epoch: {batch + 1:3d} | ' \
             f'Loss: {sum_loss / (batch + 1):.10f}')
+        loss_epoch[epoch] = sum_loss / (batch + 1)
+
+    if len(args.loss_file):
+        np.savetxt(args.loss_file, loss_epoch)
 
     if len(args.save_model):
         print(f"Saving model to: {args.save_model}")
@@ -339,12 +356,22 @@ if len(args.inference):
     y_hat_np = np.zeros([len_out,target_dim],dtype=np.float32)
     l_np = np.ones((len_out,args.bottle_dim),dtype=np.float32)
 
+    # optionally read latent vectors from file for injection into network
+    if inject_l_hat:
+        l_hat = np.fromfile(args.read_latent, dtype=np.float32)
+        #print(l_hat.shape)
+        l_hat = l_hat.reshape((-1),args.bottle_dim)
+        #print(l_hat.shape)
+  
     with torch.no_grad():
         for f in range(len_out):
             (b,y) = dataset_eval.__getitem__(f)
             # set voicing feature, as we trained on all voiced
             b[0,21] = 1
-            y_hat,l = model(torch.from_numpy(b).to(device))
+            if inject_l_hat:
+                y_hat,l = model(torch.from_numpy(b).to(device), torch.from_numpy(l_hat[f,:]).to(device))
+            else:
+                y_hat,l = model(torch.from_numpy(b).to(device))
             y_hat = 20*y_hat[0,].cpu().numpy()
             # restore frame energy
             y_hat_np[f,] = y_hat + dataset_eval.get_edB_target(f)

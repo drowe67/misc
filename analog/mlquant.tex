@@ -129,6 +129,11 @@ Informal listening tests using headphones and laptop speakers (see \emph{240118\
 \end{enumerate} 
 So overall results were not satisfactory for a practical quantisation system, however this appears to be due to autoencoder distortion rather than VQ. The hybrid ML/VQ scheme does appear viable, suggested we have trained a ``well behaived" latent space that is amenable to quantisation. The use of ``old school" externally trained VQ was likely non-optimal but removed the need to deal with the many pitfalls of VQVAE \cite{mentzer2023finite}. The female results suggest low bit rates (12 bits/frame) may be possible if we can overcome the energy distribution issue.  However the buzzy artefacts for males suggests running the quantisation scheme on the smoothed $\mathbf{b}$ vectors may not be the best choice - we should perhaps make the target the high resolution $\mathbf{y}$ vectors.
 
+\subsection{conclusions}
+
+Demonstrated dim reduction
+Developed a scheme for combinging VQ
+
 \subsection{Weighted Linear Loss Function}
 
 From the manifold work \cite{rowe2023_manifold}, we have employed a weighted linear loss function:

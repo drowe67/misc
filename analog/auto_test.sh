@@ -2,7 +2,7 @@
 #
 # Run some automated autoencoder tests and plot results
 
-epochs=20
+epochs=200
 
 if [ $# -gt 0 ]; then
   case $1 in
@@ -158,3 +158,33 @@ if [ ! -f loss_D5.txt ]; then
     python3 autoencoder4.py ~/Downloads/train_b20_ml.f32 --lr 0.1 --epochs ${epochs} --bottle_dim 10 --nn 5 \
      --lower_limit_dB 10 --noplot --zero_mean --dct --noise_var 1E-3 --norm --loss_file loss_D5.txt
 fi
+
+#-------------------------------------------
+# autoencoder3 b->y_hat with longer epochs
+
+if [ ! -f loss_E1.txt ]; then
+    python3 autoencoder3.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 1 --epochs ${epochs} --nn 1 \
+    --frame 63 --bottle_dim 10 --gamma 0.85 --loss_file loss_E1.txt --save_model ae3_E1_g.85.pt --noplot
+fi   
+
+if [ ! -f loss_E2.txt ]; then
+    python3 autoencoder3.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 1 --epochs ${epochs} --nn 1 \
+    --frame 63 --bottle_dim 10 --gamma 0.85 --loss_file loss_E2.txt --save_model ae3_E2_g.85.pt --noplot
+fi   
+
+if [ ! -f loss_E3.txt ]; then
+    python3 autoencoder3.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 0.5 --epochs ${epochs} --nn 1 \
+    --frame 63 --bottle_dim 10 --gamma 0.85 --loss_file loss_E3.txt  --save_model ae3_E2_g.85.pt --noplot
+fi   
+
+# autoencoder2 y->y_hat with longer epochs, nn1
+if [ ! -f loss_E4.txt ]; then
+    python3 autoencoder2.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 1 --epochs ${epochs} --nn 1 \
+    --frame 63 --bottle_dim 10 --gamma 0.85 --loss_file loss_E4.txt  --save_model ae2_E4_g.85.pt --noplot
+fi   
+
+# autoencoder2 y->y_hat with longer epochs, nn2
+if [ ! -f loss_E5.txt ]; then
+    python3 autoencoder2.py ~/Downloads/train_b20_ml.f32 ~/Downloads/train_y80_ml.f32 --lr 1 --epochs ${epochs} --nn 2 \
+    --frame 63 --bottle_dim 10 --gamma 0.85 --loss_file loss_E5.txt  --save_model ae2_E5_g.85.pt --noplot
+fi   

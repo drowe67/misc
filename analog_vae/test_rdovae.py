@@ -120,10 +120,8 @@ feature_file = args.features
 checkpoint['model_args']    = (num_features, latent_dim, quant_levels, cond_size, cond_size2)
 checkpoint['model_kwargs']  = {'state_dim': state_dim, 'split_mode' : split_mode, 'pvq_num_pulses': args.pvq_num_pulses, 'state_dropout_rate': args.state_dropout_rate}
 model = RDOVAE(*checkpoint['model_args'], **checkpoint['model_kwargs'])
-
 checkpoint = torch.load(args.model_name, map_location='cpu')
 model.load_state_dict(checkpoint['state_dict'], strict=False)
-
 checkpoint['state_dict']    = model.state_dict()
 
 
@@ -131,8 +129,9 @@ checkpoint['state_dict']    = model.state_dict()
 checkpoint['dataset_args'] = (feature_file, sequence_length, num_features, 36)
 checkpoint['dataset_kwargs'] = {'lambda_min': lambda_min, 'lambda_max': lambda_max, 'enc_stride': model.enc_stride, 'quant_levels': quant_levels}
 
-#features = np.memmap(feature_file, 'r')
 features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (1, -1, nb_total_features))
+nb_features_rounded = model.dec_stride*(features.shape[1]//model.dec_stride)
+features = features[:,:nb_features_rounded,:]
 features = features[:, :, :num_used_features]
 features = torch.tensor(features)
 

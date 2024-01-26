@@ -47,4 +47,5 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --state
 
 1. Way to write/read bottleneck vectors
 
+1. Look at bottleneck vectors, PCA, any correlation?  Ameniable to VQ?  Further dim reduction?
 

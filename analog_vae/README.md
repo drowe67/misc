@@ -2,6 +2,7 @@
 
 ## LPCNet
 
+```
 git clone git@github.com:xiph/opus.git
 cd opus
 git checkout opus-ng
@@ -9,21 +10,26 @@ git checkout opus-ng
 ./configure --enable-dred
 make
 cd dnn
-
+```
+Initial test:
+```
 ./lpcnet_demo -features input.pcm features.f32
 ./lpcnet_demo -fargan-synthesis features.f32 output.pcm
-
-Playing on a different machine:
-
+```
+Playing on a remote machine:
+```
 scp deep.lan:opus/output.s16 /dev/stdout | aplay -f S16_LE -r 1600
+```
 
 ## Training
-
+```
 python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --state-dim 80 --batch-size 512 --epochs 100 --lr 0.003 --lr-decay-factor 0.0001 training_features_file.f32 model_dir_name
+```
 
 ## Testing
-
+```
 ./test.sh model01/checkpoints/checkpoint_epoch_50.pth ~/LPCNet/wav/all.wav out_16k.sw
+```
 
 # Ideas
 

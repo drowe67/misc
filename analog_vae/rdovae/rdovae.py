@@ -259,13 +259,16 @@ class RDOVAE(nn.Module):
     def __init__(self,
                  feature_dim,
                  latent_dim,
+                 EsNodB
                 ):
 
         super(RDOVAE, self).__init__()
 
         self.feature_dim    = feature_dim
         self.latent_dim     = latent_dim
- 
+        self.noise_std      = m.sqrt(10**(-EsNodB/10))
+        print(f"EsNodB: {EsNodB:5.2f} std: {self.noise_std:5.2f}")
+
         # submodules encoder and decoder share the statistical model
         self.core_encoder = nn.DataParallel(CoreEncoder(feature_dim, latent_dim))
         self.core_decoder = nn.DataParallel(CoreDecoder(latent_dim, feature_dim))
@@ -280,8 +283,9 @@ class RDOVAE(nn.Module):
 
         # run encoder
         z = self.core_encoder(features)
-        # Simulates adding gaussian noise with 0dB PSNR. Can also make the channel more realistic 
-        zn = z + 1.*torch.randn_like(z)
+
+        # Simulate channel
+        zn = z + self.noise_std*torch.randn_like(z)
 
         output = self.core_decoder(zn)
 

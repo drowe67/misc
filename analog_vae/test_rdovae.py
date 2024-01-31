@@ -49,6 +49,7 @@ parser.add_argument('--write_latent', type=str, default="", help='path to output
 
 model_group = parser.add_argument_group(title="model parameters")
 model_group.add_argument('--latent-dim', type=int, help="number of symbols produces by encoder, default: 80", default=80)
+"""
 model_group.add_argument('--cond-size', type=int, help="first conditioning size, default: 256", default=256)
 model_group.add_argument('--cond-size2', type=int, help="second conditioning size, default: 256", default=256)
 model_group.add_argument('--state-dim', type=int, help="dimensionality of transfered state, default: 24", default=24)
@@ -57,7 +58,8 @@ model_group.add_argument('--lambda-min', type=float, help="minimal value for rat
 model_group.add_argument('--lambda-max', type=float, help="maximal value for rate lambda, default: 0.0104", default=0.0104)
 model_group.add_argument('--pvq-num-pulses', type=int, help="number of pulses for PVQ, default: 82", default=82)
 model_group.add_argument('--state-dropout-rate', type=float, help="state dropout rate, default: 0", default=0.0)
-
+"""
+"""
 training_group = parser.add_argument_group(title="training parameters")
 training_group.add_argument('--batch-size', type=int, help="batch size, default: 32", default=32)
 training_group.add_argument('--lr', type=float, help='learning rate, default: 3e-4', default=3e-4)
@@ -68,7 +70,7 @@ training_group.add_argument('--split-mode', type=str, choices=['split', 'random_
 training_group.add_argument('--enable-first-frame-loss', action='store_true', default=False, help='enables dedicated distortion loss on first 4 decoder frames')
 training_group.add_argument('--initial-checkpoint', type=str, help='initial checkpoint to start training from, default: None', default=None)
 training_group.add_argument('--train-decoder-only', action='store_true', help='freeze encoder and statistical model and train decoder only')
-
+"""
 args = parser.parse_args()
 
 # set visible devices
@@ -76,6 +78,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_visible_devices
 
 
 # training parameters
+"""
 batch_size = args.batch_size
 lr = args.lr
 epochs = args.epochs
@@ -96,19 +99,23 @@ checkpoint['adam_betas'] = adam_betas
 
 # logging
 log_interval = 10
+"""
 
 # device
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+latent_dim = args.latent_dim
 
+"""
 # model parameters
 cond_size  = args.cond_size
 cond_size2 = args.cond_size2
-latent_dim = args.latent_dim
+
 quant_levels = args.quant_levels
 lambda_min = args.lambda_min
 lambda_max = args.lambda_max
 state_dim = args.state_dim
-# not expsed
+"""
+# not exposed
 nb_total_features = 36
 num_features = 20
 num_used_features = 20
@@ -118,18 +125,19 @@ num_used_features = 20
 feature_file = args.features
 
 # model
-checkpoint['model_args']    = (num_features, latent_dim, quant_levels, cond_size, cond_size2)
-checkpoint['model_kwargs']  = {'state_dim': state_dim, 'split_mode' : split_mode, 'pvq_num_pulses': args.pvq_num_pulses, 'state_dropout_rate': args.state_dropout_rate}
-model = RDOVAE(*checkpoint['model_args'], **checkpoint['model_kwargs'])
+#checkpoint['model_args']    = (num_features, latent_dim)
+#checkpoint['model_kwargs']  = {'state_dim': state_dim, 'split_mode' : split_mode, 'pvq_num_pulses': args.pvq_num_pulses, 'state_dropout_rate': args.state_dropout_rate}
+#model = RDOVAE(*checkpoint['model_args'], **checkpoint['model_kwargs'])
+model = RDOVAE(num_features, latent_dim)
 checkpoint = torch.load(args.model_name, map_location='cpu')
 model.load_state_dict(checkpoint['state_dict'], strict=False)
 checkpoint['state_dict']    = model.state_dict()
 
-
 # dataloader
+"""
 checkpoint['dataset_args'] = (feature_file, sequence_length, num_features, 36)
 checkpoint['dataset_kwargs'] = {'lambda_min': lambda_min, 'lambda_max': lambda_max, 'enc_stride': model.enc_stride, 'quant_levels': quant_levels}
-
+"""
 features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (1, -1, nb_total_features))
 nb_features_rounded = model.dec_stride*(features.shape[1]//model.dec_stride)
 print(nb_features_rounded)

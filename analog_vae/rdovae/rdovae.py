@@ -126,17 +126,19 @@ class CoreEncoder(nn.Module):
     FRAMES_PER_STEP = 4
     CONV_KERNEL_SIZE = 4
 
-    def __init__(self, feature_dim, output_dim, cond_size, cond_size2, state_size=24):
+    def __init__(self, feature_dim, output_dim):
 
         super(CoreEncoder, self).__init__()
 
         # hyper parameters
         self.feature_dim        = feature_dim
         self.output_dim         = output_dim
+        """
         self.cond_size          = cond_size
         self.cond_size2         = cond_size2
         self.state_size         = state_size
-
+        """
+        
         # derived parameters
         self.input_dim = self.FRAMES_PER_STEP * self.feature_dim
 
@@ -195,7 +197,7 @@ class CoreDecoder(nn.Module):
 
     FRAMES_PER_STEP = 4
 
-    def __init__(self, input_dim, output_dim, cond_size, cond_size2, state_size=24):
+    def __init__(self, input_dim, output_dim):
         """ core decoder for RDOVAE
 
             Computes features from latents, initial state, and quantization index
@@ -207,9 +209,11 @@ class CoreDecoder(nn.Module):
         # hyper parameters
         self.input_dim  = input_dim
         self.output_dim = output_dim
+        """
         self.cond_size  = cond_size
         self.cond_size2 = cond_size2
         self.state_size = state_size
+        """
 
         self.input_size = self.input_dim
 
@@ -266,18 +270,13 @@ class RDOVAE(nn.Module):
     def __init__(self,
                  feature_dim,
                  latent_dim,
-                 quant_levels,
-                 cond_size,
-                 cond_size2,
-                 state_dim=24,
-                 split_mode='split',
-                 pvq_num_pulses=82,
-                 state_dropout_rate=0):
+                ):
 
         super(RDOVAE, self).__init__()
 
         self.feature_dim    = feature_dim
         self.latent_dim     = latent_dim
+        """
         self.quant_levels   = quant_levels
         self.cond_size      = cond_size
         self.cond_size2     = cond_size2
@@ -285,10 +284,11 @@ class RDOVAE(nn.Module):
         self.state_dim      = state_dim
         self.pvq_num_pulses = pvq_num_pulses
         self.state_dropout_rate = state_dropout_rate
+        """
 
         # submodules encoder and decoder share the statistical model
-        self.core_encoder = nn.DataParallel(CoreEncoder(feature_dim, latent_dim, cond_size, cond_size2, state_size=state_dim))
-        self.core_decoder = nn.DataParallel(CoreDecoder(latent_dim, feature_dim, cond_size, cond_size2, state_size=state_dim))
+        self.core_encoder = nn.DataParallel(CoreEncoder(feature_dim, latent_dim))
+        self.core_decoder = nn.DataParallel(CoreDecoder(latent_dim, feature_dim))
 
         self.enc_stride = CoreEncoder.FRAMES_PER_STEP
         self.dec_stride = CoreDecoder.FRAMES_PER_STEP

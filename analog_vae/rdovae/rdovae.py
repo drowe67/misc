@@ -133,12 +133,7 @@ class CoreEncoder(nn.Module):
         # hyper parameters
         self.feature_dim        = feature_dim
         self.output_dim         = output_dim
-        """
-        self.cond_size          = cond_size
-        self.cond_size2         = cond_size2
-        self.state_size         = state_size
-        """
-        
+         
         # derived parameters
         self.input_dim = self.FRAMES_PER_STEP * self.feature_dim
 
@@ -209,12 +204,6 @@ class CoreDecoder(nn.Module):
         # hyper parameters
         self.input_dim  = input_dim
         self.output_dim = output_dim
-        """
-        self.cond_size  = cond_size
-        self.cond_size2 = cond_size2
-        self.state_size = state_size
-        """
-
         self.input_size = self.input_dim
 
         # Layers are organized like a DenseNet
@@ -276,16 +265,7 @@ class RDOVAE(nn.Module):
 
         self.feature_dim    = feature_dim
         self.latent_dim     = latent_dim
-        """
-        self.quant_levels   = quant_levels
-        self.cond_size      = cond_size
-        self.cond_size2     = cond_size2
-        self.split_mode     = split_mode
-        self.state_dim      = state_dim
-        self.pvq_num_pulses = pvq_num_pulses
-        self.state_dropout_rate = state_dropout_rate
-        """
-
+ 
         # submodules encoder and decoder share the statistical model
         self.core_encoder = nn.DataParallel(CoreEncoder(feature_dim, latent_dim))
         self.core_decoder = nn.DataParallel(CoreDecoder(latent_dim, feature_dim))

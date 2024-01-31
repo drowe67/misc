@@ -305,5 +305,5 @@ class RDOVAE(nn.Module):
 
         output = self.core_decoder(zn)
 
-        return output
+        return output,z
 

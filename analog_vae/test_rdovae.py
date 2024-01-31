@@ -44,6 +44,7 @@ parser.add_argument('features', type=str, help='path to feature file in .f32 for
 parser.add_argument('output', type=str, help='path to output folder')
 
 parser.add_argument('--cuda-visible-devices', type=str, help="comma separates list of cuda visible device indices, default: ''", default="")
+parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors z[latent_dim] in .f32 format')
 
 
 model_group = parser.add_argument_group(title="model parameters")
@@ -131,6 +132,7 @@ checkpoint['dataset_kwargs'] = {'lambda_min': lambda_min, 'lambda_max': lambda_m
 
 features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (1, -1, nb_total_features))
 nb_features_rounded = model.dec_stride*(features.shape[1]//model.dec_stride)
+print(nb_features_rounded)
 features = features[:,:nb_features_rounded,:]
 features = features[:, :, :num_used_features]
 features = torch.tensor(features)
@@ -140,13 +142,13 @@ if __name__ == '__main__':
     # push model to device
     model.to(device)
     features.to(device)
-    #print(features.dtype)
-    output = model(features)
-    
+    output,z = model(features)
+    print(output.shape, z.shape)
     output = torch.cat([output, torch.zeros_like(output)[:,:,:16]], dim=-1)
-    #print(output.dtype)
-    
     output = output.detach().numpy().flatten().astype('float32')
-    
-
     output.tofile(args.output)
+
+    if len(args.write_latent):
+        z = z.detach().numpy().flatten().astype('float32')
+        z.tofile(args.write_latent)
+   

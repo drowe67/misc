@@ -267,7 +267,6 @@ class RDOVAE(nn.Module):
         self.feature_dim    = feature_dim
         self.latent_dim     = latent_dim
         self.noise_std      = m.sqrt(10**(-EsNodB/10))
-        print(f"EsNodB: {EsNodB:5.2f} std: {self.noise_std:5.2f}")
 
         # submodules encoder and decoder share the statistical model
         self.core_encoder = nn.DataParallel(CoreEncoder(feature_dim, latent_dim))
@@ -275,6 +274,16 @@ class RDOVAE(nn.Module):
 
         self.enc_stride = CoreEncoder.FRAMES_PER_STEP
         self.dec_stride = CoreDecoder.FRAMES_PER_STEP
+
+        # SNR calcs
+        B = 3000                               # bandwidth for measuring noise power
+        Tf = 0.01                              # time for one frame
+        Rs = latent_dim/(Tf*self.enc_stride)   # symbol rate over channel
+        EsNo = 10**(EsNodB/10)                 # linear Es/No
+        SNR = (EsNo)*(Rs/B)
+        SNRdB = 10*m.log10(SNR)
+        print(f"EsNodB.: {EsNodB:5.2f} std: {self.noise_std:5.2f}")
+        print(f"SNR3kdB: {SNRdB:5.2f}  Rs:  {Rs:7.2f}")
 
         if self.dec_stride % self.enc_stride != 0:
             raise ValueError(f"get_decoder_chunks_generic: encoder stride does not divide decoder stride")
@@ -285,6 +294,7 @@ class RDOVAE(nn.Module):
         z = self.core_encoder(features)
 
         # Simulate channel
+        # arrange as QPSK symbols
         zn = z + self.noise_std*torch.randn_like(z)
 
         output = self.core_decoder(zn)

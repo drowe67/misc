@@ -33,25 +33,27 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --state
 
 # Ideas
 
-1. Not sure about training with tanh clamping at +/-1.  We should be using soft decision information, e.g. 1 symbol plus 1 of noise is a "very likely" 1 symbol.
+1. Test: Multipath with no noise should mean speech is not impaired, as no "symbol errors".
+
+1. Not sure about training with tanh clamping at +/-1 on rx, as fading and noise will push it >>1.  We should be using soft decision information, e.g. 1 symbol plus 1 of noise is a "very likely" 1 symbol.
 
 1. Can we include maximum likelyhood detection in rx side of the bottelneck?  E.g. a +2 received means very likely +1 was transmitted, and shouldn't have the same weight in decoding operation as a 0 received.  Probability of received symbol.
 
 1. Plot scatter diagram of Tx to see where symbols are being mapped.  Would expect random rotations, and magntitudes
    near 1.
 
-1. Reshape pairs of symbols to QPSK, as I think effect of noise will be treated differently in a 2D mapping maybe sqrt(2) better).
+1. Reshape pairs of symbols to QPSK, as I think effect of noise will be treated differently in a 2D mapping maybe sqrt(2) better.
 
 1. Reshape into matrix with Nc=number of carriers columns to simulate OFDM.
 
-1. Ability to inject different levels of noise at test time.
+1. ~Ability to inject different levels of noise at test time.~
 
 1. Using OFDM matrix, simulate symbol by symbol fading channel.  This is a key test.  Need an efficient way to generate fading data, maybe create using Octave for now, an hours worth, or rotate around different channels while training.
 
-1. Confirm SNR calculations, maybe print them, or have SNR3k | Es/No as cmd line options
+1. ~Confirm SNR calculations, maybe print them, or have SNR3k | Es/No as cmd line options~
 
 1. PAPR optimisation.  We could explicitely calculate PAPR, or optimise for maximum average power.  Be interesting to observe envelope of waveform as it trains. We might need to include sync symbols.
 
 1. Way to write/read bottleneck vectors (channel symbols)
 
-1. Look at bottleneck vectors, PCA, any correlation?  Ameniable to VQ?  Further dim reduction? VQ would enable comparative test using classical methods.
+1. Look at bottleneck vectors, PCA, any correlation?  Ameniable to VQ?  Further dim reduction? VQ would enable comparative test using classical FEC methods.

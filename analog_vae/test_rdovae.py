@@ -36,7 +36,6 @@ import tqdm
 
 from rdovae import RDOVAE, RDOVAEDataset, distortion_loss
 
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument('model_name', type=str, help='path to model in .pth format')
@@ -55,6 +54,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_visible_devices
 
 # device
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 latent_dim = args.latent_dim
 
 # not exposed
@@ -75,6 +75,7 @@ nb_features_rounded = model.dec_stride*(features_in.shape[1]//model.dec_stride)
 features = features_in[:,:nb_features_rounded,:]
 features = features[:, :, :num_used_features]
 features = torch.tensor(features)
+print(f"Processing: {nb_features_rounded}")
 
 if __name__ == '__main__':
 
@@ -86,8 +87,14 @@ if __name__ == '__main__':
    # push model to device and run test
    model.to(device)
    features.to(device)
-   output,z = model(features)
-   print(output.shape, z.shape)
+   output,z,tx_sym = model(features)
+
+   # lets check actual Es/No and assumption |z| ~ 1
+   Es_meas = np.var(tx_sym.detach().numpy())
+   No = model.get_noise_std()**2
+   EsNodB_meas = 10*np.log10(Es_meas/No)
+   print(f"Measured EsNodB: {EsNodB_meas:5.2f}")
+
    output = torch.cat([output, torch.zeros_like(output)[:,:,:16]], dim=-1)
    output = output.detach().numpy().flatten().astype('float32')
    output.tofile(args.output)

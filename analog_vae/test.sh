@@ -35,7 +35,7 @@ shift; shift; shift
 
 lpcnet_demo -features ${input_speech} ${features_in}
 python3 ./test_rdovae.py ${model} ${features_in} ${features_out} "$@"
-if [ ! $3 == "-" ]; then
+if [ ! $output_speech == "-" ]; then
     lpcnet_demo -fargan-synthesis ${features_out} ${output_speech}
 else
     tmp=$(mktemp)

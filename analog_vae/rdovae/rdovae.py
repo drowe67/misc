@@ -254,7 +254,6 @@ class CoreDecoder(nn.Module):
         return features
 
 
-
 class RDOVAE(nn.Module):
     def __init__(self,
                  feature_dim,
@@ -264,40 +263,58 @@ class RDOVAE(nn.Module):
 
         super(RDOVAE, self).__init__()
 
-        self.feature_dim    = feature_dim
-        self.latent_dim     = latent_dim
-        self.noise_std      = m.sqrt(10**(-EsNodB/10))
+        self.feature_dim = feature_dim
+        self.latent_dim  = latent_dim
+        self.Es = 2      # assuming |z| ~ 1 due to encoder tanh()
+        self.noise_std   = m.sqrt(self.Es * 10**(-EsNodB/10))
 
-        # submodules encoder and decoder share the statistical model
-        self.core_encoder = nn.DataParallel(CoreEncoder(feature_dim, latent_dim))
-        self.core_decoder = nn.DataParallel(CoreDecoder(latent_dim, feature_dim))
+        # TODO: nn.DataParallel() shouldn't be needed
+        self.core_encoder =  nn.DataParallel(CoreEncoder(feature_dim, latent_dim))
+        self.core_decoder =  nn.DataParallel(CoreDecoder(latent_dim, feature_dim))
+        #self.core_encoder = CoreEncoder(feature_dim, latent_dim)
+        #self.core_decoder = CoreDecoder(latent_dim, feature_dim)
 
         self.enc_stride = CoreEncoder.FRAMES_PER_STEP
         self.dec_stride = CoreDecoder.FRAMES_PER_STEP
 
         # SNR calcs
         B = 3000                               # bandwidth for measuring noise power
-        Tf = 0.01                              # time for one frame
+        Tf = 0.01                              # time for one frame of features
         Rs = latent_dim/(Tf*self.enc_stride)   # symbol rate over channel
         EsNo = 10**(EsNodB/10)                 # linear Es/No
         SNR = (EsNo)*(Rs/B)
         SNRdB = 10*m.log10(SNR)
-        print(f"EsNodB.: {EsNodB:5.2f} std: {self.noise_std:5.2f}")
+        print(f"EsNodB.: {EsNodB:5.2f}  std: {self.noise_std:5.2f}")
         print(f"SNR3kdB: {SNRdB:5.2f}  Rs:  {Rs:7.2f}")
 
         if self.dec_stride % self.enc_stride != 0:
             raise ValueError(f"get_decoder_chunks_generic: encoder stride does not divide decoder stride")
 
+    def get_noise_std(self):
+        return self.noise_std
+    
     def forward(self, features):
 
         # run encoder
         z = self.core_encoder(features)
 
-        # Simulate channel
-        # arrange as QPSK symbols
-        zn = z + self.noise_std*torch.randn_like(z)
+        # Simulate channel --------
 
-        output = self.core_decoder(zn)
+        # map z to QPSK symbols, note Es = var(tx_sym) = 2 var(z) = 2 
+        # assuming |z| ~ 1 after training
+        tx_sym = z[:,:,::2] + 1j*z[:,:,1::2]
 
-        return output,z
+        # complex AWGN noise
+        n = self.noise_std*torch.randn_like(tx_sym)
+        #print(torch.var(tx_sym),torch.var(n))
+
+        rx_sym = tx_sym + n
+
+        # demap QPSK symbols
+        z[:,:,::2] = rx_sym.real
+        z[:,:,1::2] = rx_sym.imag
+
+        output = self.core_decoder(z)
+
+        return output,z,tx_sym
 

@@ -265,7 +265,7 @@ class RDOVAE(nn.Module):
 
         self.feature_dim = feature_dim
         self.latent_dim  = latent_dim
-        self.Es = 2      # assuming |z| ~ 1 due to encoder tanh()
+        self.Es = 2      # Es of complex QPSK symbols assuming |z| ~ 1 due to encoder tanh()
         self.noise_std   = m.sqrt(self.Es * 10**(-EsNodB/10))
 
         # TODO: nn.DataParallel() shouldn't be needed
@@ -277,40 +277,67 @@ class RDOVAE(nn.Module):
         self.enc_stride = CoreEncoder.FRAMES_PER_STEP
         self.dec_stride = CoreDecoder.FRAMES_PER_STEP
 
-        # SNR calcs
-        B = 3000                               # bandwidth for measuring noise power
-        Tf = 0.01                              # time for one frame of features
-        Rs = latent_dim/(Tf*self.enc_stride)   # symbol rate over channel
-        EsNo = 10**(EsNodB/10)                 # linear Es/No
-        SNR = (EsNo)*(Rs/B)
-        SNRdB = 10*m.log10(SNR)
-        print(f"EsNodB.: {EsNodB:5.2f}  std: {self.noise_std:5.2f}")
-        print(f"SNR3kdB: {SNRdB:5.2f}  Rs:  {Rs:7.2f}")
-
         if self.dec_stride % self.enc_stride != 0:
             raise ValueError(f"get_decoder_chunks_generic: encoder stride does not divide decoder stride")
+
+        # SNR calcs
+        B = 3000                                        # bandwidth for measuring noise power (Hz)
+        self.Rfeat = 100                                # feature update rate (Hz)
+        Tfeat = self.Tfeat = 1/self.Rfeat               # feature update period (s) 
+        self.Rlat = latent_dim/(Tfeat*self.enc_stride)  # total latent symbol rate over channel (Hz)
+        EsNo = 10**(EsNodB/10)                          # linear Es/No
+        SNR = (EsNo)*(self.Rlat/B)
+        SNRdB = 10*m.log10(SNR)
+        print(f"EsNodB.: {EsNodB:5.2f}  std: {self.noise_std:5.2f}")
+        print(f"SNR3kdB: {SNRdB:5.2f}  Rlat:  {self.Rlat:7.2f}")
+
+        # set up OFDM "modem frame" parameters.  Modem frame is Nc carriers wide in frequency 
+        # and Ns symbols in duration 
+        bps = 2                                         # (bits per symbol) latent symbols per QPSK symbol
+        Ts = 0.02                                       # OFDM QPSK symbol period
+        Rs = 1/Ts                                       # OFDM QPSK symbol rate
+        Nsmf = self.latent_dim // bps                   # total number of symbols in a modem frame
+        Ns = int(self.Tfeat*self.enc_stride // Ts)      # number of QPSK symbols per "modem frame"
+        Nc = int(Nsmf // Ns)                            # number of carriers
+        assert Ns*Nc*bps == latent_dim                  # sanity check
+        self.Rs = Rs
+        self.Ns = Ns
+        self.Nc = Nc
+        print(f"Nsmf: {Nsmf:3d} Ns: {Ns:3d} Nc: {Nc:3d}")
 
     def get_noise_std(self):
         return self.noise_std
     
-    def forward(self, features):
+    def forward(self, features, G1=(1,1), G2=(0,0)):
 
-        # run encoder
+        # run encoder, outputs sequence of latents that each describe 40ms of speech
         z = self.core_encoder(features)
-
-        # Simulate channel --------
 
         # map z to QPSK symbols, note Es = var(tx_sym) = 2 var(z) = 2 
         # assuming |z| ~ 1 after training
         tx_sym = z[:,:,::2] + 1j*z[:,:,1::2]
 
-        # complex AWGN noise
-        n = self.noise_std*torch.randn_like(tx_sym)
-        #print(torch.var(tx_sym),torch.var(n))
+        # reshape into sequence of OFDM frames
+        rx_sym = torch.reshape(tx_sym,(-1,self.Nc,self.Ns))
+        
+        # Simulate channel at one sample per QPSK symbol (Fs=Rs) --------
 
-        rx_sym = tx_sym + n
+        # multipath, calculate channel H at each point in freq and time
+        d = 0.002                                               # Multipath Poor (MPP) path delay (s)
+        for f in range(rx_sym.shape[0]):
+            for s in range(self.Ns):
+                for c in range(self.Nc):
+                    omega = 2*m.pi*c
+                    arg = torch.tensor(-1j*omega*d*self.Rs)
+                    H = G1[s] + G2[s]*torch.exp(arg)            # single complex number decribes channel
+                    rx_sym[c,s] = rx_sym[c,s]*torch.abs(H)      # "genie" phase equalisation assumed, so just magnitude
+
+        # complex AWGN noise
+        n = self.noise_std*torch.randn_like(rx_sym)
+        rx_sym = rx_sym + n
 
         # demap QPSK symbols
+        rx_sym = torch.reshape(rx_sym,tx_sym.shape)
         z[:,:,::2] = rx_sym.real
         z[:,:,1::2] = rx_sym.imag
 

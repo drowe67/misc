@@ -75,7 +75,7 @@ nb_features_rounded = model.dec_stride*(features_in.shape[1]//model.dec_stride)
 features = features_in[:,:nb_features_rounded,:]
 features = features[:, :, :num_used_features]
 features = torch.tensor(features)
-print(f"Processing: {nb_features_rounded}")
+print(f"Processing: {nb_features_rounded} feature vectors")
 
 if __name__ == '__main__':
 
@@ -89,11 +89,13 @@ if __name__ == '__main__':
    features.to(device)
    output,z,tx_sym = model(features)
 
-   # lets check actual Es/No and assumption |z| ~ 1
+   # lets check actual Es/No and monitor assumption |z| ~ 1
    Es_meas = np.var(tx_sym.detach().numpy())
    No = model.get_noise_std()**2
    EsNodB_meas = 10*np.log10(Es_meas/No)
    print(f"Measured EsNodB: {EsNodB_meas:5.2f}")
+
+   # TODO plot scatter diagram, to show effect of fading
 
    output = torch.cat([output, torch.zeros_like(output)[:,:,:16]], dim=-1)
    output = output.detach().numpy().flatten().astype('float32')

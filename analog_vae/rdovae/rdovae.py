@@ -258,14 +258,16 @@ class RDOVAE(nn.Module):
     def __init__(self,
                  feature_dim,
                  latent_dim,
-                 EsNodB
+                 EsNodB,
+                 multipath_delay = 0.002
                 ):
 
         super(RDOVAE, self).__init__()
 
         self.feature_dim = feature_dim
         self.latent_dim  = latent_dim
-        self.Es = 2      # Es of complex QPSK symbols assuming |z| ~ 1 due to encoder tanh()
+        self.multipath_delay = multipath_delay # Multipath Poor (MPP) path delay (s)
+        self.Es = 2                            # Es of complex QPSK symbols assuming |z| ~ 1 due to encoder tanh()
         self.noise_std   = m.sqrt(self.Es * 10**(-EsNodB/10))
 
         # TODO: nn.DataParallel() shouldn't be needed
@@ -310,6 +312,10 @@ class RDOVAE(nn.Module):
     
     def forward(self, features, G1=(1,1), G2=(0,0)):
 
+        # we need one Doppler spread sample for every symbol in OFDM modem frame
+        assert (len(G1) == self.Ns)
+        assert (len(G2) == self.Ns)
+
         # run encoder, outputs sequence of latents that each describe 40ms of speech
         z = self.core_encoder(features)
 
@@ -319,19 +325,18 @@ class RDOVAE(nn.Module):
 
         # reshape into sequence of OFDM frames
         rx_sym = torch.reshape(tx_sym,(-1,self.Nc,self.Ns))
-        #print(rx_sym.shape)
-        #quit()
-        # Simulate channel at one sample per QPSK symbol (Fs=Rs) --------
+
+        # Simulate channel at one sample per QPSK symbol (Fs=Rs) --------------------------------
 
         # multipath, calculate channel H at each point in freq and time
-        d = 0.002                                               # Multipath Poor (MPP) path delay (s)
+        d = self.multipath_delay
         for f in range(rx_sym.shape[0]):
             for s in range(self.Ns):
                 for c in range(self.Nc):
                     omega = 2*m.pi*c
                     arg = torch.tensor(-1j*omega*d*self.Rs)
-                    H = G1[s] + G2[s]*torch.exp(arg)                # single complex number decribes channel
-                    rx_sym[f,c,s] = rx_sym[f,c,s]*torch.abs(H)      # "genie" phase equalisation assumed, so just magnitude
+                    H = G1[s] + G2[s]*torch.exp(arg)            # single complex number decribes channel
+                    rx_sym[f,c,s] = rx_sym[f,c,s]*torch.abs(H)  # "genie" phase equalisation assumed, so just magnitude
 
         # complex AWGN noise
         n = self.noise_std*torch.randn_like(rx_sym)
@@ -339,10 +344,16 @@ class RDOVAE(nn.Module):
 
         # demap QPSK symbols
         rx_sym = torch.reshape(rx_sym,tx_sym.shape)
-        z[:,:,::2] = rx_sym.real
-        z[:,:,1::2] = rx_sym.imag
+        z_hat = torch.zeros_like(z)
+        z_hat[:,:,::2] = rx_sym.real
+        z_hat[:,:,1::2] = rx_sym.imag
 
-        output = self.core_decoder(z)
+        features_hat = self.core_decoder(z)
 
-        return output,z,tx_sym
+        return {
+            "features_hat" : features_hat,
+            "z_hat"  : z_hat,
+            "tx_sym" : tx_sym
+        }
+    
 

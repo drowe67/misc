@@ -40,7 +40,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('model_name', type=str, help='path to model in .pth format')
 parser.add_argument('features', type=str, help='path to input feature file in .f32 format')
-parser.add_argument('output', type=str, help='path to output feature file in .f32 format')
+parser.add_argument('features_hat', type=str, help='path to output feature file in .f32 format')
 parser.add_argument('--cuda-visible-devices', type=str, help="comma separates list of cuda visible device indices, default: ''", default="")
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors z[latent_dim] in .f32 format')
 parser.add_argument('--EsNodB', type=float, default=0, help='per symbol SNR in dB')
@@ -94,21 +94,20 @@ if __name__ == '__main__':
    # push model to device and run test
    model.to(device)
    features.to(device)
-   output,z,tx_sym = model(features,G1=G1,G2=G2)
+   output = model(features,G1=G1,G2=G2)
 
    # lets check actual Es/No and monitor assumption |z| ~ 1
-   Es_meas = np.var(tx_sym.detach().numpy())
+   Es_meas = np.var(output["tx_sym"].detach().numpy())
    No = model.get_noise_std()**2
    EsNodB_meas = 10*np.log10(Es_meas/No)
    print(f"Measured EsNodB: {EsNodB_meas:5.2f}")
 
-   # TODO plot scatter diagram, to show effect of fading
-
-   output = torch.cat([output, torch.zeros_like(output)[:,:,:16]], dim=-1)
-   output = output.detach().numpy().flatten().astype('float32')
-   output.tofile(args.output)
+   features_hat = output["features_hat"]
+   features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:16]], dim=-1)
+   features_hat = features_hat.detach().numpy().flatten().astype('float32')
+   features_hat.tofile(args.features_hat)
 
    if len(args.write_latent):
-      z = z.detach().numpy().flatten().astype('float32')
-      z.tofile(args.write_latent)
+      z_hat = output["z_hat"].detach().numpy().flatten().astype('float32')
+      z_hat.tofile(args.write_latent)
    

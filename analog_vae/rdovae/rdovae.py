@@ -319,7 +319,8 @@ class RDOVAE(nn.Module):
 
         # reshape into sequence of OFDM frames
         rx_sym = torch.reshape(tx_sym,(-1,self.Nc,self.Ns))
-        
+        #print(rx_sym.shape)
+        #quit()
         # Simulate channel at one sample per QPSK symbol (Fs=Rs) --------
 
         # multipath, calculate channel H at each point in freq and time
@@ -327,10 +328,10 @@ class RDOVAE(nn.Module):
         for f in range(rx_sym.shape[0]):
             for s in range(self.Ns):
                 for c in range(self.Nc):
-                    omega = 2*m.pi*c                            # freq of carrier c in rads, (note Fs=Rs)
+                    omega = 2*m.pi*c
                     arg = torch.tensor(-1j*omega*d*self.Rs)
-                    H = G1[s] + G2[s]*torch.exp(arg)            # single complex number decribes channel for symbol c,s
-                    rx_sym[c,s] = rx_sym[c,s]*torch.abs(H)      # "genie" phase equalisation assumed, so just magnitude
+                    H = G1[s] + G2[s]*torch.exp(arg)                # single complex number decribes channel
+                    rx_sym[f,c,s] = rx_sym[f,c,s]*torch.abs(H)      # "genie" phase equalisation assumed, so just magnitude
 
         # complex AWGN noise
         n = self.noise_std*torch.randn_like(rx_sym)

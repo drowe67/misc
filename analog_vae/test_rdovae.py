@@ -80,7 +80,7 @@ print(f"Processing: {nb_features_rounded} feature vectors")
 
 G1 = torch.tensor((1,1))
 G2 = torch.tensor((0,0))
-if test_mp:
+if args.test_mp:
    # with d = 0.001, every 4th carrier should be nulled
    G2 = torch.tensor((1,1))
 
@@ -94,7 +94,7 @@ if __name__ == '__main__':
    # push model to device and run test
    model.to(device)
    features.to(device)
-   output,z,tx_sym = model(features,G1=G2,G2=G2)
+   output,z,tx_sym = model(features,G1=G1,G2=G2)
 
    # lets check actual Es/No and monitor assumption |z| ~ 1
    Es_meas = np.var(tx_sym.detach().numpy())

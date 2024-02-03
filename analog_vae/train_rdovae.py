@@ -40,20 +40,9 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('features', type=str, help='path to feature file in .f32 format')
 parser.add_argument('output', type=str, help='path to output folder')
-
 parser.add_argument('--cuda-visible-devices', type=str, help="comma separates list of cuda visible device indices, default: ''", default="")
-
-
-model_group = parser.add_argument_group(title="model parameters")
-model_group.add_argument('--latent-dim', type=int, help="number of symbols produces by encoder, default: 80", default=80)
-model_group.add_argument('--cond-size', type=int, help="first conditioning size, default: 256", default=256)
-model_group.add_argument('--cond-size2', type=int, help="second conditioning size, default: 256", default=256)
-model_group.add_argument('--state-dim', type=int, help="dimensionality of transfered state, default: 24", default=24)
-model_group.add_argument('--quant-levels', type=int, help="number of quantization levels, default: 16", default=16)
-model_group.add_argument('--lambda-min', type=float, help="minimal value for rate lambda, default: 0.0002", default=2e-4)
-model_group.add_argument('--lambda-max', type=float, help="maximal value for rate lambda, default: 0.0104", default=0.0104)
-model_group.add_argument('--pvq-num-pulses', type=int, help="number of pulses for PVQ, default: 82", default=82)
-model_group.add_argument('--state-dropout-rate', type=float, help="state dropout rate, default: 0", default=0.0)
+parser.add_argument('--latent-dim', type=int, help="number of symbols produced by encoder, default: 80", default=80)
+parser.add_argument('--EsNodB', type=float, default=0, help='per symbol SNR in dB')
 
 training_group = parser.add_argument_group(title="training parameters")
 training_group.add_argument('--batch-size', type=int, help="batch size, default: 32", default=32)
@@ -61,8 +50,7 @@ training_group.add_argument('--lr', type=float, help='learning rate, default: 3e
 training_group.add_argument('--epochs', type=int, help='number of training epochs, default: 100', default=100)
 training_group.add_argument('--sequence-length', type=int, help='sequence length, needs to be divisible by 4, default: 256', default=256)
 training_group.add_argument('--lr-decay-factor', type=float, help='learning rate decay factor, default: 2.5e-5', default=2.5e-5)
-training_group.add_argument('--split-mode', type=str, choices=['split', 'random_split'], help='splitting mode for decoder input, default: split', default='split')
-training_group.add_argument('--enable-first-frame-loss', action='store_true', default=False, help='enables dedicated distortion loss on first 4 decoder frames')
+
 training_group.add_argument('--initial-checkpoint', type=str, help='initial checkpoint to start training from, default: None', default=None)
 training_group.add_argument('--train-decoder-only', action='store_true', help='freeze encoder and statistical model and train decoder only')
 
@@ -82,7 +70,7 @@ lr = args.lr
 epochs = args.epochs
 sequence_length = args.sequence_length
 lr_decay_factor = args.lr_decay_factor
-split_mode = args.split_mode
+
 # not exposed
 adam_betas = [0.8, 0.95]
 adam_eps = 1e-8
@@ -90,7 +78,6 @@ adam_eps = 1e-8
 checkpoint['batch_size'] = batch_size
 checkpoint['lr'] = lr
 checkpoint['lr_decay_factor'] = lr_decay_factor
-checkpoint['split_mode'] = split_mode
 checkpoint['epochs'] = epochs
 checkpoint['sequence_length'] = sequence_length
 checkpoint['adam_betas'] = adam_betas
@@ -102,24 +89,17 @@ log_interval = 10
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 # model parameters
-cond_size  = args.cond_size
-cond_size2 = args.cond_size2
 latent_dim = args.latent_dim
-quant_levels = args.quant_levels
-lambda_min = args.lambda_min
-lambda_max = args.lambda_max
-state_dim = args.state_dim
-# not expsed
-num_features = 20
 
+# not exposed
+num_features = 20
 
 # training data
 feature_file = args.features
 
 # model
-checkpoint['model_args']    = (num_features, latent_dim, quant_levels, cond_size, cond_size2)
-checkpoint['model_kwargs']  = {'state_dim': state_dim, 'split_mode' : split_mode, 'pvq_num_pulses': args.pvq_num_pulses, 'state_dropout_rate': args.state_dropout_rate}
-model = RDOVAE(*checkpoint['model_args'], **checkpoint['model_kwargs'])
+checkpoint['model_args']    = (num_features, latent_dim, args.EsNodB)
+model = RDOVAE(*checkpoint['model_args'])
 
 if type(args.initial_checkpoint) != type(None):
     checkpoint = torch.load(args.initial_checkpoint, map_location='cpu')
@@ -139,16 +119,13 @@ if args.train_decoder_only:
 
 # dataloader
 checkpoint['dataset_args'] = (feature_file, sequence_length, num_features, 36)
-checkpoint['dataset_kwargs'] = {'lambda_min': lambda_min, 'lambda_max': lambda_max, 'enc_stride': model.enc_stride, 'quant_levels': quant_levels}
+checkpoint['dataset_kwargs'] = {'enc_stride': model.enc_stride}
 dataset = RDOVAEDataset(*checkpoint['dataset_args'], **checkpoint['dataset_kwargs'])
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
-
-
 
 # optimizer
 params = [p for p in model.parameters() if p.requires_grad]
 optimizer = torch.optim.Adam(params, lr=lr, betas=adam_betas, eps=adam_eps)
-
 
 # learning rate scheduler
 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda x : 1 / (1 + lr_decay_factor * x))
@@ -170,25 +147,16 @@ if __name__ == '__main__':
         with tqdm.tqdm(dataloader, unit='batch') as tepoch:
             for i, features in enumerate(tepoch):
 
-                # zero out gradients
                 optimizer.zero_grad()
-
-                # push inputs to device
-                features    = features.to(device)
-
-                # run model
+                features = features.to(device)
                 output = model(features)
-
-                total_loss = distortion_loss(features, output)
-
+                total_loss = distortion_loss(features, output["features_hat"])
                 total_loss.backward()
-
                 optimizer.step()
-
                 scheduler.step()
 
                 # collect running stats
-                running_total_loss      += float(total_loss.detach().cpu())
+                running_total_loss += float(total_loss.detach().cpu())
 
                 if (i + 1) % log_interval == 0:
                     current_loss = (running_total_loss - previous_total_loss) / log_interval

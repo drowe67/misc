@@ -327,9 +327,9 @@ class RDOVAE(nn.Module):
         for f in range(rx_sym.shape[0]):
             for s in range(self.Ns):
                 for c in range(self.Nc):
-                    omega = 2*m.pi*c
+                    omega = 2*m.pi*c                            # freq of carrier c in rads, (note Fs=Rs)
                     arg = torch.tensor(-1j*omega*d*self.Rs)
-                    H = G1[s] + G2[s]*torch.exp(arg)            # single complex number decribes channel
+                    H = G1[s] + G2[s]*torch.exp(arg)            # single complex number decribes channel for symbol c,s
                     rx_sym[c,s] = rx_sym[c,s]*torch.abs(H)      # "genie" phase equalisation assumed, so just magnitude
 
         # complex AWGN noise

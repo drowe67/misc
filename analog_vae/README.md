@@ -44,7 +44,7 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --state
 
 1. Reshape pairs of symbols to QPSK, as I think effect of noise will be treated differently in a 2D mapping maybe sqrt(2) better.
 
-1. Reshape into matrix with Nc=number of carriers columns to simulate OFDM.
+1. ~Reshape into matrix with Nc=number of carriers columns to simulate OFDM.~
 
 1. ~Ability to inject different levels of noise at test time.~
 
@@ -53,7 +53,5 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --state
 1. ~Confirm SNR calculations, maybe print them, or have SNR3k | Es/No as cmd line options~
 
 1. PAPR optimisation.  We could explicitely calculate PAPR, or optimise for maximum average power.  Be interesting to observe envelope of waveform as it trains. We might need to include sync symbols.
-
-1. Way to write/read bottleneck vectors (channel symbols)
 
 1. Look at bottleneck vectors, PCA, any correlation?  Ameniable to VQ?  Further dim reduction? VQ would enable comparative test using classical FEC methods.

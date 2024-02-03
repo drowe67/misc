@@ -45,6 +45,7 @@ parser.add_argument('--cuda-visible-devices', type=str, help="comma separates li
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors z[latent_dim] in .f32 format')
 parser.add_argument('--EsNodB', type=float, default=0, help='per symbol SNR in dB')
 parser.add_argument('--passthru', action='store_true', help='copy features in to feature out, bypassing ML network')
+parser.add_argument('--test_mp', action='store_true', help='Fixed notch test multipath channel')
 model_group = parser.add_argument_group(title="model parameters")
 model_group.add_argument('--latent-dim', type=int, help="number of symbols produces by encoder, default: 80", default=80)
 args = parser.parse_args()
@@ -77,6 +78,12 @@ features = features[:, :, :num_used_features]
 features = torch.tensor(features)
 print(f"Processing: {nb_features_rounded} feature vectors")
 
+G1 = torch.tensor((1,1))
+G2 = torch.tensor((0,0))
+if test_mp:
+   # with d = 0.001, every 4th carrier should be nulled
+   G2 = torch.tensor((1,1))
+
 if __name__ == '__main__':
 
    if args.passthru:
@@ -87,7 +94,7 @@ if __name__ == '__main__':
    # push model to device and run test
    model.to(device)
    features.to(device)
-   output,z,tx_sym = model(features)
+   output,z,tx_sym = model(features,G1=G2,G2=G2)
 
    # lets check actual Es/No and monitor assumption |z| ~ 1
    Es_meas = np.var(tx_sym.detach().numpy())

@@ -46,8 +46,7 @@ parser.add_argument('--write_latent', type=str, default="", help='path to output
 parser.add_argument('--EsNodB', type=float, default=0, help='per symbol SNR in dB')
 parser.add_argument('--passthru', action='store_true', help='copy features in to feature out, bypassing ML network')
 parser.add_argument('--test_mp', action='store_true', help='Fixed notch test multipath channel')
-model_group = parser.add_argument_group(title="model parameters")
-model_group.add_argument('--latent-dim', type=int, help="number of symbols produces by encoder, default: 80", default=80)
+parser.add_argument('--latent-dim', type=int, help="number of symbols produces by encoder, default: 80", default=80)
 args = parser.parse_args()
 
 # set visible devices
@@ -64,10 +63,10 @@ num_features = 20
 num_used_features = 20
 
 # load model from a checkpoint file
-model = RDOVAE(num_features, latent_dim, args.EsNodB)
+model = RDOVAE(num_features, latent_dim, args.EsNodB, args.test_mp)
 checkpoint = torch.load(args.model_name, map_location='cpu')
 model.load_state_dict(checkpoint['state_dict'], strict=False)
-checkpoint['state_dict']    = model.state_dict()
+checkpoint['state_dict'] = model.state_dict()
 
 # dataloader
 feature_file = args.features
@@ -78,10 +77,11 @@ features = features[:, :, :num_used_features]
 features = torch.tensor(features)
 print(f"Processing: {nb_features_rounded} feature vectors")
 
-G1 = torch.tensor((1,1))
-G2 = torch.tensor((0,0))
+G1 = None
+G2 = None
 if args.test_mp:
    # with d = 0.001, every 4th carrier should be nulled
+   G1 = torch.tensor((1,1))
    G2 = torch.tensor((1,1))
 
 if __name__ == '__main__':

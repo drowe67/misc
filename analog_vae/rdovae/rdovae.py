@@ -259,6 +259,7 @@ class RDOVAE(nn.Module):
                  feature_dim,
                  latent_dim,
                  EsNodB,
+                 multipath_en = False,
                  multipath_delay = 0.002
                 ):
 
@@ -266,6 +267,7 @@ class RDOVAE(nn.Module):
 
         self.feature_dim = feature_dim
         self.latent_dim  = latent_dim
+        self.multipath_en = multipath_en
         self.multipath_delay = multipath_delay # Multipath Poor (MPP) path delay (s)
         self.Es = 2                            # Es of complex QPSK symbols assuming |z| ~ 1 due to encoder tanh()
         self.noise_std   = m.sqrt(self.Es * 10**(-EsNodB/10))
@@ -310,11 +312,12 @@ class RDOVAE(nn.Module):
     def get_noise_std(self):
         return self.noise_std
     
-    def forward(self, features, G1=(1,1), G2=(0,0)):
+    def forward(self, features, G1=None, G2=None):
 
         # we need one Doppler spread sample for every symbol in OFDM modem frame
-        assert (len(G1) == self.Ns)
-        assert (len(G2) == self.Ns)
+        if self.multipath_en:
+            assert (len(G1) == self.Ns)
+            assert (len(G2) == self.Ns)
 
         # run encoder, outputs sequence of latents that each describe 40ms of speech
         z = self.core_encoder(features)
@@ -327,16 +330,17 @@ class RDOVAE(nn.Module):
         rx_sym = torch.reshape(tx_sym,(-1,self.Nc,self.Ns))
 
         # Simulate channel at one sample per QPSK symbol (Fs=Rs) --------------------------------
-
+        
         # multipath, calculate channel H at each point in freq and time
-        d = self.multipath_delay
-        for f in range(rx_sym.shape[0]):
-            for s in range(self.Ns):
-                for c in range(self.Nc):
-                    omega = 2*m.pi*c
-                    arg = torch.tensor(-1j*omega*d*self.Rs)
-                    H = G1[s] + G2[s]*torch.exp(arg)            # single complex number decribes channel
-                    rx_sym[f,c,s] = rx_sym[f,c,s]*torch.abs(H)  # "genie" phase equalisation assumed, so just magnitude
+        if self.multipath_en:
+            d = self.multipath_delay
+            for f in range(rx_sym.shape[0]):
+                for s in range(self.Ns):
+                    for c in range(self.Nc):
+                        omega = 2*m.pi*c
+                        arg = torch.tensor(-1j*omega*d*self.Rs)
+                        H = G1[s] + G2[s]*torch.exp(arg)            # single complex number decribes channel
+                        rx_sym[f,c,s] = rx_sym[f,c,s]*torch.abs(H)  # "genie" phase equalisation assumed, so just magnitude
 
         # complex AWGN noise
         n = self.noise_std*torch.randn_like(rx_sym)

@@ -36,17 +36,18 @@ class RDOVAEDataset(torch.utils.data.Dataset):
                 sequence_length,
                 num_used_features=20,
                 num_features=36,
-                lambda_min=0.0002,
-                lambda_max=0.0135,
-                quant_levels=16,
                 enc_stride=2):
 
         self.sequence_length = sequence_length
+        """
         self.lambda_min = lambda_min
         self.lambda_max = lambda_max
+        """
         self.enc_stride = enc_stride
+        """
         self.quant_levels = quant_levels
         self.denominator = (quant_levels - 1) / np.log(lambda_max / lambda_min)
+        """
 
         if sequence_length % enc_stride:
             raise ValueError(f"RDOVAEDataset.__init__: enc_stride {enc_stride} does not divide sequence length {sequence_length}")

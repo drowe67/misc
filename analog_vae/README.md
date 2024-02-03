@@ -23,7 +23,7 @@ scp deep.lan:opus/output.s16 /dev/stdout | aplay -f S16_LE -r 1600
 
 ## Training
 ```
-python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --state-dim 80 --batch-size 512 --epochs 100 --lr 0.003 --lr-decay-factor 0.0001 training_features_file.f32 model_dir_name
+python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch-size 512 --epochs 100 --lr 0.003 --lr-decay-factor 0.0001 training_features_file.f32 model_dir_name
 ```
 
 ## Testing

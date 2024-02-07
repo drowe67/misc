@@ -87,8 +87,8 @@ if args.test_mp:
 if __name__ == '__main__':
 
    if args.passthru:
-      output = features_in.flatten()
-      output.tofile(args.output)
+      features_hat = features_in.flatten()
+      features_hat.tofile(args.features_hat)
       quit()
 
    # push model to device and run test
@@ -97,7 +97,8 @@ if __name__ == '__main__':
    output = model(features,G1=G1,G2=G2)
 
    # lets check actual Es/No and monitor assumption |z| ~ 1
-   Es_meas = np.var(output["tx_sym"].detach().numpy())
+   tx_sym = output["tx_sym"].detach().numpy()
+   Es_meas = np.var(tx_sym)
    No = model.get_noise_std()**2
    EsNodB_meas = 10*np.log10(Es_meas/No)
    print(f"Measured EsNodB: {EsNodB_meas:5.2f}")

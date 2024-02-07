@@ -352,7 +352,7 @@ class RDOVAE(nn.Module):
         z_hat[:,:,::2] = rx_sym.real
         z_hat[:,:,1::2] = rx_sym.imag
 
-        features_hat = self.core_decoder(z)
+        features_hat = self.core_decoder(z_hat)
 
         return {
             "features_hat" : features_hat,

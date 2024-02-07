@@ -77,12 +77,22 @@ features = features[:, :, :num_used_features]
 features = torch.tensor(features)
 print(f"Processing: {nb_features_rounded} feature vectors")
 
-G1 = None
-G2 = None
+H = None
 if args.test_mp:
-   # with d = 0.001, every 4th carrier should be nulled
-   G1 = torch.tensor((1,1))
-   G2 = torch.tensor((1,1))
+   # construct a contrived multipath model, will be a series of peaks an notches, between H=2 an H=0
+   G1 = 1
+   G2 = 1
+   d  = 0.002
+   Rs = model.get_Rs()
+   Nc = model.get_Nc()
+
+   num_timesteps_at_rate_Rs = int(nb_features_rounded*model.get_Rs()/model.get_Rfeat())
+   H = torch.zeros((1,num_timesteps_at_rate_Rs,Nc))
+   for c in range(Nc):
+      omega = 2*np.pi*c
+      arg = torch.tensor(-1j*omega*d*Rs)
+      H[0,:,c] = torch.abs(G1 + G2*torch.exp(arg))  # in this case channel doesn't evolve over time
+                                                    # only mag matters, we assume external phase equalisation
 
 if __name__ == '__main__':
 
@@ -94,7 +104,7 @@ if __name__ == '__main__':
    # push model to device and run test
    model.to(device)
    features.to(device)
-   output = model(features,G1=G1,G2=G2)
+   output = model(features,H)
 
    # lets check actual Es/No and monitor assumption |z| ~ 1
    tx_sym = output["tx_sym"].detach().numpy()

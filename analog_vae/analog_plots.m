@@ -16,3 +16,14 @@ function do_plots(fn='l.f32',png_fn='')
     mesh(cc{1},cc{2},nn);
 
 endfunction
+
+function multipath_example()
+    Nc = 20; Rs = 50; d = 0.002;
+    G1 = 1; G2 = 1;
+    w = 2*pi*(0:Nc-1);
+    H = G1 + G2*exp(-j*w*d*Rs);
+    figure(1); clf; plot((0:Nc-1)*Rs, abs(H),'+-');
+    title('|H(f)| for test multipath channel');
+    xlabel('Freq (Hz)'); ylabel('|H(f)|');
+    print("-dpng","multipath_h.png")
+endfunction

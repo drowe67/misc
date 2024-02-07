@@ -31,20 +31,23 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 ./test.sh model01/checkpoints/checkpoint_epoch_50.pth ~/LPCNet/wav/all.wav out_16k.sw
 ```
 
-# Ideas
+# Notes
+
+1. Issues: We would like smooth degredation from high SNR to low SNR, rather than training and operating at one SNR.  Currently if trained at 10dB, not as good as model trained at 0dB when tested at 0dB.  Also, if trained at 0dB, quality is reduced when tested on high SNR channel, compared to model trained ta high SNR.
 
 1. Test: Multipath with no noise should mean speech is not impaired, as no "symbol errors".
 
-1. Test: co-channel interference, interfering sinusoids, and impulse noise.
+1. Test: co-channel interference, interfering sinusoids, and impulse noise, non-flat passband.
 
-1. Test: level sensitivity, do we need/assume amplitude nomralisation?
+1. Test: level sensitivity, do we need/assume amplitude normalisation?
+
+1. Test: Try vocoder with several speakers and background noise.
 
 1. Not sure about training with tanh clamping at +/-1 on rx, as fading and noise will push it >>1.  We should be using soft decision information, e.g. 1 symbol plus 1 of noise is a "very likely" 1 symbol.
 
 1. Can we include maximum likelyhood detection in rx side of the bottelneck?  E.g. a +2 received means very likely +1 was transmitted, and shouldn't have the same weight in decoding operation as a 0 received.  Probability of received symbol.
 
-1. Plot scatter diagram of Tx to see where symbols are being mapped.  Would expect random rotations, and magntitudes
-   near 1.
+1. Plot scatter diagram of Tx to see where symbols are being mapped.
 
 1. ~Reshape pairs of symbols to QPSK, as I think effect of noise will be treated differently in a 2D mapping maybe sqrt(2) better.~
 
@@ -64,7 +67,7 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 
 1. How can we apply interleaving, e.g./ just spread symbol sover a longer modem frame, or let network spread them.
 
-1. Diveristy in frequency - classical DSP or with ML in the loop?
+1. Diversity in frequency - classical DSP or with ML in the loop?
 
 1. Sweep different latent dimensions and choose best perf for given SNR.
 

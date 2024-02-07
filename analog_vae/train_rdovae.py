@@ -34,7 +34,8 @@ import torch
 import tqdm
 
 from rdovae import RDOVAE, RDOVAEDataset, distortion_loss
-
+from matplotlib import pyplot as plt
+import numpy as np
 
 parser = argparse.ArgumentParser()
 
@@ -53,6 +54,7 @@ training_group.add_argument('--lr-decay-factor', type=float, help='learning rate
 
 training_group.add_argument('--initial-checkpoint', type=str, help='initial checkpoint to start training from, default: None', default=None)
 training_group.add_argument('--train-decoder-only', action='store_true', help='freeze encoder and statistical model and train decoder only')
+training_group.add_argument('--plot_loss', action='store_true', help='plot loss versus epoch as we train')
 
 args = parser.parse_args()
 
@@ -136,6 +138,10 @@ if __name__ == '__main__':
     model.to(device)
 
     # Main training loop
+    if args.plot_loss:
+        plt.figure(1)
+        loss_epoch=np.zeros((args.epochs+1))
+
     for epoch in range(1, epochs + 1):
 
         print(f"training epoch {epoch}...")
@@ -143,7 +149,11 @@ if __name__ == '__main__':
         # running stats
         running_total_loss      = 0
         previous_total_loss     = 0
+        current_loss            = 0.
 
+        if args.plot_loss:
+            plt.figure(1)
+            
         with tqdm.tqdm(dataloader, unit='batch') as tepoch:
             for i, features in enumerate(tepoch):
 
@@ -165,6 +175,14 @@ if __name__ == '__main__':
                         total_loss=running_total_loss / (i + 1),
                     )
                     previous_total_loss = running_total_loss
+                    loss_epoch[epoch] = current_loss
+
+        if args.plot_loss:
+            plt.clf()
+            plt.semilogy(range(1,epoch+1),loss_epoch[1:epoch+1])
+            plt.grid()
+            plt.show(block=False)
+            plt.pause(0.01)
 
         # save checkpoint
         checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pth')
@@ -172,3 +190,7 @@ if __name__ == '__main__':
         checkpoint['loss'] = running_total_loss / len(dataloader)
         checkpoint['epoch'] = epoch
         torch.save(checkpoint, checkpoint_path)
+
+        if args.plot_loss:
+           plt.savefig(args.output + '_loss.png')
+ 

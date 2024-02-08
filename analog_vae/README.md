@@ -27,13 +27,35 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 ```
 
 ## Testing
-```
-./test.sh model01/checkpoints/checkpoint_epoch_50.pth ~/LPCNet/wav/all.wav out_16k.sw
-```
+
+1. Generate `out.wav` at EsNo = 10 dB:
+   ```
+   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/all.wav out.wav --EsNodB 10
+   ```
+
+1. Play output sample to your default `aplay` sound device at Es/No = 3dB:
+   ```
+   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --EsNodB 3
+   ```
+
+1. Vanilla `fargan` (ie no analog VAE) for comparison:
+   ```
+   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --passthru
+   ```
+
+1. Multipath demo at approx 0dB B=3000 Hz SNR. First generate multipath channel samples using GNU Octave (only need to be generated once): 
+   ```
+   octave:85> Rs=50; Nc=20; multipath_samples("mpp", Rs, Rs, Nc, 60, "h.f32")
+   $ ./test.sh model01/checkpoints/checkpoint_epoch_100.pth ~/LPCNet/wav/all.wav - --EsNodB 2 --write_latent z_hat.f32 --mp h.f32
+   ``
+   Then use Octave to plot scatter diagram using z_hat latents from channel:
+   ```
+   octave:91> analog_plots; do_plots('z_hat.f32') 
+   ```
 
 # Notes
 
-1. Issues: We would like smooth degredation from high SNR to low SNR, rather than training and operating at one SNR.  Currently if trained at 10dB, not as good as model trained at 0dB when tested at 0dB.  Also, if trained at 0dB, quality is reduced when tested on high SNR channel, compared to model trained ta high SNR.
+1. Issues: We would like smooth degredation from high SNR to low SNR, rather than training and operating at one SNR.  Currently if trained at 10dB, not as good as model trained at 0dB when tested at 0dB.  Also, if trained at 0dB, quality is reduced when tested on high SNR channel, compared to model trained at high SNR.
 
 1. Test: Multipath with no noise should mean speech is not impaired, as no "symbol errors".
 
@@ -42,6 +64,7 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 1. Test: level sensitivity, do we need/assume amplitude normalisation?
 
 1. Test: Try vocoder with several speakers and background noise.
+   + can hear some whitsles on vk5dgr_test.wav with vanilla fargan (maybe check if I have correct version)
 
 1. Not sure about training with tanh clamping at +/-1 on rx, as fading and noise will push it >>1.  We should be using soft decision information, e.g. 1 symbol plus 1 of noise is a "very likely" 1 symbol.
 

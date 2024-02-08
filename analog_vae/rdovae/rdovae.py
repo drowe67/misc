@@ -259,7 +259,6 @@ class RDOVAE(nn.Module):
                  feature_dim,
                  latent_dim,
                  EsNodB,
-                 multipath_en = False,
                  multipath_delay = 0.002
                 ):
 
@@ -267,7 +266,6 @@ class RDOVAE(nn.Module):
 
         self.feature_dim = feature_dim
         self.latent_dim  = latent_dim
-        self.multipath_en = multipath_en
         self.multipath_delay = multipath_delay # Multipath Poor (MPP) path delay (s)
         self.Es = 2                            # Es of complex QPSK symbols assuming |z| ~ 1 due to encoder tanh()
         self.noise_std   = m.sqrt(self.Es * 10**(-EsNodB/10))
@@ -321,18 +319,16 @@ class RDOVAE(nn.Module):
     def get_Nc(self):
         return self.Nc
     
-    def forward(self, features, H=None):
+    def forward(self, features, H):
         
         (num_batches, num_ten_ms_timesteps, num_features) = features.shape
         num_timesteps_at_rate_Rs = int(num_ten_ms_timesteps*self.Rs/self.Rfeat)
-        print(num_timesteps_at_rate_Rs)
 
         # For every OFDM modem time step, we need one channel sample for each carrier
-        if self.multipath_en:
-            print(features.shape,H.shape)
-            assert (H.shape[0] == num_batches)
-            assert (H.shape[1] == num_timesteps_at_rate_Rs)
-            assert (H.shape[2] == self.Nc)
+        print(features.shape,H.shape)
+        assert (H.shape[0] == num_batches)
+        assert (H.shape[1] == num_timesteps_at_rate_Rs)
+        assert (H.shape[2] == self.Nc)
 
         # run encoder, outputs sequence of latents that each describe 40ms of speech
         z = self.core_encoder(features)
@@ -340,22 +336,23 @@ class RDOVAE(nn.Module):
         # map z to QPSK symbols, note Es = var(tx_sym) = 2 var(z) = 2 
         # assuming |z| ~ 1 after training
         tx_sym = z[:,:,::2] + 1j*z[:,:,1::2]
-       
+        qpsk_shape = tx_sym.shape
+
         # reshape into sequence of OFDM frames
-        rx_sym = torch.reshape(tx_sym,(num_batches,num_timesteps_at_rate_Rs,self.Nc))
+        tx_sym = torch.reshape(tx_sym,(num_batches,num_timesteps_at_rate_Rs,self.Nc))
 
         # Simulate channel at one sample per QPSK symbol (Fs=Rs) --------------------------------
         
-        # multipath, calculate channel H at each point in freq and time
-        if self.multipath_en:
-            rx_sym = rx_sym * H
- 
+        # multipath, multiply by per-carrier channel magnitudes at each OFDM modem timestep
+        # preserve tx_sym variable so we can return it to measure power after multipath channel
+        tx_sym = tx_sym * H
+
         # complex AWGN noise
-        n = self.noise_std*torch.randn_like(rx_sym)
-        rx_sym = rx_sym + n
+        n = self.noise_std*torch.randn_like(tx_sym)
+        rx_sym = tx_sym + n
 
         # demap QPSK symbols
-        rx_sym = torch.reshape(rx_sym,tx_sym.shape)
+        rx_sym = torch.reshape(rx_sym,qpsk_shape)
         z_hat = torch.zeros_like(z)
         z_hat[:,:,::2] = rx_sym.real
         z_hat[:,:,1::2] = rx_sym.imag
@@ -365,7 +362,7 @@ class RDOVAE(nn.Module):
         return {
             "features_hat" : features_hat,
             "z_hat"  : z_hat,
-            "tx_sym" : tx_sym
+            "tx_sym" : tx_sym,
         }
     
 

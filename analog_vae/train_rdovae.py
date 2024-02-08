@@ -43,7 +43,7 @@ parser.add_argument('features', type=str, help='path to feature file in .f32 for
 parser.add_argument('output', type=str, help='path to output folder')
 parser.add_argument('--cuda-visible-devices', type=str, help="comma separates list of cuda visible device indices, default: ''", default="")
 parser.add_argument('--latent-dim', type=int, help="number of symbols produced by encoder, default: 80", default=80)
-parser.add_argument('--EsNodB', type=float, default=0, help='per symbol SNR in dB')
+parser.add_argument('--EsNodB', type=float, default=0, help='latent symbol Es/No in dB (note different to QPSK symbol Es/No)')
 
 training_group = parser.add_argument_group(title="training parameters")
 training_group.add_argument('--batch-size', type=int, help="batch size, default: 32", default=32)

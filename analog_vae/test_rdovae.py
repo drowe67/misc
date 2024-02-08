@@ -41,12 +41,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('model_name', type=str, help='path to model in .pth format')
 parser.add_argument('features', type=str, help='path to input feature file in .f32 format')
 parser.add_argument('features_hat', type=str, help='path to output feature file in .f32 format')
+parser.add_argument('--latent-dim', type=int, help="number of symbols produces by encoder, default: 80", default=80)
 parser.add_argument('--cuda-visible-devices', type=str, help="comma separates list of cuda visible device indices, default: ''", default="")
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors z[latent_dim] in .f32 format')
-parser.add_argument('--EsNodB', type=float, default=0, help='per symbol SNR in dB')
+parser.add_argument('--EsNodB', type=float, default=0, help='latent symbol Es/No in dB (note different to QPSK symbol Es/No)')
 parser.add_argument('--passthru', action='store_true', help='copy features in to feature out, bypassing ML network')
 parser.add_argument('--test_mp', action='store_true', help='Fixed notch test multipath channel')
-parser.add_argument('--latent-dim', type=int, help="number of symbols produces by encoder, default: 80", default=80)
+parser.add_argument('--mp_file', type=str, default="", help='path to multipath file, rate Rs time steps by Nc carriers .f32 format')
 args = parser.parse_args()
 
 # set visible devices
@@ -63,7 +64,7 @@ num_features = 20
 num_used_features = 20
 
 # load model from a checkpoint file
-model = RDOVAE(num_features, latent_dim, args.EsNodB, args.test_mp)
+model = RDOVAE(num_features, latent_dim, args.EsNodB)
 checkpoint = torch.load(args.model_name, map_location='cpu')
 model.load_state_dict(checkpoint['state_dict'], strict=False)
 checkpoint['state_dict'] = model.state_dict()
@@ -77,9 +78,14 @@ features = features[:, :, :num_used_features]
 features = torch.tensor(features)
 print(f"Processing: {nb_features_rounded} feature vectors")
 
-H = None
+# default multipath model H=1
+Rs = model.get_Rs()
+Nc = model.get_Nc()
+num_timesteps_at_rate_Rs = int(nb_features_rounded*model.get_Rs()/model.get_Rfeat())
+H = torch.ones((1,num_timesteps_at_rate_Rs,Nc))
+
+# construct a contrived multipath model, will be a series of peaks an notches, between H=2 an H=0
 if args.test_mp:
-   # construct a contrived multipath model, will be a series of peaks an notches, between H=2 an H=0
    G1 = 1
    G2 = 1
    d  = 0.002
@@ -87,12 +93,24 @@ if args.test_mp:
    Nc = model.get_Nc()
 
    num_timesteps_at_rate_Rs = int(nb_features_rounded*model.get_Rs()/model.get_Rfeat())
-   H = torch.zeros((1,num_timesteps_at_rate_Rs,Nc))
    for c in range(Nc):
       omega = 2*np.pi*c
       arg = torch.tensor(-1j*omega*d*Rs)
       H[0,:,c] = torch.abs(G1 + G2*torch.exp(arg))  # in this case channel doesn't evolve over time
                                                     # only mag matters, we assume external phase equalisation
+
+# user supplied multipath model
+if args.mp_file:
+   H = np.reshape(np.fromfile(args.mp_file, dtype=np.float32), (1, -1, Nc))
+   print(H.shape, num_timesteps_at_rate_Rs)
+   if H.shape[1] < num_timesteps_at_rate_Rs:
+      print("Multipath file too short")
+      quit()
+   H = H[:,:num_timesteps_at_rate_Rs,:]
+   #hf_gain = np.std(H)
+   #H = H/hf_gain
+   print(H.shape,np.var(H))
+   H = torch.tensor(H)
 
 if __name__ == '__main__':
 
@@ -104,14 +122,19 @@ if __name__ == '__main__':
    # push model to device and run test
    model.to(device)
    features.to(device)
+   H.to(device)
    output = model(features,H)
 
-   # lets check actual Es/No and monitor assumption |z| ~ 1
+   # lets check actual Es/No and monitor assumption |z| ~ 1, especially for multipath
    tx_sym = output["tx_sym"].detach().numpy()
    Es_meas = np.var(tx_sym)
    No = model.get_noise_std()**2
    EsNodB_meas = 10*np.log10(Es_meas/No)
-   print(f"Measured EsNodB: {EsNodB_meas:5.2f}")
+   bps = 2
+   B = 3000
+   # Es/No is defined as noise on latent samples (Eb/No if this were pure digital), not QPSK symbols
+   SNRdB_meas = EsNodB_meas + 10*np.log10(Rs*Nc*bps/B)
+   print(f"Measured: Es after multipath: {Es_meas:5.2f} EsNodB: {EsNodB_meas:5.2f} SNR3kdB: {SNRdB_meas:5.2f}")
 
    features_hat = output["features_hat"]
    features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:16]], dim=-1)

@@ -9,9 +9,9 @@
 \title{Analog Transmission of Vocoder Features}
 \maketitle
 
-Given a vector of vocoder features $\bf{f}$, use an autoencoder $E$ to map them to a dimension $d$ latent vector $\bf{z}$ where $d$ is even.  The magnitude of each element of $\bf{z}$ is constrained to a maximum of 1, but unlike digital modulation is continuusly valued and not constrained to a discrete set of points. For bandwidth efficient transmission over the channel the elements of $\bf{z}$ are mapped to $d/2$ complex symbols $\bf{q}$. Compared to classical digital modulation, the elements of $\bf{z}$ can be considered BPSK symbols (continuously valued, analog bits), and the elements of $\bf{q}$ analog QPSK symbols.
+Given a vector of vocoder features $\bf{f}$, use an autoencoder $E$ to map them to a dimension $d$ latent vector $\bf{z}$ where $d$ is even.  The magnitude of each element $z_i$ of $\bf{z}$ is constrained to a maximum of 1, but unlike digital modulation is continuously valued and not constrained to a discrete set of points. For bandwidth efficient transmission over the channel the elements of $\bf{z}$ are mapped to $d/2$ complex symbols $\bf{q}$. Compared to classical digital modulation, the elements of $\bf{z}$ can be considered BPSK symbols (continuously valued, analog bits), and the elements of $\bf{q}$ analog QPSK symbols.
 
-Our goal is to determine if reasonable speech quality can be obtained over a channel of bandwidth $B<3000$ Hz and SNR between 0 and 6dB, both comparable to Single Side Band (SSB) - a common power and bandwidth efficient form of analog radio communication.
+Our goal is to determine if reasonable speech quality can be obtained over a channel of bandwidth $B<3000$ Hz and SNR between 0 and 6dB, roughly the lower limit of Single Side Band (SSB) - a common power and bandwidth efficient form of analog radio communication.
 
 \section{Noise Simulation}
 
@@ -23,9 +23,9 @@ For example with $T_z=0.04, d=80, R_b=2000$ symbols/s.  The QPSK symbol rate is 
 \begin{equation}
 R_q = \frac{d}{2T_z} 
 \end{equation}
-For example with $T_z=0.04, d=80, R_q=1000$ symbols/s
+For example with $T_z=0.04, d=80, R_q=1000$ symbols/s.
 
-We wish to simulate a channel of known $E_b/N_0$, where $E_b$ is the energy of each BPSK symbol, and $N_0$ is the noise power per unit bandwidth.  The energy of each BPSK symbol $E_b$ is the symbol power $S$ divided by the symbol rate $R_b=1/T_b$.  The noise per unit bandwidth is the total noise power $N$ divided by the bandwidth $B$ of the system.  If we are simulating at one sample per symbol, $B=R_b$:
+We wish to simulate a channel with a user-defined $E_b/N_0$, where $E_b$ is the energy of each BPSK symbol, and $N_0$ is the noise power per unit bandwidth.  The energy of each BPSK symbol $E_b$ is the signal power $S$ divided by the symbol rate $R_b=1/T_b$.  The noise per unit bandwidth is the total noise power $N$ divided by the bandwidth $B$ of the system.  If we are simulating at one sample per symbol, $B=R_b$:
 \begin{equation}
 \begin{split}
 \frac{E_b}{N_0} &= \frac{S/R_b}{N/R_b} \\
@@ -33,7 +33,7 @@ We wish to simulate a channel of known $E_b/N_0$, where $E_b$ is the energy of e
                 &= \frac{A^2}{\sigma^2}
 \end{split}
 \end{equation}
-where $A$ is the amplitude of each BPSK symbol and $\sigma^2=N$ is the variance (mean noise energy per sample).  If the noise is zero mean, we can estimate $\sigma^2$ over $K$ noise sample $r_i$:
+where $A$ is the amplitude of each BPSK symbol and $\sigma^2=N$ is the noise variance (mean noise energy per sample).  If the noise is zero mean, we can estimate $\sigma^2$ over $K$ noise samples $r_i$ as:
 \begin{equation}
 \sigma^2 = \frac{1}{K}\sum_{i=0}^{K-1}r_i^2
 \end{equation}
@@ -45,14 +45,14 @@ r_i &= \sigma \mathcal{N}_i(0,1) \\
 \end{split}
 \end{equation}
 
-In practice we add noise to the QPSK symbols.  Due to orthogonality, this can be viewed as two independant channels that have the same noise power:
+In practice we simulate the channel by adding noise to the QPSK symbols.  Due to orthogonality, this can be simulated as two independent channels that have the same noise power:
 \begin{equation}
 r_i = \sigma \mathcal{N}_{2i}(0,1) + j\sigma\mathcal{N}_{2i+1}(0,1)
 \end{equation}
 
 \section{SNR Measurement}
 
-It is useful to formulate expressions for estimating SNR from the BPSK and QPSK symbols.  The Signal to Noise ratio (SNR) is given by:
+In order to compare with other methods of speech communication, it is useful to formulate expressions for estimating SNR from the BPSK and QPSK symbols.  The Signal to Noise ratio (SNR) is given by:
 \begin{equation}
 \label{eq:snr_theory}
 \begin{split}
@@ -65,13 +65,15 @@ At one sample per symbol, the power, the mean energy of each QPSK symbol over a 
 \begin{equation}
 E_q = Var(q_i) = \frac{1}{K}\sum_{i=0}^{K-1}|q_i|^2
 \end{equation}
-As each QPSK contains 2 BPSK symbols, then energy is split evenly:
+As each QPSK symbol contains 2 BPSK symbols, the energy is split evenly:
 \begin{equation}
-E_b = E_q/2 = Var(q_i)/2
+E_b = E_q/2
 \end{equation}
 For example if the symbol amplitude is $A=1, E_b=A^2=1$, then $E_q=1+1=2$.
 
-For transmission over multipath channels we arrange the QPSK symbols as $N_c$ parallel carriers, each running at a symbol rate of $R_s$ symbols/s, where $R_s$ is chosen based on delay spread considerations and is typically around 50 Hz.  However the OFDM carriers are arranged such that the total QPSK symbol rate over the channel $R_q$ remains constant, so for a given carrier power $S$, $E_q=S/R_q$ remains constant.  The expressions above can be used as a check for the noise injection process:
+For transmission over multipath channels we arrange the QPSK symbols as $N_c$ parallel carriers, each running at a symbol rate of $R_s$ symbols/s, where $R_s$ is chosen based on delay spread considerations.  A typical value for HF modems is $R_s=50$ Hz. However the OFDM carriers are arranged such that the total QPSK symbol rate over the channel $R_q$ remains constant, so for a given signal power $S$, $E_q=S/R_q$ remains constant.
+
+The expressions above can be used as a check for the noise injection process:
 \begin{enumerate}
 \item Set a target $E_b/N_0$ for the simulation run.
 \item Establish the target SNR from (\ref{eq:snr_theory}) evaluated using the target $E_b/N_0$.
@@ -102,9 +104,10 @@ For transmission over multipath channels we arrange the QPSK symbols as $N_c$ pa
  $T_q$ & QPSK symbol period & seconds \\
  $T_s$ & per carrier QPSK symbol period & seconds\\
  $T_z$ & time between latent vector updates & seconds\\
+ $r_i$ & noise sample \\
  $SNR$ & signal to noise Ratio \\
- $S$ & signal power & Watts \\
- $N$ & noise power & Watts \\
+ $S$ & total signal (carrier) power & Watts \\
+ $N$ & total noise power & Watts \\
  $\bf{z}$ & Autoencoder output latent vector \\ 
  $z_i$ & single latent vector element of $\bf{z}$, a BPSK symbol \\ 
  \hline

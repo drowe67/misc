@@ -134,7 +134,7 @@ if __name__ == '__main__':
    B = 3000
    # Es/No is defined as noise on latent samples (Eb/No if this were pure digital), not QPSK symbols
    SNRdB_meas = EsNodB_meas + 10*np.log10(Rs*Nc*bps/B)
-   print(f"Measured: Es after multipath: {Es_meas:5.2f} EsNodB: {EsNodB_meas:5.2f} SNR3kdB: {SNRdB_meas:5.2f}")
+   print(f"Measured: Es: {Es_meas:5.2f} EsNodB: {EsNodB_meas:5.2f} SNR3kdB: {SNRdB_meas:5.2f}")
 
    features_hat = output["features_hat"]
    features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:16]], dim=-1)

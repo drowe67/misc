@@ -38,7 +38,7 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
    ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --EsNodB 3
    ```
 
-1. Vanilla `fargan` (ie no analog VAE) for comparison:
+1. Vanilla LPCNet-fargan (ie no analog VAE) for comparison:
    ```
    ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --passthru
    ```
@@ -47,7 +47,7 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
    ```
    octave:85> Rs=50; Nc=20; multipath_samples("mpp", Rs, Rs, Nc, 60, "h.f32")
    $ ./test.sh model01/checkpoints/checkpoint_epoch_100.pth ~/LPCNet/wav/all.wav - --EsNodB 2 --write_latent z_hat.f32 --mp h.f32
-   ``
+   ```
    Then use Octave to plot scatter diagram using z_hat latents from channel:
    ```
    octave:91> analog_plots; do_plots('z_hat.f32') 

@@ -258,7 +258,7 @@ class RDOVAE(nn.Module):
     def __init__(self,
                  feature_dim,
                  latent_dim,
-                 EsNodB,
+                 EbNodB,
                  multipath_delay = 0.002
                 ):
 
@@ -267,8 +267,10 @@ class RDOVAE(nn.Module):
         self.feature_dim = feature_dim
         self.latent_dim  = latent_dim
         self.multipath_delay = multipath_delay # Multipath Poor (MPP) path delay (s)
-        self.Es = 2                            # Es of complex QPSK symbols assuming |z| ~ 1 due to encoder tanh()
-        self.noise_std   = m.sqrt(self.Es * 10**(-EsNodB/10))
+        self.A = 1                             # Amplitude of BPSK symbols ~ 1 due to encoder tanh()
+        self.Eb = self.A**2                    # Energy of BPSK symbols
+        EbNo = 10**(EbNodB/10)                 # linear Eb/No
+        self.sigma  = self.A/m.sqrt(EbNo)      # AWGN simulation noise std dev
 
         # TODO: nn.DataParallel() shouldn't be needed
         self.core_encoder =  nn.DataParallel(CoreEncoder(feature_dim, latent_dim))
@@ -284,22 +286,22 @@ class RDOVAE(nn.Module):
 
         # SNR calcs
         B = 3000                                        # bandwidth for measuring noise power (Hz)
-        self.Rfeat = 100                                # feature update rate (Hz)
-        Tfeat = self.Tfeat = 1/self.Rfeat               # feature update period (s) 
-        self.Rlat = latent_dim/(Tfeat*self.enc_stride)  # total latent symbol rate over channel (Hz)
-        EsNo = 10**(EsNodB/10)                          # linear Es/No
-        SNR = (EsNo)*(self.Rlat/B)
+        self.Tf = 0.01                                  # feature update period (s) 
+        self.Tz = self.Tf*self.enc_stride               # autoencoder latent vector update period (s)
+        self.Rz = 1/self.Tz
+        self.Rb =  latent_dim/self.Tz                   # BPSK symbol rate (symbols/s or Hz)
+        SNR = (EbNo)*(self.Rb/B)
         SNRdB = 10*m.log10(SNR)
-        print(f"EsNodB.: {EsNodB:5.2f}  std: {self.noise_std:5.2f}")
-        print(f"SNR3kdB: {SNRdB:5.2f}  Rlat:  {self.Rlat:7.2f}")
+        print(f"EbNodB.: {EbNodB:5.2f}  std: {self.sigma:5.2f}")
+        print(f"SNR3kdB: {SNRdB:5.2f}  Rb:  {self.Rb:7.2f}")
 
         # set up OFDM "modem frame" parameters.  Modem frame is Nc carriers wide in frequency 
         # and Ns symbols in duration 
-        bps = 2                                         # (bits per symbol) latent symbols per QPSK symbol
+        bps = 2                                         # BPSK symbols per QPSK symbol
         Ts = 0.02                                       # OFDM QPSK symbol period
         Rs = 1/Ts                                       # OFDM QPSK symbol rate
         Nsmf = self.latent_dim // bps                   # total number of QPSK symbols in a modem frame across all carriers
-        Ns = int(self.Tfeat*self.enc_stride // Ts)      # duration of "modem frame" in QPSK symbols
+        Ns = int(self.Tz // Ts)                         # duration of "modem frame" in QPSK symbols
         Nc = int(Nsmf // Ns)                            # number of carriers
         assert Ns*Nc*bps == latent_dim                  # sanity check, one modem frame should contain all the latent features
         self.Rs = Rs
@@ -307,22 +309,28 @@ class RDOVAE(nn.Module):
         self.Nc = Nc
         print(f"Nsmf: {Nsmf:3d} Ns: {Ns:3d} Nc: {Nc:3d}")
 
-    def get_noise_std(self):
-        return self.noise_std
+    def get_sigma(self):
+        return self.sigma
     
     def get_Rs(self):
         return self.Rs
     
-    def get_Rfeat(self):
-        return self.Rfeat
+    def get_Rb(self):
+        return self.Rb
 
     def get_Nc(self):
         return self.Nc
     
+    def get_enc_stride(self):
+        return self.enc_stride
+    
+    def get_Ns(self):
+        return self.Ns
+    
     def forward(self, features, H):
         
         (num_batches, num_ten_ms_timesteps, num_features) = features.shape
-        num_timesteps_at_rate_Rs = int(num_ten_ms_timesteps*self.Rs/self.Rfeat)
+        num_timesteps_at_rate_Rs = int((num_ten_ms_timesteps // self.enc_stride)*self.Ns)
 
         # For every OFDM modem time step, we need one channel sample for each carrier
         print(features.shape,H.shape)
@@ -348,7 +356,7 @@ class RDOVAE(nn.Module):
         tx_sym = tx_sym * H
 
         # complex AWGN noise
-        n = self.noise_std*torch.randn_like(tx_sym)
+        n = self.sigma*torch.randn_like(tx_sym)
         rx_sym = tx_sym + n
 
         # demap QPSK symbols

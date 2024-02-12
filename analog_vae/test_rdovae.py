@@ -81,7 +81,7 @@ print(f"Processing: {nb_features_rounded} feature vectors")
 # default multipath model H=1
 Rs = model.get_Rs()
 Nc = model.get_Nc()
-num_timesteps_at_rate_Rs = int(nb_features_rounded*model.get_Rs()/model.get_Rfeat())
+num_timesteps_at_rate_Rs = int((nb_features_rounded // model.get_enc_stride())*model.get_Ns())
 H = torch.ones((1,num_timesteps_at_rate_Rs,Nc))
 
 # construct a contrived multipath model, will be a series of peaks an notches, between H=2 an H=0
@@ -125,16 +125,15 @@ if __name__ == '__main__':
    H.to(device)
    output = model(features,H)
 
-   # lets check actual Es/No and monitor assumption |z| ~ 1, especially for multipath
+   # lets check actual Eq/No, Eb/No and SNR, and monitor assumption |z| ~ 1, especially for multipath
    tx_sym = output["tx_sym"].detach().numpy()
-   Es_meas = np.var(tx_sym)
-   No = model.get_noise_std()**2
-   EsNodB_meas = 10*np.log10(Es_meas/No)
-   bps = 2
+   Eq_meas = np.var(tx_sym)
+   No = model.get_sigma()**2
+   EqNodB_meas = 10*np.log10(Eq_meas/No)
+   Rq = Rs*Nc
    B = 3000
-   # Es/No is defined as noise on latent samples (Eb/No if this were pure digital), not QPSK symbols
-   SNRdB_meas = EsNodB_meas + 10*np.log10(Rs*Nc*bps/B)
-   print(f"Measured: Es: {Es_meas:5.2f} EsNodB: {EsNodB_meas:5.2f} SNR3kdB: {SNRdB_meas:5.2f}")
+   SNRdB_meas = EqNodB_meas + 10*np.log10(Rq/B)
+   print(f"Measured: Eq: {Eq_meas:5.2f} EqNodB: {EqNodB_meas:5.2f} EbNodB: {EqNodB_meas-3:5.2f} SNR3kdB: {SNRdB_meas:5.2f}")
 
    features_hat = output["features_hat"]
    features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:16]], dim=-1)

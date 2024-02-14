@@ -59,10 +59,9 @@ def distortion_loss(y_true, y_pred, rate_lambda=None):
 
     loss = torch.mean(ceps_error ** 2 + 3. * (10/18) * torch.abs(pitch_error) * pitch_weight + (1/18) * corr_error ** 2, dim=-1)
 
-    if type(rate_lambda) != type(None):
-        loss = loss / torch.sqrt(rate_lambda)
-
-    loss = torch.mean(loss)
+    # reduce bias towards lower Eb/No when training over a range of Eb/No
+    # loss = torch.mean(loss)
+    loss = torch.mean(torch.sqrt(torch.mean(loss, dim=1)))
 
     return loss
 
@@ -259,18 +258,18 @@ class RDOVAE(nn.Module):
                  feature_dim,
                  latent_dim,
                  EbNodB,
-                 multipath_delay = 0.002
+                 multipath_delay = 0.002,
+                 range_EbNo = False,
+                 ber_test = False
                 ):
 
         super(RDOVAE, self).__init__()
 
         self.feature_dim = feature_dim
         self.latent_dim  = latent_dim
+        self.range_EbNo = range_EbNo
+        self.ber_test = ber_test
         self.multipath_delay = multipath_delay # Multipath Poor (MPP) path delay (s)
-        self.A = 1                             # Amplitude of BPSK symbols ~ 1 due to encoder tanh()
-        self.Eb = self.A**2                    # Energy of BPSK symbols
-        EbNo = 10**(EbNodB/10)                 # linear Eb/No
-        self.sigma  = self.A/m.sqrt(EbNo)      # AWGN simulation noise std dev
 
         # TODO: nn.DataParallel() shouldn't be needed
         self.core_encoder =  nn.DataParallel(CoreEncoder(feature_dim, latent_dim))
@@ -284,19 +283,27 @@ class RDOVAE(nn.Module):
         if self.dec_stride % self.enc_stride != 0:
             raise ValueError(f"get_decoder_chunks_generic: encoder stride does not divide decoder stride")
 
-        # SNR calcs
-        B = 3000                                        # bandwidth for measuring noise power (Hz)
-        self.Tf = 0.01                                  # feature update period (s) 
-        self.Tz = self.Tf*self.enc_stride               # autoencoder latent vector update period (s)
+        self.Tf = 0.01                                 # feature update period (s) 
+        self.Tz = self.Tf*self.enc_stride              # autoencoder latent vector update period (s)
         self.Rz = 1/self.Tz
-        self.Rb =  latent_dim/self.Tz                   # BPSK symbol rate (symbols/s or Hz)
-        SNR = (EbNo)*(self.Rb/B)
-        SNRdB = 10*m.log10(SNR)
-        print(f"EbNodB.: {EbNodB:5.2f}  std: {self.sigma:5.2f}")
-        print(f"SNR3kdB: {SNRdB:5.2f}  Rb:  {self.Rb:7.2f}")
+        self.Rb =  latent_dim/self.Tz                  # BPSK symbol rate (symbols/s or Hz)
 
-        # set up OFDM "modem frame" parameters.  Modem frame is Nc carriers wide in frequency 
-        # and Ns symbols in duration 
+        # set up noise sigma if doing a fixed Eb/No run (e.g. inference)
+        if self.range_EbNo == False:
+            self.A = 1                                 # Amplitude of BPSK symbols ~ 1 due to encoder tanh()
+            self.Eb = self.A**2                        # Energy of BPSK symbols
+            EbNo = 10**(EbNodB/10)                     # linear Eb/No
+            self.sigma  = self.A/m.sqrt(EbNo)          # AWGN simulation noise std dev, power spread between real and imag
+
+            # SNR calcs
+            B = 3000                                   # bandwidth for measuring noise power (Hz)
+            SNR = (EbNo)*(self.Rb/B)
+            SNRdB = 10*m.log10(SNR)
+            print(f"EbNodB.: {EbNodB:5.2f}  sigma: {self.sigma:5.2f}")
+            print(f"SNR3kdB: {SNRdB:5.2f}  Rb...:  {self.Rb:7.2f}")
+
+        # set up OFDM "modem frame" parameters to support multipath simulation.  Modem frame is Nc carriers 
+        # wide in frequency and Ns symbols in duration 
         bps = 2                                         # BPSK symbols per QPSK symbol
         Ts = 0.02                                       # OFDM QPSK symbol period
         Rs = 1/Ts                                       # OFDM QPSK symbol rate
@@ -333,19 +340,21 @@ class RDOVAE(nn.Module):
         num_timesteps_at_rate_Rs = int((num_ten_ms_timesteps // self.enc_stride)*self.Ns)
 
         # For every OFDM modem time step, we need one channel sample for each carrier
-        print(features.shape,H.shape)
+        #print(features.shape,H.shape, features.device, H.device)
         assert (H.shape[0] == num_batches)
         assert (H.shape[1] == num_timesteps_at_rate_Rs)
         assert (H.shape[2] == self.Nc)
 
         # run encoder, outputs sequence of latents that each describe 40ms of speech
         z = self.core_encoder(features)
-
+        if self.ber_test:
+            z = torch.sign(torch.rand_like(z)-0.5)
+        
         # map z to QPSK symbols, note Es = var(tx_sym) = 2 var(z) = 2 
         # assuming |z| ~ 1 after training
         tx_sym = z[:,:,::2] + 1j*z[:,:,1::2]
         qpsk_shape = tx_sym.shape
-
+        
         # reshape into sequence of OFDM frames
         tx_sym = torch.reshape(tx_sym,(num_batches,num_timesteps_at_rate_Rs,self.Nc))
 
@@ -356,15 +365,28 @@ class RDOVAE(nn.Module):
         tx_sym = tx_sym * H
 
         # complex AWGN noise
-        n = self.sigma*torch.randn_like(tx_sym)
+        if self.range_EbNo:
+            EbNodB = -2 + 15*torch.rand(num_batches, 1, 1, device=z.device)
+            sigma = 10**(-EbNodB/20)
+        else:
+            sigma = self.sigma
+        # note noise power sigma**2 is split between real and imag channels
+        n = sigma*torch.randn_like(tx_sym)   
         rx_sym = tx_sym + n
 
         # demap QPSK symbols
         rx_sym = torch.reshape(rx_sym,qpsk_shape)
+
         z_hat = torch.zeros_like(z)
         z_hat[:,:,::2] = rx_sym.real
         z_hat[:,:,1::2] = rx_sym.imag
 
+        if self.ber_test:
+            n_errors = torch.sum(-z*z_hat>0)
+            n_bits = torch.numel(z)
+            BER = n_errors/n_bits
+            print(f"n_bits: {n_bits:d} BER: {BER:5.3f}")
+            
         features_hat = self.core_decoder(z_hat)
 
         return {
@@ -372,5 +394,3 @@ class RDOVAE(nn.Module):
             "z_hat"  : z_hat,
             "tx_sym" : tx_sym,
         }
-    
-

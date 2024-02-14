@@ -43,7 +43,8 @@ parser.add_argument('features', type=str, help='path to feature file in .f32 for
 parser.add_argument('output', type=str, help='path to output folder')
 parser.add_argument('--cuda-visible-devices', type=str, help="comma separates list of cuda visible device indices, default: ''", default="")
 parser.add_argument('--latent-dim', type=int, help="number of symbols produced by encoder, default: 80", default=80)
-parser.add_argument('--EsNodB', type=float, default=0, help='latent symbol Es/No in dB (note different to QPSK symbol Es/No)')
+parser.add_argument('--EbNodB', type=float, default=0, help='BPSK Eb/No in dB')
+parser.add_argument('--range_EbNo', action='store_true', help='Use a range of Eb/No during training')
 
 training_group = parser.add_argument_group(title="training parameters")
 training_group.add_argument('--batch-size', type=int, help="batch size, default: 32", default=32)
@@ -100,8 +101,8 @@ num_features = 20
 feature_file = args.features
 
 # model
-checkpoint['model_args']    = (num_features, latent_dim, args.EsNodB)
-model = RDOVAE(*checkpoint['model_args'])
+checkpoint['model_args'] = (num_features, latent_dim, args.EbNodB, args.range_EbNo, args.range_EbNo)
+model = RDOVAE(num_features, latent_dim, args.EbNodB, range_EbNo=args.range_EbNo)
 
 if type(args.initial_checkpoint) != type(None):
     checkpoint = torch.load(args.initial_checkpoint, map_location='cpu')
@@ -124,6 +125,12 @@ checkpoint['dataset_args'] = (feature_file, sequence_length, num_features, 36)
 checkpoint['dataset_kwargs'] = {'enc_stride': model.enc_stride}
 dataset = RDOVAEDataset(*checkpoint['dataset_args'], **checkpoint['dataset_kwargs'])
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
+
+# default multipath model H=1
+Rs = model.get_Rs()
+Nc = model.get_Nc()
+num_timesteps_at_rate_Rs = int((sequence_length // model.get_enc_stride())*model.get_Ns())
+H = torch.ones((batch_size,num_timesteps_at_rate_Rs,Nc))
 
 # optimizer
 params = [p for p in model.parameters() if p.requires_grad]
@@ -159,7 +166,8 @@ if __name__ == '__main__':
 
                 optimizer.zero_grad()
                 features = features.to(device)
-                output = model(features)
+                H = H.to(device)
+                output = model(features,H)
                 total_loss = distortion_loss(features, output["features_hat"])
                 total_loss.backward()
                 optimizer.step()

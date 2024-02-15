@@ -7,7 +7,7 @@ pkg load statistics;
 function do_plots(fn='l.f32',png_fn='')
     l=load_f32(fn,1);
     s=l(1:2:end)+j*l(2:2:end);
-    figure(1); clf; plot(s,'.')
+    figure(1); clf; plot(s,'.'); axis([-4 4 -4 4])
     if length(png_fn)
         print("-dpng",png_fn);
     end

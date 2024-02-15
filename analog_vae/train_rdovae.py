@@ -90,7 +90,7 @@ log_interval = 10
 
 # device
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-
+print(device)
 # model parameters
 latent_dim = args.latent_dim
 
@@ -183,7 +183,8 @@ if __name__ == '__main__':
                         total_loss=running_total_loss / (i + 1),
                     )
                     previous_total_loss = running_total_loss
-                    loss_epoch[epoch] = current_loss
+                    if args.plot_loss:
+                        loss_epoch[epoch] = current_loss
 
         if args.plot_loss:
             plt.clf()

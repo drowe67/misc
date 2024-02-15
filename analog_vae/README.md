@@ -26,16 +26,18 @@ scp deep.lan:opus/output.s16 /dev/stdout | aplay -f S16_LE -r 1600
 python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch-size 512 --epochs 100 --lr 0.003 --lr-decay-factor 0.0001 training_features_file.f32 model_dir_name
 ```
 
-## Testing
+## Inference
 
-1. Generate `out.wav` at EsNo = 10 dB:
+`test_rdovae.py` is used for inference.  It runs by default on the CPU, but will run on the GPU with the `--cuda-visible-devices 0` option.
+
+1. Generate `out.wav` at Eb/No = 10 dB:
    ```
-   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/all.wav out.wav --EsNodB 10
+   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/all.wav out.wav --EbNodB 10
    ```
 
-1. Play output sample to your default `aplay` sound device at Es/No = 3dB:
+1. Play output sample to your default `aplay` sound device at Eb/No = 3dB:
    ```
-   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --EsNodB 3
+   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --EbNodB 3
    ```
 
 1. Vanilla LPCNet-fargan (ie no analog VAE) for comparison:
@@ -46,16 +48,31 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 1. Multipath demo at approx 0dB B=3000 Hz SNR. First generate multipath channel samples using GNU Octave (only need to be generated once): 
    ```
    octave:85> Rs=50; Nc=20; multipath_samples("mpp", Rs, Rs, Nc, 60, "h.f32")
-   $ ./test.sh model01/checkpoints/checkpoint_epoch_100.pth ~/LPCNet/wav/all.wav - --EsNodB 2 --write_latent z_hat.f32 --mp h.f32
+   $ ./test.sh model01/checkpoints/checkpoint_epoch_100.pth ~/LPCNet/wav/all.wav - --EbNodB 2 --write_latent z_hat.f32 --mp h.f32
    ```
    Then use Octave to plot scatter diagram using z_hat latents from channel:
    ```
    octave:91> analog_plots; do_plots('z_hat.f32') 
    ```
 
+## Tests
+
+1. BER test to check simulation modem calibration `--ber_test`
+2. Fixed multipath channel test `--mp_test`.
+
+# Models
+
+| Model | Description |
+| ---- | ---- |
+| model01 | trained at Eb/No 0 dB |
+| model02 | trained at Eb/No 10 dB |
+| model03 | --range_EbNo -2 ... 13 dB |
+
 # Notes
 
-1. Issues: We would like smooth degredation from high SNR to low SNR, rather than training and operating at one SNR.  Currently if trained at 10dB, not as good as model trained at 0dB when tested at 0dB.  Also, if trained at 0dB, quality is reduced when tested on high SNR channel, compared to model trained at high SNR.
+1. Issue: ~We would like smooth degredation from high SNR to low SNR, rather than training and operating at one SNR.  Currently if trained at 10dB, not as good as model trained at 0dB when tested at 0dB.  Also, if trained at 0dB, quality is reduced when tested on high SNR channel, compared to model trained at high SNR.~  This has been dealt with by training at a range of SNRs.
+
+1. Issue: occasional pops in output speech (e.g. model03, 100dB) in model03 training with varying SNRs.  Seems less prevelant model01/02 trained with a fixed SNR. Perhaps we could have a loss function component that discourages large energy excursions, perhaps first cepstral?  Or remove sqrt in loss?
 
 1. Test: Multipath with no noise should mean speech is not impaired, as no "symbol errors".
 
@@ -95,3 +112,8 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 1. Sweep different latent dimensions and choose best perf for given SNR.
 
 1. Can we use loss function as an objective measure for comparing different schemes?
+
+1. Naming thoughts:
+   * Can be interpreted as a VAE, would make some sense to ML people, but not helpful for comms people, perhap better as a second line description than a title
+   * Neural modem - as network selects constellation, or "neural speech modem"
+   * Neural channel coding - as network takes features and encoders them for transmisison of the channel

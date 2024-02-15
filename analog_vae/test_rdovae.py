@@ -42,7 +42,7 @@ parser.add_argument('model_name', type=str, help='path to model in .pth format')
 parser.add_argument('features', type=str, help='path to input feature file in .f32 format')
 parser.add_argument('features_hat', type=str, help='path to output feature file in .f32 format')
 parser.add_argument('--latent-dim', type=int, help="number of symbols produces by encoder, default: 80", default=80)
-parser.add_argument('--cuda-visible-devices', type=str, help="comma separates list of cuda visible device indices, default: ''", default="")
+parser.add_argument('--cuda-visible-devices', type=str, help="set to 0 to run using GPU rather than CPU", default="")
 parser.add_argument('--write_latent', type=str, default="", help='path to output file of latent vectors z[latent_dim] in .f32 format')
 parser.add_argument('--EbNodB', type=float, default=0, help='BPSK Eb/No in dB')
 parser.add_argument('--passthru', action='store_true', help='copy features in to feature out, bypassing ML network')
@@ -121,13 +121,13 @@ if __name__ == '__main__':
 
    # push model to device and run test
    model.to(device)
-   features.to(device)
-   H.to(device)
+   features = features.to(device)
+   H = H.to(device)
    output = model(features,H)
 
    # Lets check actual Eq/No, Eb/No and SNR, and monitor assumption |z| ~ 1, especially for multipath.
    # If |z| ~ 1, Eb ~ 1, Eq ~ 2, and the measured SNR should match the set point SNR. 
-   tx_sym = output["tx_sym"].detach().numpy()
+   tx_sym = output["tx_sym"].cpu().detach().numpy()
    Eq_meas = np.var(tx_sym)
    No = model.get_sigma()**2
    EqNodB_meas = 10*np.log10(Eq_meas/No)
@@ -138,10 +138,10 @@ if __name__ == '__main__':
 
    features_hat = output["features_hat"]
    features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:16]], dim=-1)
-   features_hat = features_hat.detach().numpy().flatten().astype('float32')
+   features_hat = features_hat.cpu().detach().numpy().flatten().astype('float32')
    features_hat.tofile(args.features_hat)
 
    if len(args.write_latent):
-      z_hat = output["z_hat"].detach().numpy().flatten().astype('float32')
+      z_hat = output["z_hat"].cpu().detach().numpy().flatten().astype('float32')
       z_hat.tofile(args.write_latent)
    

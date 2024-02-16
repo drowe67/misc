@@ -35,7 +35,7 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
    ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/all.wav out.wav --EbNodB 10
    ```
 
-1. Play output sample to your default `aplay` sound device at Eb/No = 3dB:
+1. Play output sample to your default `aplay` sound device at BPSK Eb/No = 3dB:
    ```
    ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --EbNodB 3
    ```
@@ -48,7 +48,7 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 1. Multipath demo at approx 0dB B=3000 Hz SNR. First generate multipath channel samples using GNU Octave (only need to be generated once): 
    ```
    octave:85> Rs=50; Nc=20; multipath_samples("mpp", Rs, Rs, Nc, 60, "h.f32")
-   $ ./test.sh model01/checkpoints/checkpoint_epoch_100.pth ~/LPCNet/wav/all.wav - --EbNodB 2 --write_latent z_hat.f32 --mp h.f32
+   $ ./test.sh model03/checkpoints/checkpoint_epoch_100.pth ~/LPCNet/wav/all.wav tmp.wav --EbNodB 3 --write_latent z_hat.f32 --mp_file h.f32
    ```
    Then use Octave to plot scatter diagram using z_hat latents from channel:
    ```

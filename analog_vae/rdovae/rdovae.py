@@ -58,10 +58,9 @@ def distortion_loss(y_true, y_pred, rate_lambda=None):
     pitch_weight = torch.relu(y_true[..., 19:] + 0.5) ** 2
 
     loss = torch.mean(ceps_error ** 2 + 3. * (10/18) * torch.abs(pitch_error) * pitch_weight + (1/18) * corr_error ** 2, dim=-1)
-
+    loss = torch.mean(loss)
     # reduce bias towards lower Eb/No when training over a range of Eb/No
-    # loss = torch.mean(loss)
-    loss = torch.mean(torch.sqrt(torch.mean(loss, dim=1)))
+    #loss = torch.mean(torch.sqrt(torch.mean(loss, dim=1)))
 
     return loss
 

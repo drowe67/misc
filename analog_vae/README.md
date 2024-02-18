@@ -23,7 +23,7 @@ scp deep.lan:opus/output.s16 /dev/stdout | aplay -f S16_LE -r 1600
 
 ## Training
 ```
-python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch-size 512 --epochs 100 --lr 0.003 --lr-decay-factor 0.0001 training_features_file.f32 model_dir_name
+python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch-size 512 --epochs 100 --lr 0.003 --lr-decay-factor 0.0001 --plot_loss training_features_file.f32 model_dir_name
 ```
 
 ## Inference
@@ -66,13 +66,17 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 | ---- | ---- |
 | model01 | trained at Eb/No 0 dB |
 | model02 | trained at Eb/No 10 dB |
-| model03 | --range_EbNo -2 ... 13 dB |
+| model03 | --range_EbNo -2 ... 13 dB, modified sqrt loss |
+| model04 | --range_EbNo -2 ... 13 dB, orginal loss, noise might be 3dB less after calibration |
+| model05 | --range_EbNo, --mp_file h_mpp.f32, sounds good on MPP and AWGN at a range of SNR - no pops |
 
 # Notes
 
 1. Issue: ~We would like smooth degredation from high SNR to low SNR, rather than training and operating at one SNR.  Currently if trained at 10dB, not as good as model trained at 0dB when tested at 0dB.  Also, if trained at 0dB, quality is reduced when tested on high SNR channel, compared to model trained at high SNR.~  This has been dealt with by training at a range of SNRs.
 
-1. Issue: occasional pops in output speech (e.g. model03, 100dB) in model03 training with varying SNRs.  Seems less prevelant model01/02 trained with a fixed SNR. Perhaps we could have a loss function component that discourages large energy excursions, perhaps first cepstral?  Or remove sqrt in loss?
+1. Issue: occasional pops in output speech (e.g. model01/03/04, vk5dgr_test 0 and 100dB, model03 all 100dB).  Speaker depedence, e.g. predictor struggling with uneven pitch tracks of some speakers?  Network encountering data it hasn't seen before? Some bug unrealted to training? (note model05 with multipath in loop is pop free)
+
+1. Issue: vk5dgr_test.wav sounds poorer than LPCNet/wav/all.wav - same speaker, but former much louder.
 
 1. Test: Multipath with no noise should mean speech is not impaired, as no "symbol errors".
 

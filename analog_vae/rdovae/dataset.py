@@ -33,25 +33,38 @@ import numpy as np
 class RDOVAEDataset(torch.utils.data.Dataset):
     def __init__(self,
                 feature_file,
-                sequence_length,
+                sequence_length,      # number of feature vectors in each sequence of time steps we train on
+                mp_sequence_length,   # corresponding number of multipath vectors in each sequence of time steps we train on
+                Nc,
                 num_used_features=20,
                 num_features=36,
-                enc_stride=2):
+                mp_file=""
+                ):
 
         self.sequence_length = sequence_length
-        self.enc_stride = enc_stride
-
-        if sequence_length % enc_stride:
-            raise ValueError(f"RDOVAEDataset.__init__: enc_stride {enc_stride} does not divide sequence length {sequence_length}")
 
         self.features = np.reshape(np.fromfile(feature_file, dtype=np.float32), (-1, num_features))
         self.features = self.features[:, :num_used_features]
         self.num_sequences = self.features.shape[0] // sequence_length
+        
+        # optionally load multipath model
+        self.mp_sequence_length = mp_sequence_length
+        if len(mp_file):
+            self.H = np.reshape(np.fromfile(mp_file, dtype=np.float32), (-1, Nc))
+            mp_num_sequences = self.H.shape[0] // mp_sequence_length
+            if mp_num_sequences < self.num_sequences:
+                print("Multipath file too short")
+                quit()
+        else:
+            self.H = np.ones((self.num_sequences*self.mp_sequence_length,Nc))
+        print(f"dataloader: sequence_length: {self.sequence_length:d} num_sequences: {self.sequence_length:d} mp_sequence_length: {mp_sequence_length:d}")
+        print(self.features.shape, self.H.shape)
 
     def __len__(self):
         return self.num_sequences
 
     def __getitem__(self, index):
         features = self.features[index * self.sequence_length: (index + 1) * self.sequence_length, :]
+        H = self.H[index * self.mp_sequence_length: (index + 1) * self.mp_sequence_length, :]
 
-        return features
+        return features,H

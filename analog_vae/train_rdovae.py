@@ -45,6 +45,7 @@ parser.add_argument('--cuda-visible-devices', type=str, help="comma separates li
 parser.add_argument('--latent-dim', type=int, help="number of symbols produced by encoder, default: 80", default=80)
 parser.add_argument('--EbNodB', type=float, default=0, help='BPSK Eb/No in dB')
 parser.add_argument('--range_EbNo', action='store_true', help='Use a range of Eb/No during training')
+parser.add_argument('--mp_file', type=str, default="", help='path to multipath file, rate Rs time steps by Nc carriers .f32 format')
 
 training_group = parser.add_argument_group(title="training parameters")
 training_group.add_argument('--batch-size', type=int, help="batch size, default: 32", default=32)
@@ -101,7 +102,7 @@ num_features = 20
 feature_file = args.features
 
 # model
-checkpoint['model_args'] = (num_features, latent_dim, args.EbNodB, args.range_EbNo, args.range_EbNo)
+checkpoint['model_args'] = (num_features, latent_dim, args.EbNodB, args.range_EbNo)
 model = RDOVAE(num_features, latent_dim, args.EbNodB, range_EbNo=args.range_EbNo)
 
 if type(args.initial_checkpoint) != type(None):
@@ -121,16 +122,12 @@ if args.train_decoder_only:
         p.requires_grad = False
 
 # dataloader
-checkpoint['dataset_args'] = (feature_file, sequence_length, num_features, 36)
-checkpoint['dataset_kwargs'] = {'enc_stride': model.enc_stride}
-dataset = RDOVAEDataset(*checkpoint['dataset_args'], **checkpoint['dataset_kwargs'])
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
-
-# default multipath model H=1
-Rs = model.get_Rs()
 Nc = model.get_Nc()
-num_timesteps_at_rate_Rs = int((sequence_length // model.get_enc_stride())*model.get_Ns())
-H = torch.ones((batch_size,num_timesteps_at_rate_Rs,Nc))
+mp_sequence_length = int((sequence_length // model.get_enc_stride())*model.get_Ns())
+checkpoint['dataset_args'] = (feature_file, sequence_length, mp_sequence_length, Nc)
+checkpoint['dataset_kwargs'] = {'enc_stride': model.enc_stride}
+dataset = RDOVAEDataset(*checkpoint['dataset_args'], mp_file = args.mp_file)
+dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
 
 # optimizer
 params = [p for p in model.parameters() if p.requires_grad]
@@ -162,11 +159,14 @@ if __name__ == '__main__':
             plt.figure(1)
             
         with tqdm.tqdm(dataloader, unit='batch') as tepoch:
-            for i, features in enumerate(tepoch):
+            for i, (features,H) in enumerate(tepoch):
 
                 optimizer.zero_grad()
                 features = features.to(device)
                 H = H.to(device)
+                #H_ = H.cpu().numpy().flatten().astype('float32')
+                #H_.tofile("h_test.f32")
+                #quit()
                 output = model(features,H)
                 total_loss = distortion_loss(features, output["features_hat"])
                 total_loss.backward()

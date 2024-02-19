@@ -315,6 +315,19 @@ class RDOVAE(nn.Module):
         self.Nc = Nc
         print(f"Nsmf: {Nsmf:3d} Ns: {Ns:3d} Nc: {Nc:3d}")
 
+        # DFT matrices for symbol rate to Rs to sample rate Fs conversion (could be FFTs but for non power of 2 Nc,M DFT in 
+        # matrix form is convenient)
+        self.Fs = 8000                                               # sample rate of modem signal 
+        self.M = int(self.Fs // self.Rs)                             # oversampling rate
+        self.w = 2*m.pi*(400 + torch.arange(Nc)*Rs)/self.Fs          # carrier frequencies, start at 400Hz to be above analog filtering in radios
+        self.Wfwd = torch.zeros((Nc,self.M), dtype=torch.complex64)  # forward DFT matrix
+        self.Winv = torch.zeros((self.M,Nc), dtype=torch.complex64)  # inverse DFT matrix
+        for c in range(0,Nc):
+            self.Wfwd[c,:] = torch.exp(-1j*torch.arange(self.M)*self.w[c])
+            self.Winv[:,c] = torch.exp( 1j*torch.arange(self.M)*self.w[c])
+        print(self.Winv)
+        quit()
+
     def get_sigma(self):
         return self.sigma
     

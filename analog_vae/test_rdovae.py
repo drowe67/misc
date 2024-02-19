@@ -47,8 +47,9 @@ parser.add_argument('--write_latent', type=str, default="", help='path to output
 parser.add_argument('--EbNodB', type=float, default=0, help='BPSK Eb/No in dB')
 parser.add_argument('--passthru', action='store_true', help='copy features in to feature out, bypassing ML network')
 parser.add_argument('--mp_test', action='store_true', help='Fixed notch test multipath channel')
-parser.add_argument('--mp_file', type=str, default="", help='path to multipath file, rate Rs time steps by Nc carriers .f32 format')
 parser.add_argument('--ber_test', action='store_true', help='send random PSK bits through channel model, measure BER')
+parser.add_argument('--mp_file', type=str, default="", help='path to multipath file, rate Rs time steps by Nc carriers .f32 format')
+parser.add_argument('--rate_Fs', action='store_true', help='rate Fs simulation (default rate Rs)')
 args = parser.parse_args()
 
 # set visible devices
@@ -65,7 +66,7 @@ num_features = 20
 num_used_features = 20
 
 # load model from a checkpoint file
-model = RDOVAE(num_features, latent_dim, args.EbNodB, ber_test = args.ber_test)
+model = RDOVAE(num_features, latent_dim, args.EbNodB, ber_test = args.ber_test, rate_Fs = args.rate_Fs)
 checkpoint = torch.load(args.model_name, map_location='cpu')
 model.load_state_dict(checkpoint['state_dict'], strict=False)
 checkpoint['state_dict'] = model.state_dict()

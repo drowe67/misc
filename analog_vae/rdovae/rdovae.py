@@ -321,11 +321,11 @@ class RDOVAE(nn.Module):
         self.Fs = 8000                                               # sample rate of modem signal 
         self.M = int(self.Fs // self.Rs)                             # oversampling rate
         self.w = 2*m.pi*(400 + torch.arange(Nc)*Rs)/self.Fs          # carrier frequencies, start at 400Hz to be above analog filtering in radios
-        self.Wfwd = torch.zeros((Nc,self.M), dtype=torch.complex64)  # forward DFT matrix
-        self.Winv = torch.zeros((self.M,Nc), dtype=torch.complex64)  # inverse DFT matrix
+        self.Winv = torch.zeros((Nc,self.M), dtype=torch.complex64)  # inverse DFT matrix, Nc freq domain to M time domain (OFDM Tx)
+        self.Wfwd = torch.zeros((self.M,Nc), dtype=torch.complex64)  # forward DFT matrix, M time domain to Nc freq domain (OFDM Rx)
         for c in range(0,Nc):
-            self.Wfwd[c,:] = torch.exp(-1j*torch.arange(self.M)*self.w[c])
-            self.Winv[:,c] = torch.exp( 1j*torch.arange(self.M)*self.w[c])
+           self.Winv[c,:] = torch.exp( 1j*torch.arange(self.M)*self.w[c])/self.M
+           self.Wfwd[:,c] = torch.exp(-1j*torch.arange(self.M)*self.w[c])
 
     def get_sigma(self):
         return self.sigma
@@ -376,26 +376,20 @@ class RDOVAE(nn.Module):
         # reshape into sequence of OFDM frames
         tx_sym = torch.reshape(tx_sym,(num_batches,num_timesteps_at_rate_Rs,self.Nc))
 
+        tx = None
         rx = None
         if self.rate_Fs:
             # Simulate channel at M=Fs/Rs samples per QPSK symbol ---------------------------------
 
-            # IDFT to create a time domain rate Rs signal (M samples/symbol)
-            tx = torch.zeros(num_batches,num_timesteps_at_rate_Rs,self.M, dtype=torch.complex64)
-            for s in range(num_timesteps_at_rate_Rs):
-                x = torch.matmul(self.Winv,tx_sym[:,s,:].reshape((self.Nc,1)))/self.M
-                tx[:,s,:] = x[:,0]
+            # IDFT to transform Nc carriers to M time domain samples
+            tx = torch.matmul(tx_sym, self.Winv)
+            
+            # TODO Add cyclic prefix, reshape to (batch,timessteps*M), time domain multipath simulation
 
             rx = tx + sigma*torch.randn_like(tx)/m.sqrt(self.M)
 
-            # back to freq domain, rate Rs with DFT (1 sample/symbol)
-            rx_sym = torch.zeros_like(tx_sym)
-            for s in range(num_timesteps_at_rate_Rs):
-                x = torch.matmul(self.Wfwd,rx[:,s,:].reshape(self.M,1))
-                rx_sym[:,s,:] = x[:,0]
-
-            #print(tx_sym[0,0,:], rx_sym[0,0,:])
-            #quit()
+            # DFT to transform M time domain samples to Nc carriers
+            rx_sym = torch.matmul(rx, self.Wfwd)
         else:
             # Simulate channel at one sample per QPSK symbol (Fs=Rs) --------------------------------
             
@@ -426,5 +420,6 @@ class RDOVAE(nn.Module):
             "features_hat" : features_hat,
             "z_hat"  : z_hat,
             "tx_sym" : tx_sym,
+            "tx"     : tx,
             "rx"     : rx
        }

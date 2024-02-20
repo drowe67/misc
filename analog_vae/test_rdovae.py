@@ -50,6 +50,7 @@ parser.add_argument('--mp_test', action='store_true', help='Fixed notch test mul
 parser.add_argument('--ber_test', action='store_true', help='send random PSK bits through channel model, measure BER')
 parser.add_argument('--mp_file', type=str, default="", help='path to multipath file, rate Rs time steps by Nc carriers .f32 format')
 parser.add_argument('--rate_Fs', action='store_true', help='rate Fs simulation (default rate Rs)')
+parser.add_argument('--write_rx', type=str, default="", help='path to output file of rate Fs rx samples in ..IQIQ...f32 format')
 args = parser.parse_args()
 
 # set visible devices
@@ -145,4 +146,8 @@ if __name__ == '__main__':
    if len(args.write_latent):
       z_hat = output["z_hat"].cpu().detach().numpy().flatten().astype('float32')
       z_hat.tofile(args.write_latent)
+   
+   if len(args.write_rx):
+      rx = output["rx"].cpu().detach().numpy().flatten().astype('float32')
+      rx.tofile(args.write_rx)
    

@@ -376,6 +376,7 @@ class RDOVAE(nn.Module):
         # reshape into sequence of OFDM frames
         tx_sym = torch.reshape(tx_sym,(num_batches,num_timesteps_at_rate_Rs,self.Nc))
 
+        rx = None
         if self.rate_Fs:
             # Simulate channel at M=Fs/Rs samples per QPSK symbol ---------------------------------
 
@@ -425,4 +426,5 @@ class RDOVAE(nn.Module):
             "features_hat" : features_hat,
             "z_hat"  : z_hat,
             "tx_sym" : tx_sym,
-        }
+            "rx"     : rx
+       }

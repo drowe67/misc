@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Process an audio file with test_rdovae.py
+# Some automation around inference.py to help with testing
 
 OPUS=${HOME}/opus
 PATH=${PATH}:${OPUS}
@@ -10,9 +10,9 @@ features_out=out.f32
 
 if [ $# -lt 3 ]; then
     echo "usage (write output to file):"
-    echo "  ./test.sh model in.s16 out.wav [optional test_rdovae.py args]"
+    echo "  ./inference.sh model in.s16 out.wav [optional inference.py args]"
     echo "usage (play output with aplay):"
-    echo "  ./test.sh model in.s16 - [optional test_rdovae.py args]"
+    echo "  ./inference.sh model in.s16 - [optional inference.py args]"
     exit 1
 fi
 if [ ! -f $1 ]; then
@@ -30,11 +30,11 @@ output_speech=$3
 features_in=$(mktemp)
 features_out=$(mktemp)
 
-# eat first 3 args before passing rest to test_rdovae.py in $@
+# eat first 3 args before passing rest to inference.py in $@
 shift; shift; shift
 
 lpcnet_demo -features ${input_speech} ${features_in}
-python3 ./test_rdovae.py ${model} ${features_in} ${features_out} "$@"
+python3 ./inference.py ${model} ${features_in} ${features_out} "$@"
 if [ $output_speech == "-" ]; then
     tmp=$(mktemp)
     lpcnet_demo -fargan-synthesis ${features_out} ${tmp}

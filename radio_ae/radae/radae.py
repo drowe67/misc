@@ -191,7 +191,7 @@ class CoreDecoder(nn.Module):
     FRAMES_PER_STEP = 4
 
     def __init__(self, input_dim, output_dim):
-        """ core decoder for RDOVAE
+        """ core decoder for RADAE
 
             Computes features from latents, initial state, and quantization index
 
@@ -252,7 +252,7 @@ class CoreDecoder(nn.Module):
         return features
 
 
-class RDOVAE(nn.Module):
+class RADAE(nn.Module):
     def __init__(self,
                  feature_dim,
                  latent_dim,
@@ -263,7 +263,7 @@ class RDOVAE(nn.Module):
                  rate_Fs = False
                 ):
 
-        super(RDOVAE, self).__init__()
+        super(RADAE, self).__init__()
 
         self.feature_dim = feature_dim
         self.latent_dim  = latent_dim

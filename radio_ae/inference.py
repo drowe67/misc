@@ -34,7 +34,7 @@ import numpy as np
 import torch
 import tqdm
 
-from rdovae import RDOVAE, RDOVAEDataset, distortion_loss
+from radae import RADAE, RADAEDataset, distortion_loss
 
 parser = argparse.ArgumentParser()
 
@@ -67,7 +67,7 @@ num_features = 20
 num_used_features = 20
 
 # load model from a checkpoint file
-model = RDOVAE(num_features, latent_dim, args.EbNodB, ber_test = args.ber_test, rate_Fs = args.rate_Fs)
+model = RADAE(num_features, latent_dim, args.EbNodB, ber_test = args.ber_test, rate_Fs = args.rate_Fs)
 checkpoint = torch.load(args.model_name, map_location='cpu')
 model.load_state_dict(checkpoint['state_dict'], strict=False)
 checkpoint['state_dict'] = model.state_dict()

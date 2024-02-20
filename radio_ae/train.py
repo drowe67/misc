@@ -29,13 +29,12 @@
 
 import os
 import argparse
-
 import torch
 import tqdm
-
-from rdovae import RDOVAE, RDOVAEDataset, distortion_loss
 from matplotlib import pyplot as plt
 import numpy as np
+
+from radae import RADAE, RADAEDataset, distortion_loss
 
 parser = argparse.ArgumentParser()
 
@@ -103,7 +102,7 @@ feature_file = args.features
 
 # model
 checkpoint['model_args'] = (num_features, latent_dim, args.EbNodB, args.range_EbNo)
-model = RDOVAE(num_features, latent_dim, args.EbNodB, range_EbNo=args.range_EbNo)
+model = RADAE(num_features, latent_dim, args.EbNodB, range_EbNo=args.range_EbNo)
 
 if type(args.initial_checkpoint) != type(None):
     checkpoint = torch.load(args.initial_checkpoint, map_location='cpu')
@@ -126,7 +125,7 @@ Nc = model.get_Nc()
 mp_sequence_length = int((sequence_length // model.get_enc_stride())*model.get_Ns())
 checkpoint['dataset_args'] = (feature_file, sequence_length, mp_sequence_length, Nc)
 checkpoint['dataset_kwargs'] = {'enc_stride': model.enc_stride}
-dataset = RDOVAEDataset(*checkpoint['dataset_args'], mp_file = args.mp_file)
+dataset = RADAEDataset(*checkpoint['dataset_args'], mp_file = args.mp_file)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
 
 # optimizer

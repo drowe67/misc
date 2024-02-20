@@ -23,32 +23,32 @@ scp deep.lan:opus/output.s16 /dev/stdout | aplay -f S16_LE -r 1600
 
 ## Training
 ```
-python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch-size 512 --epochs 100 --lr 0.003 --lr-decay-factor 0.0001 --plot_loss training_features_file.f32 model_dir_name
+python3 ./train.py --cuda-visible-devices 0 --sequence-length 400 --batch-size 512 --epochs 100 --lr 0.003 --lr-decay-factor 0.0001 --plot_loss training_features_file.f32 model_dir_name
 ```
 
 ## Inference
 
-`test_rdovae.py` is used for inference.  It runs by default on the CPU, but will run on the GPU with the `--cuda-visible-devices 0` option.
+`inference.py` is used for inference, which has been wrapped up in a helper script `inferences.sh`.  It runs by default on the CPU, but will run on the GPU with the `--cuda-visible-devices 0` option.
 
 1. Generate `out.wav` at Eb/No = 10 dB:
    ```
-   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/all.wav out.wav --EbNodB 10
+   ./inference.sh model01/checkpoints/checkpoint_epoch_100.pth wav/all.wav out.wav --EbNodB 10
    ```
 
 1. Play output sample to your default `aplay` sound device at BPSK Eb/No = 3dB:
    ```
-   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --EbNodB 3
+   ./inference.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --EbNodB 3
    ```
 
 1. Vanilla LPCNet-fargan (ie no analog VAE) for comparison:
    ```
-   ./test.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --passthru
+   ./inference.sh model01/checkpoints/checkpoint_epoch_100.pth wav/vk5dgr_test.wav - --passthru
    ```
 
 1. Multipath demo at approx 0dB B=3000 Hz SNR. First generate multipath channel samples using GNU Octave (only need to be generated once): 
    ```
    octave:85> Rs=50; Nc=20; multipath_samples("mpp", Rs, Rs, Nc, 60, "h.f32")
-   $ ./test.sh model03/checkpoints/checkpoint_epoch_100.pth ~/LPCNet/wav/all.wav tmp.wav --EbNodB 3 --write_latent z_hat.f32 --mp_file h.f32
+   $ ./inference.sh model03/checkpoints/checkpoint_epoch_100.pth ~/LPCNet/wav/all.wav tmp.wav --EbNodB 3 --write_latent z_hat.f32 --mp_file h.f32
    ```
    Then use Octave to plot scatter diagram using z_hat latents from channel:
    ```
@@ -87,11 +87,9 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 1. Test: Try vocoder with several speakers and background noise.
    + can hear some whitsles on vk5dgr_test.wav with vanilla fargan (maybe check if I have correct version)
 
-1. Not sure about training with tanh clamping at +/-1 on rx, as fading and noise will push it >>1.  We should be using soft decision information, e.g. 1 symbol plus 1 of noise is a "very likely" 1 symbol.
-
 1. Can we include maximum likelyhood detection in rx side of the bottelneck?  E.g. a +2 received means very likely +1 was transmitted, and shouldn't have the same weight in decoding operation as a 0 received.  Probability of received symbol.
 
-1. Plot scatter diagram of Tx to see where symbols are being mapped.
+1. ~Plot scatter diagram of Tx to see where symbols are being mapped.~
 
 1. ~Reshape pairs of symbols to QPSK, as I think effect of noise will be treated differently in a 2D mapping maybe sqrt(2) better.~
 
@@ -117,7 +115,9 @@ python3 ./train_rdovae.py --cuda-visible-devices 0 --sequence-length 400 --batch
 
 1. Can we use loss function as an objective measure for comparing different schemes?
 
-1. Naming thoughts:
-   * Can be interpreted as a VAE, would make some sense to ML people, but not helpful for comms people, perhap better as a second line description than a title
+1. Naming thoughts (what is it):
    * Neural modem - as network selects constellation, or "neural speech modem"
    * Neural channel coding - as network takes features and encoders them for transmisison of the channel
+   * Radio VAE or Radio AE - don't feel this has much to do with variational autoencoders
+   * Joint source and channel coding
+   

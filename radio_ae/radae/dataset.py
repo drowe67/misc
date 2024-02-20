@@ -30,7 +30,7 @@
 import torch
 import numpy as np
 
-class RDOVAEDataset(torch.utils.data.Dataset):
+class RADAEDataset(torch.utils.data.Dataset):
     def __init__(self,
                 feature_file,
                 sequence_length,      # number of feature vectors in each sequence of time steps we train on

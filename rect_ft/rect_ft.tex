@@ -112,9 +112,10 @@ h(n) &= \frac{1}{2 \pi} \int_{-\pi}^{+\pi} H(\omega )e^{j \omega n} d\omega \\
      &= \frac{sin \left( \frac{nB}{2} \right) }{\pi n} \\
      &= \left( \frac{\frac{B}{2 \pi}}{\frac{B}{2 \pi}} \right ) \frac{sin \left( \frac{nB}{2} \right) }{\pi n} \\
      &= \frac{B}{2 \pi} sinc \left( \frac{nB}{2} \right) \\
+     &= \frac{B}{2 \pi} sinc_{n} \left( \frac{nB}{2\pi} \right) \\
 \end{split}
 \end{equation}
-Where $sinc(x) = sin(x)/x$.  Note the normalised sinc function $sinc(x) = sin(\pi x)/(\pi x)$ is common in DSP software such as GNU Octave.
+Where $sinc(x) = sin(x)/x$.  Note the normalised sinc function $sinc_{n}(x) = sin(\pi x)/(\pi x)$ is common in DSP software such as GNU Octave.
 
 The infinite length even sequence $h(n)$ can be considered the time domain impulse response of an ideal low pass filter with cut off frequency $B/2$ radians. In practice filters are limited to $N_{tap}$ taps by applying a tapered window.  This results in non-ideal frequency response, rather than an ideal rectangular (brick wall) filter. A suitable length $N_{tap}$ set of Hanning windowed filter coefficients can be found by:
 \begin{equation}

@@ -15,6 +15,7 @@ Some small projects on miscellaneous topics.
 | Oct 2023 | manifold | Experiments with non-linear dependencies with Codec 2 spectral magnitude vectors |
 | Jan 2024 | mlquant | ML Quantisation of Vocoder Features |
 | Feb 2024 | radio_ae | Autoencoder for transmission of vocoder features over radio channels |
+| April 2024 | hf_modems | Comparison of VARA to codec2 raw data waveforms |
 
 I build the Latex documents using Texmaker:
 

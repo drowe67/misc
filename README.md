@@ -16,6 +16,7 @@ Some small projects on miscellaneous topics.
 | Jan 2024 | mlquant | ML Quantisation of Vocoder Features |
 | Feb 2024 | radio_ae | Autoencoder for transmission of vocoder features over radio channels |
 | April 2024 | hf_modems | Comparison of VARA to codec2 raw data waveforms |
+| May 2024 | ml_const | Using ML to design PSK constellations|
 
 I build the Latex documents using Texmaker:
 

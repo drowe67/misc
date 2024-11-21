@@ -641,16 +641,19 @@ endfunction
 function test_rayleigh
   N = 1E6;
   % total power in noise is sigma_n^2
-  sigma_n = 0.5*sqrt(2);
-  noise = (sigma_n/sqrt(2))*(randn(1,N) + j*randn(1,N));
-  [h x] = hist(abs(noise),50);
-  sigma = sigma_n/sqrt(2);
+  sigma_n = 0.5*sqrt(2)*100;
+  noise1 = (sigma_n/sqrt(2))*(randn(1,N) + j*randn(1,N));
+  noise2 = (sigma_n/sqrt(2))*(randn(1,N) + j*randn(1,N));
+  [h1 x1] = hist(abs(noise1),50);
+  [h x] = hist(abs(noise1)+abs(noise2),50);
+  sigma = sigma_n/sqrt(2)
   p = (x./(sigma*sigma)).*exp(-(x.^2)/(2*sigma*sigma));
   figure(1); clf;
-  plot(x,h/trapz(x,h),'b;histogram;');
+  semilogy(x1,h1/trapz(x1,h1),'b;histogram X1;');
   hold on;
-  plot(x,p,'g;pdf;');
-  hold off; grid;
+  semilogy(x,h/trapz(x,h),'r;histogram X1+X2;');
+  semilogy(x,p,'g;pdf;');
+      hold off; grid; %axis([0 5 10E-6 1]);
 end
 
 % Exploring inner term of Dt summation, comparing derived sinc() form to

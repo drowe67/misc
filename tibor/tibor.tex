@@ -9,7 +9,7 @@
 
 \section{Bandwidth of baseband BPSK}
 
-Why is the bandwidth of baseband BPSK (ASK) signal $R_s/2$, but we need bandwidth $R_s$ for a passband BPSK signal?
+Why is the bandwidth of baseband BPSK (ASK) signal $R_s/2$, but $R_s$ for a passband BPSK signal?
 
 From sampling theory any bandpass signal of bandwidth B can be exactly represented by a sequence of complex samples at sample rate B Hz, e.g. a QPSK signal of 1000 symbols/s at 1 MHz requires a sample rate of 1000 Hz (min) to represent it.
 
@@ -33,22 +33,33 @@ Re\{y\} &= 0 \ne y
 
 So the signal $y$ can only be represented by a complex valued sequence, and its spectrum is no longer symmetrical.  As the sequence is still rate $R_s$, from sampling theory the signal must have a bandwidth $R_s$.
 
-\section{Modulation Stripping of analog PSK}
+\section{Modulation Stripping of Analog PSK Symbols}
 
-Consider an analog PSK symbol $x$ that is modulated purely along the real axis, and has an unknown phase offset $\phi$:
+In digital modulation, a technique called modulation stripping can be used to resolve unknown phase offsets. Typically the received BPSK symbols are squared, and QPSK symbols taken to the fourth power, which removes the constellation phase, leaving just the phase offset.  For example consider a QPSK constellation $q=e^{jn\pi/2}, n=0,1,2,3$, with a phase offset $\phi$:
+\begin{equation}
+\begin{split}
+r &= qe^{j\phi} \\
+  &= e^{j(n\pi/2+\phi)} \\
+r^4 &= e^{j(4n\pi/2+4\phi)} \\
+arg[r^4] &= 2n\pi + 4\phi \\
+         &= 4\phi
+\end{split}
+\end{equation}
+
+Now consider an analog PSK symbol that is modulated purely along the real axis, and has an unknown phase offset $\phi$:
 \begin{equation}
 x = ae^{j\phi}
 \end{equation}
-where $-1<a<1$ is continuously valued.  In digital modulation, a technique called modulation stripping is used to resolve the phase offset. Typically the received BPSK symbols are squared, and QPSK symbols taken to the fourth power, which removes this effect of the constellation phase, leaving just the phase offset.  Applied to our real-modulated analog PSK symbol:
+where $-1<a<1$ is the continuously valued analog PSK symbol.  Squaring our real-modulated analog PSK symbol:
 \begin{equation}
 \begin{split}
 x^2 &= |a|^2e^{j2\phi} \\
 arg[x^2] &= 2\phi
 \end{split}
 \end{equation}
-which allows us to resolve the unknown phase offset $\phi$.  Not that unlike digital modulation, the symbol $x$ can take any position on the real axis on the interval $-1<a<1$.
+which allows us to resolve the unknown phase offset $\phi$.
 
-Now consider a generalised quadrature symbol $y=a+jb=me^{j\theta}$ comprised of two orthogonal, continuously valued real symbols $-1<a<1$ and $-1<b<1$.  Using the analog to QPSK, lets try applying the fourth power:
+Now consider a generalised quadrature symbol $y=a+jb=me^{j\theta}$ comprised of two orthogonal, continuously valued real symbols $-1<a<1$ and $-1<b<1$.  Using the comparison to QPSK, lets try applying the fourth power:
 \begin{equation}
 \begin{split}
 y^4 &= |m|^4e^{j4\theta+4\phi} \\

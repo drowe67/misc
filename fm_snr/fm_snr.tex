@@ -1,6 +1,7 @@
 \documentclass{article}
 \usepackage{amsmath}
 \usepackage{hyperref}
+\usepackage{float}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta}
 \tikzset{
@@ -11,24 +12,25 @@ myptr/.style={-{Stealth[scale=2]}},
 \title{FM Demodulator SNR}
 \maketitle
 
-My take on an expression for FM demodulator SNR above threshold, based mainly on Carlson \cite{crilly2009communication} but also the noise triangle/phasor model discussed in various online and text sources.
+My take on an expression for FM demodulator SNR above threshold, based mainly on Carlson \cite{crilly2009communication} but also the noise triangle/phasor model discussed in various online and text sources.  The theoretical derivation is compared to the companion Octave simulation and measurements for a commercial land mobile radio.
 
 Consider a FM signal $r(t)$ modulated by a sinusoidal message signal $x(t)$:
 \begin{equation}
 \begin{split}
-r(t) &= A_c cos(2 \pi f_c t +\phi(t)) \\
+r(t) &= A_c \mathrm{cos}(2 \pi f_c t +\phi(t)) \\
 \phi(t) &=  2 \pi f_d \int_0^t x(t) \\
-x(t) &= A cos(2 \pi f_m t)
+x(t) &= A \mathrm{cos}(2 \pi f_m t)
 \end{split}
 \end{equation}
 where $A_c$ is the carrier level, $f_c$ the carrier frequency, $x(t)$ the message signal of peak amplitude $A \le 1$, and the peak deviation is $f_d$.  We assume we can extract the phase term $\phi(t)$ from the carrier phase $2 \pi f_c t$. An ideal FM demodulator can be modelled as: 
 \begin{equation}
+\label{eq:fm_demod}
 y(t) = \frac{d\phi}{dt}
 \end{equation}
 Giving the demodulated message signal:
 \begin{equation}
 \label{eq:fm_signal}
-y_s(t) = 2 \pi f_d A cos (2 \pi f_m t)
+y_s(t) = 2 \pi f_d A \mathrm{cos} (2 \pi f_m t)
 \end{equation}
 The average power at the demodulator output is then:
 \begin{equation}
@@ -40,10 +42,10 @@ S = (2 \pi f_d )^2 \frac{A^2}{2}
 \begin{center}
 \begin{tikzpicture}
 \draw [myptr] (0,0) -- node[below] {$A_c$} (5,0);
-\draw [myptr] (5,0) -- node[right] {$A_n$} (5,2);
-\draw [myptr,blue] (0,0) -- (5,2);
-\draw [myptr,dashed] (7,0) arc (0:360:2);
-\node[above]  at (1.5,0) {$\phi_n$};
+\draw [myptr] (5,0) -- node[right] {$A_n$} (5,1.5);
+\draw [myptr,blue] (0,0) -- (5,1.5);
+\draw [myptr,dashed] (6.5,0) arc (0:360:1.5);
+\node[above]  at (1.75,0) {$\phi_n$};
 \node[left] at (7,0) {$f_n$};
 \end{tikzpicture}
 \end{center}
@@ -51,11 +53,17 @@ S = (2 \pi f_d )^2 \frac{A^2}{2}
 \label{fig:phasor}
 \end{figure}
 
-Consider the FM carrier plus noise signal in Figure \ref{fig:phasor}.  As a thought experiment consider the signal has been frequency shifted such that the carrier frequency is now 0 and the carrier phasor lies stationary along the real axis.  The sum of the carrier and noise vector has variations in magnitude and phase, however our demodulator is only sensitive to changes in phase. Let $A_n$ be the magnitude of the signal from a small slice of the input noise spectrum, effectively a small interfering sine wave summed with the carrier. As the noise vector rotates, it generates a sinusoidally changing angle $\phi_n$.  The peak of the angle (deviation of the noise signal) occurs when $sin(\phi_n) = A_n/A_c$. For $A_c>>A_n$ we can use the approximation $\phi_n=A_n/A_c$.  By considering (\ref{eq:fm_signal}) the demodulated signal from the input noise at $f_c+f_n$ is:
+Consider the FM carrier plus noise signal in Figure \ref{fig:phasor}.  As a thought experiment consider the signal has been frequency shifted such that the carrier frequency is now 0 and the carrier phasor lies stationary along the real axis.  The sum of the carrier and noise vector has variations in magnitude and phase, however our demodulator is only sensitive to changes in phase. 
+
+Let $A_n$ be the magnitude of the signal from a small slice of the input noise spectrum, effectively a small interfering sine wave summed with the carrier. As the noise vector rotates, we can observe $\phi_n$ will be changing or modulated by the noise vector. Consider the component of the noise vector at right angles to the carrier (our demodulator ignores the AM component in phase with the carrier). The peak of the angle (deviation of the noise signal) occurs when $\mathrm{tan}(\phi_n) = A_n/A_c$.  We therefore express $\phi_n$ as:
 \begin{equation}
-\label{eq:fm_noise}
-y_n(t) = 2 \pi f_n (A_n/A_c) cos(2 \pi f_n t)
+\phi_n = \mathrm{atan}(A_n/A_c)\mathrm{sin}(2 \pi f_n t)
 \end{equation}
+Passing this through our ideal demodulator (\ref{eq:fm_demod}):
+\begin{equation}
+y_n(t) = \frac{d\phi_n}{dt} =  2 \pi f_n (A_n/A_c) \mathrm{cos}(2 \pi f_n t)
+\end{equation}
+where for $A_c>>A_n$ we can use the approximation $\mathrm{atan}(x)=x$.
 This is an interesting result:
 \begin{enumerate}
 \item The slice of noise at $f_c+f_n$ is demodulated as a baseband sine wave at $f_n$.
@@ -72,29 +80,43 @@ N = (2\pi)^2 \frac{N_0}{C} \int_{-f_m}^{f_m} f_n^2 df_n = (2\pi)^2 \frac{N_0}{3C
 \end{equation}
 where $N_0=A_n^2$ is the demodulator input power per unit bandwidth, and $C=A_c^2$ is the carrier power.  The signal to noise ratio at the FM demodulator output is then \cite{crilly2009communication}:
 \begin{equation}
-\label{eq_snr}
+\label{eq:snr}
 \frac{S}{N} = 3 \beta^2 \frac{A^2}{2} \frac{C}{N_0 f_m}
 \end{equation}
 where the deviation $\beta=f_d/f_m$. Discussion:
 \begin{enumerate}
-\item The term $\frac{C}{N_0 f_m}$ is equivalent to a SSB product detector SNR with modulation bandwidth $f_m$, which makes (\ref{eq_snr}) useful for comparing FM performance to SSB for a range of $\beta$.
+\item The term $\frac{C}{N_0 f_m}$ is equivalent to a SSB product detector SNR with modulation bandwidth $f_m$, which makes (\ref{eq:snr}) useful for comparing FM performance to SSB for a range of $\beta$.
 \item Only noise from the interval $f_c \pm f_m$ contributes to the demodulator noise power and hence SNR. This gives an intuitive explanation of why FM SNR increases with the deviation $\beta$: as $f_d$ increases and $f_m$ remains fixed, the signal power $S$ increases as a function of $f_d^2$ while noise power remains the same.
-\item Note (\ref{eq_snr}) is not dependant on the total noise power at the input of the FM demodulator (which is set by the IF filter), just the noise density $N_0$.  This can lead to some surprising results, e.g. the SNR of a small deviation test tone is quite independent of IF filter bandwidth.
+\item Note (\ref{eq:snr}) is not dependant on the total noise power at the input of the FM demodulator (which is set by the IF filter), just the noise density $N_0$.  This can lead to some surprising results, e.g. the SNR of a small deviation test tone is quite independent of IF filter bandwidth.
 \item The $A$ term is useful when testing FM radios, for example it is common to use a test tone of 60\% full deviation or $A=0.6$.
 \end{enumerate}
 
+For narrow band FM on land mobile radio (LMR), a common choice is $\beta=f_d/f_m=2500/3000$.  Figure \ref{fig:snr_cnr} is a plot of the measured SNR from an Octave simulation. Expressing (\ref{eq:snr}) in dB:
+\begin{equation}
+SNR_{dB} = 10\mathrm{log_{10}}\left( 3 \beta^2 \frac{A^2}{2} \right) + 10\mathrm{log_{10}}(C/N_0f_m)
+SNR_{dB} = G_{FM} + CNR_{dB}
+\end{equation}
+For this example $G_{FM}=0.18$ dB, which produces SNR performance almost identical to SSB. Figure \ref{fig:snr_rx} is a plot of measured SNR against Rx input level for a commercial land mobile radio, with the same $\beta=f_d/f_m=2500/3000$ and test tone level $A=0.6$.  The results agree with theory to within about 1dB. To compute the theoretical SNR the Rx level is mapped to $CNR_{dB}$ using:
+\begin{equation}
+CNR_{dB} = \mathrm{Rx}_{dBm} - (-174 + NF_{dB} + 10\mathrm{log_{10}}(f_m)) 
+\end{equation}
+where $NF_{dB}=5$ dB is the estimated radio noise figure.
+
 \begin{figure}[h]
-\caption{Theoretical and simulated SNR versus $CNR=C/N_0f_m$, $f_m=3000$, $\beta=1$, $A=1$.}
-\label{fig:fm_cnr_snr}
+\caption{Theoretical (\ref{eq:snr}) and simulated SNR versus CNR, both measured in a noise bandwidth of $f_m=3000$ Hz, $\beta=0.83$, $A=1$.}
+\label{fig:snr_cnr}
 \begin{center}
 \input {snr_cnr.tex}
 \end{center}
 \end{figure}
 
-
-TODO: different threshold expressions based on CNR definition. Independence of CNR
-
-TODO: Tibors measurements
+\begin{figure}[h]
+\caption{Measured SNR from a commercial LMR against Rx input level for $f_m=3000$ Hz, $\beta=0.83$, $A=0.6$, $NF=5$ dB.}
+\label{fig:snr_rx}
+\begin{center}
+\input {snr_rx.tex}
+\end{center}
+\end{figure}
 
 \bibliographystyle{plain}
 \bibliography{fm_snr_refs}

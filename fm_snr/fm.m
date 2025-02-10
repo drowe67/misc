@@ -6,6 +6,7 @@
 % usage:
 %
 %   octave:16> fm; run_fm_curves("snr_cnr")
+%   octave:17> fm; run_fm_measured("snr_rx")
 
 1;
 
@@ -115,7 +116,7 @@ function sim_out = analog_fm_test(sim_in)
 
   Fs = fm_states.Fs = 96000;  
   fm_max = sim_out.fm_max = fm_states.fm_max = 3E3;
-  fd = fm_states.fd = 3E3;
+  fd = fm_states.fd = 2.5E3;
   fm_states.fc = 24E3;
 
   fm_states.pre_emp = pre_emp = sim_in.pre_emp;
@@ -180,7 +181,7 @@ function sim_out = analog_fm_test(sim_in)
     snr = (sinad-nad)/nad;
     sim_out.snrdB(ne) = 10*log10(snr);
    
-    snr_theory_dB = Gfm + aCNdB;
+    snr_theory_dB = Gfm_dB + aCNdB;
     fx = 1/(2*pi*tc); W = fm_max;
     I = (W/fx)^3/(3*((W/fx) - atan(W/fx)));
     I_dB = 10*log10(I);
@@ -224,12 +225,12 @@ function sim_out = analog_fm_test(sim_in)
 endfunction
 
 
-function run_fm_curves(epslatex)
+function run_fm_curves(epslatex="")
   sim_in.nsam    = 96000;
   sim_in.verbose = 1;
   sim_in.pre_emp = 0;
   sim_in.de_emp  = 0;
-  sim_in.CNdB = 10:2:25;
+  sim_in.CNdB = 0:2:30;
 
   sim_out = analog_fm_test(sim_in);
 
@@ -244,9 +245,10 @@ function run_fm_curves(epslatex)
   plot(sim_in.CNdB, sim_in.CNdB,"b; SSB Theory;");
   hold off;
   grid("minor");
-  xlabel(sprintf("Input C/N in %4.0f Hz (dB)",sim_out.fm_max));
-  ylabel("FM demod output S/N (dB)");
-  legend("boxoff"); legend('location','southeast')
+  xlabel("FM demod input CNR (dB)");
+  ylabel("FM demod output SNR (dB)");
+  legend("boxoff"); legend('location','southeast');
+  axis([0 30 0 30]);
   if length(epslatex)
     print_eps_restore(epslatex,"-S300,200",textfontsize,linewidth);
   end
@@ -279,6 +281,41 @@ function run_fm_single
   sim_in.CNdB   = 20;
   sim_out = analog_fm_test(sim_in);
 end
+
+% Experimental results from Tibor Bece
+function run_fm_measured(epslatex="")
+  fd=2500; fm=3000; A=0.6;
+  NF_dB=5;
+  Rx_dBm = -127:-104;
+  SNR_dB = [4.2 -2.2 0.3 2.0 4.2 5.9 7.2 8.6 9.4 10.6 11.5 12.5 13.6 15.2 16.1 17.1 18.2 19.2 20.0 20.9 22.0 22.8 23.8 24.7];
+  assert(length(Rx_dBm) == length(SNR_dB))
+
+  N_dBm = -174 + NF_dB + 10*log10(fm);
+  CNR_dB = Rx_dBm - N_dBm;
+  m = fd/fm;
+  Gfm = 3*(A^2/2)*m^2;
+  Gfm_dB = 10*log10(Gfm);
+  SNR_theory_dB =  CNR_dB + Gfm_dB
+  printf("fd: %5.2f fm: %5.2f Beta: %5.2f A: %3.2f Gfm_dB: %5.2f\n", fd, fm, m, A, Gfm_dB);
+  if length(epslatex)
+    [textfontsize linewidth] = set_fonts(20);
+  end
+
+  figure(1); clf;
+  plot(Rx_dBm, SNR_dB,"r;FM Measured;");
+  hold on;
+  plot(Rx_dBm, SNR_theory_dB,"g;FM Theory;");
+  hold off;
+  grid("minor");
+  xlabel("Rx input level (dBm)");
+  ylabel("FM demod output SNR (dB)");
+  legend("boxoff"); legend('location','southeast');
+  axis([-127 -100 0 30]);
+  if length(epslatex)
+    print_eps_restore(epslatex,"-S300,200",textfontsize,linewidth);
+  end
+
+endfunction
 
 function [textfontsize linewidth] = set_fonts(font_size=12)
   textfontsize = get(0,"defaulttextfontsize");

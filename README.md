@@ -17,6 +17,7 @@ Some small projects on miscellaneous topics.
 | April 2024 | hf_modems | Comparison of VARA to codec2 raw data waveforms |
 | May 2024 | ml_const | Using ML to design PSK constellations|
 | Nov 2024 | tibor | Attempts to answer interesting DSP questions posed by Tibor |
+| Feb 2025 | fm_snr | My derivation of FM SNR |
 
 I build the Latex documents using Texmaker:
 

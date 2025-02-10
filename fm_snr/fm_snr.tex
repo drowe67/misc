@@ -1,0 +1,67 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+\tikzset{
+myptr/.style={-{Stealth[scale=2]}},
+}
+\begin{document}
+
+\title{FM Demodulator SNR}
+\maketitle
+
+\begin{figure}[h]
+\begin{center}
+\begin{tikzpicture}
+\draw [myptr] (0,0) -- node[below] {$A_c$} (5,0);
+\draw [myptr] (5,0) -- node[right] {$A_n$} (5,2);
+\draw [dashed] (0,0) -- (5,2);
+\draw (5,0) circle (2);
+\node[above]  at (1.5,0) {$\phi_n$};
+\end{tikzpicture}
+\end{center}
+\label{fig:phasor}
+\caption{Phasor diagram showing the sum of the carrier signal $A_c$ and a small noise vector of magnitude $A_n$.  Consider the noise vector to be a small slice of the input noise spectrum at frequency $f_n$ from the carrier. The noise vector rotates around the tip of the carrier vector at frequency $f_n$, creating sinusoidal modulation in $\phi_n$.}
+
+\end{figure}
+
+Consider a FM signal modulated by a sinusoidal signal $x(t)=Acos(\omega_mt)$ with peak deviation $f_d$ Hz.  The demodulator output is: 
+\begin{equation}
+y_s(t) = 2 \pi f_d A cos (\omega_m t)
+\end{equation}
+The average power at the demodulator output is then:
+\begin{equation}
+\label{eq:fm_demod}
+S = (2 \pi f_d )^2 \frac{A^2}{2}
+\end{equation}
+
+Consider an analytical FM carrier plus noise in Figure \ref{fig:phasor}. For convenience the signal has been frequency shifted such that the carrier frequency is now 0 and the carrier phasor lies stationary along the real axis.  The sum of the carrier and noise vector has variations in amplitude and phase, however our demodulator is only sensitive to changes in phase. Consider the effect when $A_n$ is from a small slice of the input noise spectrum, effectively a small interfering sine wave summed with the carrier. Figure \ref{fig:phasor} shows the noise signal generating a sinusoidally changing angle $\phi_n$.  The peak of the angle (deviation of the noise signal) occurs when $sin(\phi_n) = A_n/A_c$. For $A_c>>A_n$ we can use the approximation $\phi_n=A_n/A_c$.  By considering (\ref{eq:fm_demod}) the demodulated signal from the input noise at $f_n$ is:
+
+TODO: straighten this out. noise at $f_n$ offset from carrier, generates baseband noise at $f_n$?  That's kind of interesting.  What about noise from other frequencies? Is it only noise from $\pm f_m$?  That's kind of remarkable.
+
+\begin{equation}
+y_n(t) = 2 \pi f_n (A_n/Ac) cos(\omega_n t)
+\end{equation}
+which leads to the ``noise triangle" visualisation of FM where the noise is increasing as a function of frequency, unlike linear modulation scheme like SSB that have constant noise across frequency. The demodulator output power from the slice of noise at the demodulator input at frequency $f_n$ is:
+\begin{equation}
+N(f_n) =  \frac{1}{2}(2 \pi f_n (A_n/A_c) )^2 
+\end{equation}
+To find the total noise power in the demodulator output we substitute $N_0=A_n^2$, where $N_0$ is the demodulator input power per unit bandwidth and then integrate over the interval $[-f_m,f_m]$, the bandwidth of the message signal $x(t)$ with maximum modulating frequency $f_m$:
+\begin{equation}
+N = \frac{N_0 \pi^2}{C} \int_{-f_m}^{f_m} f_n^2 df_n = \frac{N_0 2\pi^2}{3C} f_m^3
+\end{equation}
+where $C=A_c^2$ is the carrier power.  The signal to noise ratio at the FM demodulator output is then \cite{crilly2009communication}:
+\begin{equation}
+\label{eq_snr}
+\frac{S}{N} = 3 \beta^2 \frac{A^2}{2} \frac{C}{N_0 f_m}
+\end{equation}
+where the deviation $\beta=f_d/f_m$. The term $\frac{C}{N_0 f_m}$ is equivalent to a SSB product detector with modulation bandwidth $f_m$, which makes  useful for comparing FM performance to SSB for a range of $\beta$.  
+
+ C/Nsubs $N_0=B/B_t$ for different CNR definitions. 
+
+TODO: plots of simulated versus actual, $B=B_t$, $B=W$
+
+\bibliographystyle{plain}
+\bibliography{fm_snr_refs}
+\end{document}

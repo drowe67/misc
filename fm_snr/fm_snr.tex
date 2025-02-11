@@ -12,7 +12,7 @@ myptr/.style={-{Stealth[scale=2]}},
 \title{FM Demodulator SNR}
 \maketitle
 
-My take on an expression for FM demodulator SNR above threshold, based mainly on Carlson \cite{crilly2009communication} but also the noise triangle/phasor model discussed in various online and text sources.  The theoretical derivation is compared to the companion Octave simulation and measurements for a commercial land mobile radio.
+My take on an expression for FM demodulator SNR, based mainly on Carlson \cite{crilly2009communication} but also the noise triangle/phasor model discussed in various online and text sources.  The theoretical derivation is compared to the companion Octave simulation and measurements for a commercial land mobile radio. The scope is for operation above the threshold of the FM demodulator, i.e $S/N>>1$.
 
 Consider a FM signal $r(t)$ modulated by a sinusoidal message signal $x(t)$:
 \begin{equation}
@@ -63,7 +63,7 @@ Passing this through our ideal demodulator (\ref{eq:fm_demod}):
 \begin{equation}
 y_n(t) = \frac{d\phi_n}{dt} =  2 \pi f_n (A_n/A_c) \mathrm{cos}(2 \pi f_n t)
 \end{equation}
-where for $A_c>>A_n$ we can use the approximation $\mathrm{atan}(x)=x$.
+where for $A_c>>A_n$ (large SNR assumption) we can use the approximation $\mathrm{atan}(x)=x$.
 This is an interesting result:
 \begin{enumerate}
 \item The slice of noise at $f_c+f_n$ is demodulated as a baseband sine wave at $f_n$.
@@ -96,14 +96,14 @@ For narrow band FM on land mobile radio (LMR), a common choice is $\beta=f_d/f_m
 SNR_{dB} = 10\mathrm{log_{10}}\left( 3 \beta^2 \frac{A^2}{2} \right) + 10\mathrm{log_{10}}(C/N_0f_m)
 SNR_{dB} = G_{FM} + CNR_{dB}
 \end{equation}
-For this example $G_{FM}=0.18$ dB, which produces SNR performance almost identical to SSB. Figure \ref{fig:snr_rx} is a plot of measured SNR against Rx input level for a commercial land mobile radio, with the same $\beta=f_d/f_m=2500/3000$ and test tone level $A=0.6$.  The results agree with theory to within about 1dB. To compute the theoretical SNR the Rx level is mapped to $CNR_{dB}$ using:
+For this example $G_{FM}=0.18$ dB, which produces SNR performance almost identical to SSB. Figure \ref{fig:snr_rx} is a plot of measured SNR against Rx input level for a commercial land mobile radio, with the same $\beta=f_d/f_m=2500/3000$ and test tone level $A=0.6$ (thanks Tibor Bece for these measurements).  Above threshold, the results agree with theory to within about 1dB. To compute the theoretical SNR the Rx level is mapped to $CNR_{dB}$ using:
 \begin{equation}
 CNR_{dB} = \mathrm{Rx}_{dBm} - (-174 + NF_{dB} + 10\mathrm{log_{10}}(f_m)) 
 \end{equation}
 where $NF_{dB}=5$ dB is the estimated radio noise figure.
 
 \begin{figure}[h]
-\caption{Theoretical (\ref{eq:snr}) and simulated SNR versus CNR, both measured in a noise bandwidth of $f_m=3000$ Hz, $\beta=0.83$, $A=1$.}
+\caption{FM theoretical (\ref{eq:snr}) and simulated SNR versus CNR, both measured in a noise bandwidth of $f_m=3000$ Hz, $\beta=0.83$, $A=1$. Note the ``FM Theory" line is only accurate for $S/N>>1$. Simulated SNR deviates from theory by 1dB at $SNR \approx 12$ dB, a commonly cited threshold figure in the literature \cite{crilly2009communication}.}
 \label{fig:snr_cnr}
 \begin{center}
 \input {snr_cnr.tex}

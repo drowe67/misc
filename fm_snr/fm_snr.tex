@@ -69,12 +69,12 @@ This is an interesting result:
 \item The slice of noise at $f_c+f_n$ is demodulated as a baseband sine wave at $f_n$.
 \item The amplitude of the demodulated noise is a function of $f_n$.
 \end{enumerate}
-This leads to the ``noise triangle" visualisation of FM where the noise is increasing as a function of frequency, unlike linear modulation scheme like SSB that have constant noise across frequency. The demodulator output power from the slice of noise at the demodulator input at frequency $f_c+f_n$ is:
+This leads to the ``noise triangle" visualisation of FM where the noise is increasing as a function of frequency, unlike linear modulation schemes like SSB that have constant noise across frequency. The demodulator output power from the slice of noise at the demodulator input at frequency $f_c+f_n$ is:
 \begin{equation}
 \label{eq:fm_noise_power}
 N(f_n) =  \frac{1}{2}(2 \pi f_n (A_n/A_c) )^2 
 \end{equation}
-The total noise power in the demodulator output is the noise power per unit bandwidth summed over the interval $[-f_m,f_m]$, where $f_m$ is the maximum frequency of the message signal $x(t)$. Using the 1:1 frequency relationship between a noise slice at the demodulator input and output (\ref{eq:fm_noise}), we can integrate (\ref{eq:fm_noise_power}) over the interval $[-f_m,f_m]$ to find the total noise power:
+The total noise power in the demodulator output is the noise power per unit bandwidth summed over the interval $[-f_m,f_m]$, where $f_m$ is the maximum frequency of the message signal $x(t)$. Using the 1:1 frequency relationship between a noise slice at the demodulator input and output, we can integrate (\ref{eq:fm_noise_power}) over the interval $[-f_m,f_m]$ to find the total noise power:
 \begin{equation}
 N = (2\pi)^2 \frac{N_0}{C} \int_{-f_m}^{f_m} f_n^2 df_n = (2\pi)^2 \frac{N_0}{3C} f_m^3
 \end{equation}

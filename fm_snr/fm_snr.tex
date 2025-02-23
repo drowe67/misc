@@ -93,17 +93,19 @@ where the deviation $\beta=f_d/f_m$. Discussion:
 
 For narrow band FM on land mobile radio (LMR), a common choice is $\beta=f_d/f_m=2500/3000$.  Figure \ref{fig:snr_cnr} is a plot of the measured SNR from an Octave simulation. Expressing (\ref{eq:snr}) in dB:
 \begin{equation}
-SNR_{dB} = 10\mathrm{log_{10}}\left( 3 \beta^2 \frac{A^2}{2} \right) + 10\mathrm{log_{10}}(C/N_0f_m)
-SNR_{dB} = G_{FM} + CNR_{dB}
+\begin{split}
+\mathrm{SNR_{dB}} &= 10\mathrm{log_{10}}\left( 3 \beta^2 \frac{A^2}{2} \right) + 10\mathrm{log_{10}}(C/N_0f_m) \\
+\mathrm{SNR_{dB}} &= \mathrm{G_{FM}} + \mathrm{CNR_{dB}}
+\end{split}
 \end{equation}
-For this example $G_{FM}=0.18$ dB, which produces SNR performance almost identical to SSB. Figure \ref{fig:snr_rx} is a plot of measured SNR against Rx input level for a commercial land mobile radio, with the same $\beta=f_d/f_m=2500/3000$ and test tone level $A=0.6$ (thanks Tibor Bece for these measurements).  Above threshold, the results agree with theory to within about 1dB. To compute the theoretical SNR the Rx level is mapped to $CNR_{dB}$ using:
+For this example $\mathrm{G_{FM}}=0.18$ dB, which produces SNR performance almost identical to SSB. Figure \ref{fig:snr_rx} is a plot of measured SNR against Rx input level for a commercial land mobile radio, with the same $\beta=f_d/f_m=2500/3000$ and test tone level $A=0.6$ (thanks Tibor Bece for these measurements).  Above threshold, the results agree with theory to within about 1dB. To compute the theoretical SNR the Rx level is mapped to $CNR_{dB}$ using:
 \begin{equation}
-CNR_{dB} = \mathrm{Rx}_{dBm} - (-174 + NF_{dB} + 10\mathrm{log_{10}}(f_m)) 
+\mathrm{CNR_{dB}} = \mathrm{Rx_{dBm}} - (-174 + \mathrm{NF_{dB}} + 10\mathrm{log_{10}}(f_m)) 
 \end{equation}
-where $NF_{dB}=5$ dB is the estimated radio noise figure.
+where $\mathrm{NF_{dB}}=5$ dB is the estimated radio noise figure.
 
 \begin{figure}[h]
-\caption{FM theoretical (\ref{eq:snr}) and simulated SNR versus CNR, both measured in a noise bandwidth of $f_m=3000$ Hz, $\beta=0.83$, $A=1$. Note the ``FM Theory" line is only accurate for $S/N>>1$. Simulated SNR deviates from theory by 1dB at $SNR \approx 12$ dB, a commonly cited threshold figure in the literature \cite{crilly2009communication}.}
+\caption{FM theoretical (\ref{eq:snr}) and simulated SNR versus CNR, both measured in a noise bandwidth of $f_m=3000$ Hz, $\beta=0.83$, $A=1$. Note the ``FM Theory" line is only accurate for $S/N>>1$. Simulated SNR deviates from theory by 1~dB at $\mathrm{SNR_{dB}} \approx 12$ dB, a commonly cited threshold figure in the literature \cite{crilly2009communication}.}
 \label{fig:snr_cnr}
 \begin{center}
 \input {snr_cnr.tex}
@@ -111,7 +113,7 @@ where $NF_{dB}=5$ dB is the estimated radio noise figure.
 \end{figure}
 
 \begin{figure}[h]
-\caption{Measured SNR from a commercial LMR against Rx input level for $f_m=3000$ Hz, $\beta=0.83$, $A=0.6$, $NF=5$ dB.}
+\caption{Measured SNR from a commercial LMR against Rx input level for $f_m=3000$ Hz, $\beta=0.83$, $A=0.6$, $\mathrm{NF_{dB}}=5$ dB.}
 \label{fig:snr_rx}
 \begin{center}
 \input {snr_rx.tex}

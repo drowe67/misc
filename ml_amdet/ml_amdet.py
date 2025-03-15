@@ -35,7 +35,6 @@ class aDataset(torch.utils.data.Dataset):
         else:
             y = torch.zeros_like(x)
         # return am_in, det_out sample pair for training
-        #print(x.dtype,y.dtype)
         return x,y
    
 parser = argparse.ArgumentParser()
@@ -67,11 +66,9 @@ class Detector(nn.Module):
 
 model = Detector()
 print(model)
-
-    
+ 
 loss_fn = nn.MSELoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
-print(model.stack[0].weight, model.stack[0].bias)
 
 # Train model
 for epoch in range(args.epochs):
@@ -95,20 +92,22 @@ for epoch in range(args.epochs):
         det_out_log = np.concatenate((det_out_log,det_out));
         det_out__log = np.concatenate((det_out__log,det_out_.detach().numpy()));
 
-    plt.subplot(311)
-    plt.plot(am_in_log)
-    plt.ylabel('AM In')
-    plt.subplot(312)
-    plt.plot(det_out_log);
-    plt.ylabel('Det Out')
-    plt.subplot(313)
-    plt.plot(det_out__log,'r');
-    plt.ylabel('Det Out ML')
-    plt.show()
-
     print(f'Epochs:{epoch + 1:5d} | ' \
         f'Batches per epoch: {batch + 1:3d} | ' \
         f'Loss: {sum_loss / (batch + 1):.10f}')
-    
-    print(model.stack[0].weight, model.stack[0].bias)
 
+# plot signals to show network training
+plt.subplot(311)
+plt.plot(am_in_log)
+plt.ylabel('AM In')
+plt.subplot(312)
+plt.plot(det_out_log);
+plt.ylabel('Det Out')
+plt.subplot(313)
+plt.plot(det_out__log,'r');
+plt.ylabel('Det Out ML')
+
+# print final weight and bias after training
+print(model.stack[0].weight, model.stack[0].bias)
+
+plt.savefig('ml_amdet.eps')

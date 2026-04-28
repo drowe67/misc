@@ -503,12 +503,12 @@ G_1 + G_2 e^{-j \omega_{c+1} d F_s} &= H(e^{j \omega_{c+1}}) \\
   H(e^{j \omega_{c+1}})
 \end{bmatrix} \\
 Ag &= h \\
- g &= (A^TA)^{-1}A^Th \\
+ g &= (A^HA)^{-1}A^Hh \\
  \overline{H(e^{j \omega_c})} &= G_1 + G_2e^{-j \omega_{c}   d F_s}
 \end{split}
 \end{equation} 
 
-where $\overline{H(e^{j \omega_c})}$ is the smoothed estimate of the channel at $\omega_c$.  Note that the channel delay $d$ is actually an unknown (and indeed the entire model is an approximation of the real channel). It was found that in simulation, choosing $d=0.002$ or $d=0.004$ produced reasonable results, possibly due to the symmetry of the RHS of (\ref{eq:hf_model_freq}), and the dominance of channel over resampler noise at low SNRs. If $d$ is approximated with a known value, the $(A^TA)^{-1}A^T$ term can then be precomputed as all the parameters of $A$ are known.
+where $\overline{H(e^{j \omega_c})}$ is the smoothed estimate of the channel at $\omega_c$.  Note that the channel delay $d$ is actually an unknown (and indeed the entire model is an approximation of the real channel). It was found that in simulation, choosing $d=0.002$ or $d=0.004$ produced reasonable results, possibly due to the symmetry of the RHS of (\ref{eq:hf_model_freq}), and the dominance of channel over resampler noise at low SNRs. If $d$ is approximated with a known value, the $(A^HA)^{-1}A^H$ term can then be precomputed as all the parameters of $A$ are known.
 
 This algorithm is denoted \emph{lin2ls}.  It's BER performance is plotted in Figure \ref{fig:equaliser_curves} and three resamplers summarised in Table \ref{tab:resampler_summary}.
 

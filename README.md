@@ -19,6 +19,7 @@ Some small projects on miscellaneous topics.
 | Nov 2024 | tibor | Attempts to answer interesting DSP questions posed by Tibor |
 | Feb 2025 | fm_snr | My derivation of FM SNR |
 | Mar 2025 | ml_amdet | Simple ML example of an AM (diode) detector |
+| Jul 2026 | uhf_pa | 450 MHz UHF PA design exercise |
 
 I build the Latex documents using Texmaker:
 

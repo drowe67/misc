@@ -1,0 +1,119 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{graphicx} 
+\usepackage{siunitx}  
+\usepackage{circuitikz}
+
+\begin{document}
+
+\title{UHF PA Design Exercise}
+\maketitle
+
+\begin{figure}[h]
+    \centering
+\begin{circuitikz}[american, scale=1.1, transform shape]
+
+    % ==========================================
+    % 1. DRIVER STAGE (Generic Gain Block)
+    % ==========================================
+    % Place the amplifier block at the start
+    \draw (-6.5, 0) node[buffer] (Driver) {Driver};
+    \draw (-8.5, 0) node[left] {RF IN} -- (Driver.west);
+    
+    % DC Bias / Power for the Gain Block (Top pin of the amplifier)
+    \draw (Driver.north) -- (-6.5, 1) to[short] (-6.5, 1.2) node[above] {$V_{\text{cc}}$};
+    
+    % Ground connection for the Gain Block (Bottom pin)
+    \draw (Driver.south) -- (-6.5, -0.8) node[ground] {};
+
+    % ==========================================
+    % 2. INTER-STAGE MATCHING
+    % ==========================================
+    % Output of Driver connects to an interstage matching / DC block network
+    \draw (Driver.out) to[C, l=$C_{\text{block}}$] (-4.5, 0)
+                      to[L, l_=$L_{\text{inter}}$] (-2.5, 0) 
+                      node[circle, fill, inner sep=1pt] (In_node) {};
+                      
+    % Shunt capacitor to ground for impedance tuning
+    \draw (In_node) to[C, l=$C_{\text{tune}}$] (-2.5, -1) node[ground] {};
+
+    % ==========================================
+    % 3. FINAL OUTPUT STAGE (RD01MUS2)
+    % ==========================================
+    % Transistor Node
+    \draw (0,0) node[nmosd] (Q) {};
+    \node[right=0.2cm, font=\bfseries] at (Q.text) {Q1};
+    \node[right=0.2cm, yshift=-0.4cm, font=\small] at (Q.text) {RD01MUS2};
+
+    % Ground the Source
+    \draw (Q.source) -- (0,-1) node[ground] {};
+
+    % Connect Inter-stage to Gate via Bias Node
+    \draw (In_node) -- (Q.gate);
+    \draw (-1, 0) node[circle, fill, inner sep=1pt] (G_bias) {};
+    
+    % Gate Bias Feed
+    \draw (G_bias) -- (-1, 1.2) to[R, l=$R_{\text{bias}}$] (-1, 2.3) 
+          to[short] (-1, 2.6) node[above] {$V_{\text{gg}}$};
+
+    % Drain Output Side (DC Feed & Output Matching)
+    \draw (Q.drain) -- (0,1) node[circle, fill, inner sep=1pt] (D_node) {};
+    
+    % DC Supply Feed via RF Choke
+    \draw (D_node) to[L, l=$RFC$] (0, 2.3) node[circle, fill, inner sep=1pt] (Vdd_node) {};
+    \draw (Vdd_node) to[short] (0, 2.6) node[above] {$V_{\text{dd}}$};
+    \draw (Vdd_node) to[C, l=$C_{\text{bypass}}$] (1.2, 2.3) node[ground] {};
+    
+    % Output Matching Network
+    \draw (D_node) to[C, l=$C_{\text{out1}}$] (2,1) node[circle, fill, inner sep=1pt] (Out_node) {};
+    \draw (Out_node) to[L, l=$L_{\text{out}}$] (2,-0.2) node[ground] {};
+    \draw (Out_node) to[C, l=$C_{\text{out2}}$] (4,1) 
+          to[short] (4.5,1) 
+          node[right] {RF OUT};
+
+\end{circuitikz}
+
+    \caption{Two stage prototype PA.}
+    \label{fig:my_image_label}
+\end{figure}
+
+\begin{figure}[h]
+    \centering              
+    \includegraphics[width=0.6\textwidth]{board1}
+    \caption{Two stage PA PCB used for prototyping, modified to have an interstage and HP final stage match. Trimmer provides final stage bias adjustment.}
+    \label{fig:my_image_label}
+\end{figure}
+
+\begin{figure}[h]
+    \centering              
+    \includegraphics[width=0.6\textwidth]{board2}
+    \caption{DC blocking capacitor (lower middle) that provides AC ground for interstage match shunt inductor is connected near the near gate ground DC blocking capacitor (lower RHS) to minimise current loop.}
+    \label{fig:my_image_label}
+\end{figure}
+
+\begin{figure}[h]
+    \centering              
+    \includegraphics[width=0.6\textwidth]{board3}
+    \caption{Output shunt matching component (in this iteration an inductor) is connected directly to source to minimise current loop.}
+    \label{fig:my_image_label}
+\end{figure}
+
+\begin{figure}[h]
+    \centering              
+    \includegraphics[width=1.2\textwidth]{tracking1}
+    \caption{Purple original design, no matches, straight through 50 ohm design. Blue is with gate degeneration 10 ohm resistor, but no matching. Yellow is the completed first prototype with high pass interstage match and high pass output match.}
+    \label{fig:my_image_label}
+\end{figure}
+
+\begin{figure}[h]
+    \centering              
+    \includegraphics[width=1.2\textwidth]{tracking2}
+    \caption{Performance across drive levels. Blue -20 \si{dBm}, pink -10 \si{dBm}, yellow 0 \si{dBm} drive (compressed). When compressed, power gain is 30 \si{dB}, when uncompressed 36 \si{dB}.}
+    \label{fig:my_image_label}
+\end{figure}
+
+TODO: KA70EI blog, good circuit
+
+\end{document}

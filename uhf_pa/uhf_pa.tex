@@ -11,6 +11,24 @@
 \title{UHF PA Design Exercise}
 \maketitle
 
+This document is a record of some experiments with a two stage PA board using a generic gain block as a driver, and RDMUS01 mosfet final stage, conducted in July 2026 by Tibor, with David taking notes.  Some details of the module including a complete schematic are presented on the \href{https://ka7oei.blogspot.com/2023/04/exploring-1-930mhz-2w-rf-broadband.html}{KA7OEI blog}. The aim was to develop a stable, 1W PA for 400-450 MHz (including the Ham 70 \si{cm} band). The general approach was:
+\begin{itemize}
+\item Start with the generic unmatched, broadband module (untuned 50 \si{\ohm} matches throughout).
+\item Add a $R_{deg}=20$ \si{\ohm} degeneration resistor across the mosfet gate to ensure stability (and the cost of some gain). Reducing this to 10 ohms resulted in insufficient drive to the final stage.
+\item Build an interstage match to transform the 50 ohm driver output impedance to 20 \si{\ohm} mosfet gate impedance.
+\item We chose $V_{dd}=7.6$ \si{V} such that a 2x swing on the mosfet output will be well less than $V_{vddmax}=25$ \si{V}.
+\item We chose an output impedance for the mosfet of 20 \si{\ohm} to obtain 1W.
+\item We designed an output match for 20 to 50 \si{\ohm}. This was initially a L network, we later experimented with a $\pi$ network, which had better harmonic suppression.
+\end{itemize}
+
+General Tips:
+\begin{itemize}
+\item Use vaseline as a non-toxic thermal grease between mosfet and heatsink.
+\item Use physically large, high $Q\approx100$ commercial inductors for matching. Not hand wound air core or wire loops, as they are excellent antennas.
+\item Use 100 \si{pF} bypass capacitors rather than 1 \si{nF}, as lower impedance. 
+\item Matching C in output stage was adjusted to achieve flat gain between $400-450$ \si{MHz}.
+\end{itemize}
+
 \begin{figure}[h]
     \centering
 \begin{circuitikz}[american, scale=1.1, transform shape]
@@ -75,35 +93,35 @@
 
 \end{circuitikz}
 
-\caption{Two stage prototype PA. An input match is formed from $C_1$ and $L_1$, and an output match by $C_2$ and $L_2$, both with high pass topologies. $R_{deg}$ is the degeneration resistance that ensures stability. $V_{gg}$ is the DC gate bias. $C_{b}$ are DC blocks. The layout should make the current loop $i_{in}$ as small as possible.}
+\caption{Two stage prototype PA. An input match is formed from $C_1$ and $L_1$, and an output match by $C_2$ and $L_2$, both with high pass topologies. $R_{deg}$ is the degeneration resistance that ensures stability. $V_{gg}$ is the DC gate bias. $C_{b1}$ and $C_{b2}$ are DC blocks. The layout should make the current loop $i_{in}$ as small as possible.}
     \label{fig:my_image_label}
 \end{figure}
 
 \begin{figure}[h]
     \centering              
     \includegraphics[width=0.6\textwidth]{board1}
-    \caption{Two stage PA PCB used for prototyping, modified to have an interstage and final stage high pass matches. Trimmer provides bias adjustment $V_{gg}$.}
+    \caption{Two stage PA PCB used for prototyping, modified to have an interstage and final stage high pass matches. Trimmer provides $V_{gg}$ gate bias adjustment.}
     \label{fig:my_image_label}
 \end{figure}
 
 \begin{figure}[h]
     \centering              
     \includegraphics[width=0.6\textwidth]{board2}
-    \caption{DC blocking capacitor (lower middle) that provides AC ground for interstage match shunt inductor is connected near the near gate ground DC blocking capacitor (lower RHS) to minimise current loop.}
+    \caption{Interstage match layout: $C_{b1}$ (lower middle) and $C_{b2}$ (lower right) ground nodes connected close together to minimise current loop $i_{in}$. $R_{deg}$ is on RHS, $C_1$ in middle.}
     \label{fig:my_image_label}
 \end{figure}
 
 \begin{figure}[h]
     \centering              
     \includegraphics[width=0.6\textwidth]{board3}
-    \caption{Output shunt matching component (in this iteration an inductor) is connected directly to source to minimise current loop.}
+    \caption{Output shunt matching component (in this iteration an inductor) is connected directly to the mosfet source pin to minimise the current loop. A better ground connection was later found to be the plane area (top), which is connected to the pad on the bottom of the mosfet.}
     \label{fig:my_image_label}
 \end{figure}
 
 \begin{figure}[h]
     \centering              
     \includegraphics[width=1.2\textwidth]{tracking1}
-    \caption{Purple original design, no matches, straight through 50 ohm design. Blue is with gate degeneration 10 ohm resistor, but no matching. Yellow is the completed first prototype with high pass interstage match and high pass output match.}
+    \caption{Purple unmodified original, no matches, straight through 50 ohm design. Blue is with gate degeneration 10 ohm resistor, but no matching. Yellow is the completed first prototype with high pass interstage match and high pass output match.}
     \label{fig:my_image_label}
 \end{figure}
 
@@ -113,7 +131,5 @@
     \caption{Performance across drive levels. Blue -20 \si{dBm}, pink -10 \si{dBm}, yellow 0 \si{dBm} drive (compressed). When compressed, power gain is 30 \si{dB}, when uncompressed 36 \si{dB}.}
     \label{fig:my_image_label}
 \end{figure}
-
-TODO: KA70EI blog, good circuit
 
 \end{document}
